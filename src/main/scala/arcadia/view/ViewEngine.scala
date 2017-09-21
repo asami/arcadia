@@ -12,7 +12,7 @@ import arcadia.context._
 /*
  * @since   Jul.  8, 2017
  *  version Aug. 30, 2017
- * @version Sep.  3, 2017
+ * @version Sep. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -69,15 +69,31 @@ class ViewEngine(
     throw new IllegalStateException(p.toMessage) // WebViewNotFoundFault(p.toMessage).RAISE
   }
 
-  def applyOption(p: Parcel): Option[Content] = findView(p).fold {
-    extend.toStream.flatMap(_.applyOption(p)).headOption
-  } { content =>
-    val t = theme getOrElse PlainTheme
-    val render = (p.render getOrElse PlainHtml).withThemePartials(t, partials)
-    val parcel  = p.withRenderStrategy(render)
-    val page = getLayout(parcel).getOrElse(content)
-    Some(page.apply(this, parcel))
+  def applyOption(p: Parcel): Option[Content] = {
+    val render = {
+      val t = theme getOrElse PlainTheme
+      (p.render getOrElse PlainHtml).withThemePartials(t, partials)
+    }
+    val parcel = p.withRenderStrategy(render)
+    findView(p).fold {
+      extend.toStream.flatMap(_.applyOption(p)).headOption orElse {
+        p.getEffectiveModel map { m =>
+          getLayout(parcel).map(_.apply(this, parcel)) getOrElse {
+            StringContent(MimeType.text_html, None, m.render(render).toString)
+          }
+        }
+      }
+    } { content =>
+      val page = getLayout(parcel).getOrElse(content)
+      Some(page.apply(this, parcel))
+    }
   }
+
+  def renderOption(p: Parcel): Option[NodeSeq] = findView(p).
+    fold(
+      extend.toStream.flatMap(_.renderOption(p)).headOption
+    )(page =>
+      Some(page.render(this, p)))
 
   def shutdown(): Unit = _template_engine.shutdown()
 
@@ -127,7 +143,8 @@ object ViewEngine {
     theme: Option[RenderTheme],
     slots: Vector[ViewEngine.Slot], // pages, components
     layouts: Map[LayoutKind, LayoutView],
-    partials: Partials
+    partials: Partials,
+    components: Components
   ) {
     // def findView(parcel: Parcel): Option[View] =
     //   slots.find(_.isAccept(parcel)).map(_.view)
@@ -143,16 +160,18 @@ object ViewEngine {
   object Rule {
     def create(
       theme: RenderTheme,
-      slots: Seq[(Guard, View)],
+      slots: Seq[Slot],
       layouts: Map[LayoutKind, LayoutView],
-      partials: Partials
-    ): Rule = Rule(Some(theme), slots.toVector.map(Slot(_)), layouts, partials)
+      partials: Partials,
+      components: Components
+    ): Rule = Rule(Some(theme), slots.toVector, layouts, partials, components)
 
     def create(head: (Guard, View), tail: (Guard, View)*): Rule = Rule(
       None,
       (head +: tail.toVector).map(Slot(_)),
       Map.empty,
-      Partials.empty
+      Partials.empty,
+      Components.empty
     )
   }
 

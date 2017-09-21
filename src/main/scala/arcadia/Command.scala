@@ -1,14 +1,17 @@
 package arcadia
 
-import org.goldenport.record.v2.Record
-import org.goldenport.values.ResourceName
+import org.goldenport.record.v2.{Record, Schema}
+import org.goldenport.i18n.I18NElement
+import arcadia.domain._
 import arcadia.view._
 import arcadia.view.ViewEngine._
 import arcadia.model._
+import arcadia.scenario.Scenario
 
 /*
  * @since   Jul. 16, 2017
- * @version Aug. 29, 2017
+ *  version Aug. 29, 2017
+ * @version Sep. 20, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Command {
@@ -31,26 +34,42 @@ case class SetupCommand() extends Command {
 case class DashboardCommand() extends Command {
 }
 
-case class ResourceDetailCommand(
-  resource: ResourceName,
+case class EntityDetailCommand(
+  klass: DomainEntityType,
   record: Record
 ) extends Command {
-  override lazy val getModel = Some(ResourceDetailModel(resource, record))
+  override lazy val getModel = Some(EntityDetailModel(klass, record))
 }
 
-case class ResourceListCommand(
-  resource: ResourceName,
+case class EntityListCommand(
+  klass: DomainEntityType,
   records: List[Record],
   transfer: Transfer
 ) extends Command {
-  override lazy val getModel = Some(ResourceListModel(resource, records, transfer))
+  override lazy val getModel = Some(EntityListModel(klass, records, transfer))
 }
-object ResourceListCommand {
+object EntityListCommand {
   def apply(
-    resource: ResourceName,
+    klass: DomainEntityType,
     records: Seq[Record],
     transfer: Transfer
-  ): ResourceListCommand = ResourceListCommand(resource, records.toList, transfer)
+  ): EntityListCommand = EntityListCommand(klass, records.toList, transfer)
+}
+
+case class PropertySheetCommand(
+  caption: Option[I18NElement],
+  schema: Option[Schema],
+  record: Record
+) extends Command {
+  override lazy val getModel = Some(PropertySheetModel(caption, schema, record))
+}
+
+case class PropertyTableCommand(
+  caption: Option[I18NElement],
+  schema: Option[Schema],
+  records: List[Record]
+) extends Command {
+  override lazy val getModel = Some(PropertyTableModel(caption, schema, records))
 }
 
 case class RecordCommand(
@@ -67,4 +86,9 @@ case class RecordsCommand(
 
 object RecordsCommand {
   def apply(records: Seq[Record]): RecordsCommand = RecordsCommand(records.toList)
+}
+
+case class ScenarioCommand(
+  scenario: Scenario
+) {
 }

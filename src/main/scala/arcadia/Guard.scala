@@ -4,7 +4,8 @@ import arcadia.model._
 
 /*
  * @since   Jul. 15, 2017
- * @version Aug. 29, 2017
+ *  version Aug. 29, 2017
+ * @version Sep. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Guard {
@@ -28,12 +29,17 @@ case class OperationNameGuard(pathname: String) extends Guard {
   def isAccept(p: Parcel) = p.getOperationName == Some(pathname)
 }
 
+case class ModelNameGuard(name: String) extends Guard {
+  def isAccept(p: Parcel) = p.getEffectiveModel.fold(false)(x =>
+    x.featureName == name || x.featureNameAliases.exists(_ == name))
+}
+
 case object DashboardModelGuard extends Guard {
-  def isAccept(p: Parcel) = p.model.fold(false)(_.isInstanceOf[IDashboardModel])
+  def isAccept(p: Parcel) = p.getEffectiveModel.fold(false)(_.isInstanceOf[IDashboardModel])
 }
 
 case object AllModelGuard extends Guard {
-  def isAccept(p: Parcel) = p.model.isDefined
+  def isAccept(p: Parcel) = p.getEffectiveModel.isDefined
 }
 
 object NotImplementedYetGuard extends Guard {

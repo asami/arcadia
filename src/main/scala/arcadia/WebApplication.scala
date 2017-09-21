@@ -14,10 +14,12 @@ import arcadia.context._
 import arcadia.controller._
 import arcadia.view._
 import arcadia.view.ViewEngine._
+import arcadia.scenario._
 
 /*
  * @since   Jul. 15, 2017
- * @version Aug. 29, 2017
+ *  version Aug. 29, 2017
+ * @version Sep. 20, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -49,7 +51,7 @@ object WebApplication {
       }
       new URLTemplateSource(url)
     }
-    val resourcedetailview = ResourceDetailView(source("plain/detail.jade")).gv
+    val entitydetailview = EntityDetailView(source("plain/detail.jade")).gv
       // val source = {
       //   if (true) {
       //     val filename = "/Users/asami/src/Project2017/EverforthFramework/src/main/resources/com/everforth/everforth/view/plain/detail.jade"
@@ -59,7 +61,7 @@ object WebApplication {
       //     new URLTemplateSource(url)
       //   }
       // }
-    val resourcelistview = ResourceListView(source("plain/list.jade")).gv
+    val entitylistview = EntityListView(source("plain/list.jade")).gv
       // val source = {
       //   if (true) {
       //     val filename = "/Users/asami/src/Project2017/EverforthFramework/src/main/resources/com/everforth/everforth/view/plain/list.jade"
@@ -72,11 +74,12 @@ object WebApplication {
     val dashboardview = DashboardView(source("plain/dashboard.jade")).gv
     val modelview = ModelView(source("plain/model.jade")).gv
     val view = ViewEngine.Rule.create(
-      resourcedetailview,
-      resourcelistview,
-      dashboardview,
+      entitydetailview,
+      entitylistview, // TODO component
+      dashboardview, // TODO component
       modelview
     )
+    val scenario = ScenarioEngine.Rule.empty
     val config = WebApplicationConfig.create("Plain")
     WebApplication("plain", None, config, standardControllerRule, view)
   }
@@ -208,10 +211,10 @@ object WebApplication {
       get_pathnode(root_node, path).map(to_children).orZero
     }
 
-    def apply(): WebApplication = {
+    def apply(platform: PlatformContext): WebApplication = {
       case class Z(views: Vector[(Guard, View)] = Vector.empty) {
-        def r: Seq[(Guard, View)] = views ++ Vector(
-          AssetView(base_url).gv
+        def r: Seq[Slot] = views.map(Slot(_)) ++ Vector(
+          Slot(AssetView(base_url).gv)
         )
         def +(rhs: T) = {
           if (is_html(rhs))
@@ -228,8 +231,8 @@ object WebApplication {
           val src = to_template_source(p)
           name match {
             case "index" => IndexView(src).gv
-            case "detail" => ResourceDetailView(src).gv
-            case "list" => ResourceListView(src).gv
+//            case "detail" => ResourceDetailView(src).gv 
+//            case "list" => ResourceListView(src).gv
             case "dashboard" => DashboardView(src).gv
             case m => PageView(m, src).gv
           }
@@ -239,22 +242,33 @@ object WebApplication {
         }
       }
       val view = {
-        val theme = PaperDashboardTheme // TODO
-        val slots = root_children./:(Z())(_+_).r
+        val applicationslots = root_children./:(Z())(_+_).r
         val layouts = build_layouts
         val partials = build_partials
-        ViewEngine.Rule.create(theme, slots, layouts, partials)
+        val comps = build_components
+        val compslots = comps.toSlots
+        val theme = PaperDashboardTheme // TODO
+        val slots = applicationslots ++ compslots
+        ViewEngine.Rule.create(theme, slots, layouts, partials, comps)
       }
-      val controller = WebApplication.standardControllerRule
+      val scenariorule = ScenarioEngine.Rule.create() // TODO
+      val scenario = new ScenarioEngine(platform, scenariorule)
+      val controller = {
+        WebApplication.standardControllerRule.append(
+          ScenarioController(scenario).gc
+        )
+      }
       val config = build_config
       WebApplication(applicationName, version, config, controller, view)
     }
 
-    private def _is_view(s: String, t: T) =
-      s == namebody(t) && getNameSuffix(t).fold(false)(suffix =>
-        WebModule.templateSuffixes.contains(suffix) ||
-          WebModule.htmlSuffixes.contains(suffix)
-      )
+    private def _is_view(s: String, t: T): Boolean =
+      s == namebody(t) && _is_view(t)
+
+    private def _is_view(t: T): Boolean = getNameSuffix(t).fold(false)(suffix =>
+      WebModule.templateSuffixes.contains(suffix) ||
+        WebModule.htmlSuffixes.contains(suffix)
+    )
 
     protected def build_config: WebApplicationConfig = {
       val a = _get_rule("WEB-INF/webapp.conf")
@@ -297,6 +311,20 @@ object WebApplication {
       }
       get_pathnode(PathName("WEB-INF/partials")).
         map(x => to_children(x)./:(Z())(_+_).r).getOrElse(Partials.empty)
+    }
+
+    protected def build_components: Components = {
+      case class Z(m: Vector[ComponentView] = Vector.empty) {
+        val r = Components(m)
+        def +(rhs: T) = {
+          if (_is_view(rhs))
+            Z(m :+ ComponentView.create(namebody(rhs), to_template_source(rhs)))
+          else
+            this
+        }
+      }
+      get_pathnode(PathName("WEB-INF/components")).
+        map(x => to_children(x)./:(Z())(_+_).r).getOrElse(Components.empty)
     }
   }
 }

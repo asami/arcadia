@@ -3,6 +3,7 @@ package arcadia.view
 import scala.xml.NodeSeq
 import java.net.URL
 import org.fusesource.scalate._
+import org.goldenport.exception.RAISE
 import org.goldenport.Strings
 import com.asamioffice.goldenport.io.UURL
 import arcadia._
@@ -13,12 +14,14 @@ import org.goldenport.util.{StringUtils, UrlUtils}
 
 /*
  * @since   Jul. 15, 2017
- * @version Aug. 30, 2017
+ *  version Aug. 30, 2017
+ * @version Sep. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
   def guard: Guard
   def apply(engine: ViewEngine, parcel: Parcel): Content
+  def render(engine: ViewEngine, parcel: Parcel): NodeSeq
   def gv: (Guard, View) = (guard, this)
 }
 
@@ -41,7 +44,7 @@ abstract class TemplateViewBase(template: TemplateSource) extends View() {
   }
 
   private def _model_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
-    parcel.model.map(model_bindings(strategy, _)) getOrElse Map.empty
+    parcel.getEffectiveModel.map(model_bindings(strategy, _)) getOrElse Map.empty
 
   protected def model_bindings(strategy: RenderStrategy, model: Model): Map[String, AnyRef] =
     model.viewBindings(strategy)
@@ -60,12 +63,12 @@ case class IndexView(template: TemplateSource) extends TemplateViewBase(template
   val guard = CommandGuard(classOf[IndexCommand])
 }
 
-case class ResourceDetailView(template: TemplateSource) extends TemplateViewBase(template) {
-  val guard = CommandGuard(classOf[ResourceDetailCommand])
+case class EntityDetailView(template: TemplateSource) extends TemplateViewBase(template) {
+  val guard = CommandGuard(classOf[EntityDetailCommand])
 }
 
-case class ResourceListView(template: TemplateSource) extends TemplateViewBase(template) {
-  val guard = CommandGuard(classOf[ResourceListCommand])
+case class EntityListView(template: TemplateSource) extends TemplateViewBase(template) {
+  val guard = CommandGuard(classOf[EntityListCommand])
 }
 
 case class DashboardView(template: TemplateSource) extends TemplateViewBase(template) {
@@ -86,6 +89,8 @@ case class HtmlView(url: URL, pathname: Option[String] = None) extends View() {
 
   def apply(engine: ViewEngine, parcel: Parcel): Content =
     BinaryContent(MimeType.text_html, new UrlBag(url))
+
+  def render(engine: ViewEngine, parcel: Parcel): NodeSeq = RAISE.notImplementedYetDefect
 }
 
 case class AssetView(baseUrl: URL) extends View() {
@@ -111,6 +116,8 @@ case class AssetView(baseUrl: URL) extends View() {
     val url = new URL(baseUrl, c.pathname)
     BinaryContent(mime, new UrlBag(url))
   }
+
+  def render(engine: ViewEngine, parcel: Parcel): NodeSeq = RAISE.notImplementedYetDefect
 }
 object AssetView {
   def fromHtmlFilenameOrUri(p: String): AssetView = {
@@ -125,4 +132,16 @@ case class LayoutView(template: TemplateSource) extends TemplateViewBase(templat
 
 case class PartialView(template: TemplateSource) extends TemplateViewBase(template) {
   val guard = NotImplementedYetGuard
+}
+
+case class ComponentView(guard: Guard, template: TemplateSource) extends TemplateViewBase(template) {
+}
+object ComponentView {
+  // val RESOURCE_LIST = "resource_list"
+  // val RESOURCE_DETAIL = "resource_detail"
+  // val RECORD_LIST = "record_list"
+  // val RECORD_DETAIL = "record_detail"
+
+  def create(name: String, template: TemplateSource): ComponentView =
+    ComponentView(ModelNameGuard(name), template)
 }

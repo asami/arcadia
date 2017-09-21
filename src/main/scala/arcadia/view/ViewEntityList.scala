@@ -4,11 +4,11 @@ import arcadia.model._
 
 /*
  * @since   Aug.  6, 2017
- * @version Aug. 29, 2017
+ * @version Sep. 20, 2017
  * @author  ASAMI, Tomoharu
  */
 
-case class ViewResourceList(model: ResourceListModel, strategy: RenderStrategy) {
+case class ViewEntityList(model: EntityListModel, strategy: RenderStrategy) {
   def first: ViewObject = apply(0)
   def second: ViewObject = apply(1)
   def third: ViewObject = apply(2)

@@ -2,10 +2,11 @@ package arcadia.domain
 
 import java.net.URI
 import org.goldenport.record.v2.Record
+import org.goldenport.values.ResourceName
 
 /*
  * @since   Aug. 30, 2017
- * @version Sep.  4, 2017
+ * @version Sep. 20, 2017
  * @author  ASAMI, Tomoharu
  */
 trait DomainObject {
@@ -39,3 +40,11 @@ object DomainObjectId {
     def s = "id undefined*"
   }
 }
+
+case class DomainEntityType(v: String) {
+  lazy val resouceName: ResourceName = ResourceName(v)
+}
+object DomainEntityType {
+}
+
+case class DomainEntityId(klass: DomainEntityType, id: DomainObjectId)

@@ -4,7 +4,8 @@ import arcadia._
 
 /*
  * @since   Jul. 15, 2017
- * @version Aug. 29, 2017
+ *  version Aug. 29, 2017
+ * @version Sep. 17, 2017
  * @author  ASAMI, Tomoharu
  */
 class ControllerEngine(
@@ -24,6 +25,8 @@ object ControllerEngine {
   case class Rule(slots: Vector[ControllerEngine.Slot]) {
     def findController(parcel: Parcel): Option[Controller] =
       slots.find(_.isAccept(parcel)).map(_.controller)
+
+    def append(p: (Guard, Controller)): Rule = copy(slots = slots :+ Slot(p))
   }
   object Rule {
     def create(slots: (Guard, Controller)*): Rule = Rule(slots.toVector.map(Slot(_)))

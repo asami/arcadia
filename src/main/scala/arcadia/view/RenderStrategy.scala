@@ -10,7 +10,8 @@ import arcadia.view.ViewEngine._
 
 /*
  * @since   Jul. 31, 2017
- * @version Aug. 29, 2017
+ *  version Aug. 29, 2017
+ * @version Sep. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -19,8 +20,10 @@ case class RenderStrategy(
   locale: Locale,
   sectionLevel: Option[Int],
   theme: RenderTheme,
+  tableKind: TableKind,
   application: WebApplicationRule,
   partials: Partials,
+  components: Components,
   context: Option[ViewContext]
 ) {
   def html = copy(scope = Html)
@@ -161,6 +164,8 @@ case object PaperDashboardTheme extends RenderTheme {
 , body: => Node): Node = kind match {
     case StandardTable => _table_container_standard(body)
     case TabularTable => _table_container_card(body) // TODO
+    case PropertyTable => _table_container_standard(body) // TODO
+    case FormTable => _table_container_standard(body) // TODO
     case DashboardTable => _table_container_card(body)
   }
 
@@ -194,6 +199,8 @@ sealed trait TableKind {
 }
 case object StandardTable extends TableKind
 case object TabularTable extends TableKind
+case object PropertyTable extends TableKind
+case object FormTable extends TableKind
 case object DashboardTable extends TableKind
 
 /*
@@ -253,6 +260,15 @@ case class Partials(
 }
 object Partials {
   val empty = Partials(Map.empty)
+}
+
+case class Components(
+  components: Vector[ComponentView]
+) {
+  def toSlots: Vector[ViewEngine.Slot] = components.map(x => x.guard -> x).map(Slot(_))
+}
+object Components {
+  val empty = Components(Vector.empty)
 }
 
 case class ViewContext(

@@ -17,12 +17,12 @@ import arcadia.view._
 /*
  * @since   Jul. 23, 2017
  *  version Aug. 29, 2017
- * @version Sep.  2, 2017
+ * @version Sep. 17, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class WebModule() {
   import WebModule._
-  def toWebApplication: WebApplication
+  def toWebApplication(platform: PlatformContext): WebApplication
 
   protected final def is_html(p: File): Boolean =
     is_html(StringUtils.toSuffix(p.getName))
@@ -55,7 +55,7 @@ object WebModule {
 }
 
 class DirectoryWebModule(base: File) extends WebModule {
-  lazy val toWebApplication = {
+  def toWebApplication(platform: PlatformContext) = {
     val builder = new WebApplication.Builder[File]() {
       protected def base_url: URL = to_url(base)
       protected def is_html(p: File): Boolean = DirectoryWebModule.this.is_html(p)
@@ -67,7 +67,7 @@ class DirectoryWebModule(base: File) extends WebModule {
       protected def root_node: File = base
       protected def to_children(p: File): List[File] = p.listFiles.toList
     }
-    builder.apply()
+    builder.apply(platform)
   }
   // def toWebApplication = {
   //   val appname = "dashboard" // TODO
@@ -125,7 +125,7 @@ class WarWebModule(war: URL) extends WebModule {
   val bag = ProjectVersionDirectoryBag.createFromZip(basedir, war)
   lazy val module = new DirectoryWebModule(bag.homeDirectory)
 
-  lazy val toWebApplication = module.toWebApplication
+  def toWebApplication(platform: PlatformContext) = module.toWebApplication(platform)
     // val builder = new WebApplication.Builder[File]() {
     //   protected def base_url: URL = to_url(base)
     //   protected def is_html(p: File): Boolean = DirectoryWebModule.this.is_html(p)
@@ -167,5 +167,5 @@ object WarWebModule {
 }
 
 class ResourceWebModule(resourcename: String, classloader: Option[ClassLoader]) extends WebModule {
-  def toWebApplication = RAISE.notImplementedYetDefect
+  def toWebApplication(platform: PlatformContext) = RAISE.notImplementedYetDefect
 }

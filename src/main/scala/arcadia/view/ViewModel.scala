@@ -7,11 +7,14 @@ import arcadia.model._
 
 /*
  * @since   Aug.  2, 2017
- * @version Aug. 30, 2017
+ * @version Sep. 20, 2017
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
   lazy val locale = strategy.locale
+  private lazy val _view_engine = strategy.context.map(_.engine).getOrElse {
+    RAISE.noReachDefect
+  }
 
   /*
    * Render
@@ -60,8 +63,8 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   def navigationContent: NodeSeq = strategy.theme.navigation.content(this)
   def content: NodeSeq = _render_partial(strategy.partials.content)
   def contentContent: NodeSeq = model match {
-    case m: ISectionModel => render_section(m)
-    case m: IComponentModel => render_component(m)
+    case m: ISectionModel => render_view_section(m)
+    case m: IComponentModel => render_view_component(m)
     case _ => <div>No content</div>
   }
   def partial(p: PartialKind): NodeSeq = _render_partial(strategy.partials.get(p))
@@ -75,6 +78,16 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
       }
     }.getOrElse(Group(Nil))
 
+  protected def render_view_section(p: ISectionModel with Model): NodeSeq = {
+    val parcel = Parcel(p, strategy)
+    _view_engine.renderOption(parcel) getOrElse render_section(p)
+  }
+
+  protected def render_view_component(p: IComponentModel with Model): NodeSeq = {
+    val parcel = Parcel(p, strategy)
+    _view_engine.renderOption(parcel) getOrElse render_component(p)
+  }
+
   /*
    * Attributes
    */
@@ -85,12 +98,17 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   /*
    * View
    */
-  def resource(name: String): ViewResourceList = {
+  def entity(name: String): ViewEntityList = {
     model match {
       case m: IndexModel =>
-        val a = m.getResourceList(name) getOrElse ResourceListModel.empty(name)
-        ViewResourceList(a, strategy)
+        val a = m.getEntityList(name) getOrElse EntityListModel.empty(name)
+        ViewEntityList(a, strategy)
       case m => RAISE.notImplementedYetDefect
     }
   }
+
+  def assets: String =
+    strategy.context.flatMap(_.parcel.context.map(_.assets)) getOrElse {
+      "assets"
+    }
 }

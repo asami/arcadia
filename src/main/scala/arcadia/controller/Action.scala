@@ -1,16 +1,16 @@
 package arcadia.controller
 
-import org.goldenport.values.ResourceName
+import org.goldenport.i18n.{I18NString, I18NElement}
 import arcadia._
 import arcadia.context._
 import arcadia.model._
-// import com.everforth.everforth.entity.{EverforthClassKind, NewsClass, BlogClass}
-import org.goldenport.i18n.{I18NString, I18NElement}
+import arcadia.domain._
+import arcadia.scenario.ScenarioEngine
 
 /*
  * @since   Jul. 16, 2017
  *  version Aug. 29, 2017
- * @version Sep.  4, 2017
+ * @version Sep. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -21,7 +21,7 @@ case class IndexAction(
 ) extends Action {
   import IndexAction._
   def apply(parcel: Parcel): Parcel =
-    if (parcel.model.isDefined) parcel else {
+    if (parcel.getEffectiveModel.isDefined) parcel else {
       val pagename = I18NString("Index page name") // TODO
       val headline = I18NElement("Index headline") // TODO
       val resources = parcel.context.map(TakeResources(_, parcel).apply) getOrElse Nil
@@ -40,23 +40,23 @@ object IndexAction {
   case class TakeResources(context: ExecutionContext, parcel: Parcel) extends ActionOperationBase {
     override val isDemo = false
 
-    def apply: List[(String, ResourceListModel)] = {
+    def apply: List[(String, EntityListModel)] = {
       List(
-        _read_resource_list_news,
-        _read_resource_list_blog
+        _read_entity_list_news,
+        _read_entity_list_blog
       )
     }
 
-    private def _read_resource_list_news() = {
-      val rsc = ResourceName("news")
+    private def _read_entity_list_news() = {
+      val rsc = DomainEntityType("news")
       val q = Query(rsc, 0, 10, 20)
-      rsc.v -> context.readResourceList(q)
+      rsc.v -> context.readEntityList(q)
     }
 
-    private def _read_resource_list_blog() = {
-      val rsc = ResourceName("blog")
+    private def _read_entity_list_blog() = {
+      val rsc = DomainEntityType("blog")
       val q = Query(rsc, 0, 10, 20)
-      rsc.v -> context.readResourceList(q)
+      rsc.v -> context.readEntityList(q)
     }
 
 //     private def _read_resource_grid(c: EverforthClassKind) = {
@@ -78,4 +78,10 @@ object IndexAction {
 //       (c.resourceName, m)
 //     }
   }
+}
+
+case class ScenarioAction(
+  engine: ScenarioEngine
+) extends Action {
+  def apply(parcel: Parcel): Parcel = engine.apply(parcel)
 }
