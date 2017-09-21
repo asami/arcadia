@@ -2,7 +2,7 @@ organization := "org.goldenport"
 
 name := "arcadia"
 
-version := "0.0.1-SNAPSHOT"
+version := "0.0.1"
 
 scalaVersion := "2.10.3"
 // crossScalaVersions := Seq("2.10.39.2", "2.9.1")
@@ -28,4 +28,14 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "2.0" % "test"
 libraryDependencies += "junit" % "junit" % "4.10" % "test"
 
 //
-publishTo := Some(Resolver.file("asamioffice", file("target/maven-repository")))
+AutoMkcol.globalSettings
+
+credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
+
+publishTo <<= version { v: String =>
+  val backlog = "https://everforth.backlog.jp/dav/APC/maven/"
+  if (v.trim.endsWith("SNAPSHOT"))
+    Some("Backlog snapshots" at backlog + "snapshots")
+  else
+    Some("Backlog releases" at backlog + "releases")
+}
