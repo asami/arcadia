@@ -11,7 +11,7 @@ import arcadia.scenario.Scenario
 /*
  * @since   Jul. 16, 2017
  *  version Aug. 29, 2017
- * @version Sep. 20, 2017
+ * @version Sep. 23, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Command {
@@ -26,6 +26,9 @@ case class IndexCommand() extends Command {
 
 case class AssetsCommand(pathname: String) extends Command {
   override val getUseLayout = Some(false)
+}
+
+case class MaterialCommand(pathname: String) extends Command {
 }
 
 case class SetupCommand() extends Command {

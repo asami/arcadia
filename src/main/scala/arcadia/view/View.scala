@@ -15,7 +15,7 @@ import org.goldenport.util.{StringUtils, UrlUtils}
 /*
  * @since   Jul. 15, 2017
  *  version Aug. 30, 2017
- * @version Sep. 21, 2017
+ * @version Sep. 23, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -88,10 +88,48 @@ case class HtmlView(url: URL, pathname: Option[String] = None) extends View() {
   val guard = PathnameGuard(_pathname)
 
   def apply(engine: ViewEngine, parcel: Parcel): Content =
-    BinaryContent(MimeType.text_html, new UrlBag(url))
+    StringContent(MimeType.text_html, None, new UrlBag(url).toText) // UTF-8
 
   def render(engine: ViewEngine, parcel: Parcel): NodeSeq = RAISE.notImplementedYetDefect
 }
+
+case class MaterialView(baseUrl: URL) extends View() {
+  val guard = new Guard {
+    def isAccept(p: Parcel): Boolean = p.command.fold(false) {
+      case MaterialCommand(pathname) =>
+        val url = new URL(baseUrl, pathname)
+        UrlUtils.isExist(url)
+      case _ => false
+    }
+  }
+
+  def apply(engine: ViewEngine, parcel: Parcel): Content = {
+    val c = parcel.takeCommand[MaterialCommand]
+    val mime = {
+      val a = for {
+        suffix <- StringUtils.getSuffix(c.pathname)
+        context <- parcel.context
+        mime <- context.getMimetypeBySuffix(suffix)
+      } yield mime
+      a.getOrElse(MimeType.application_octet_stream)
+    }
+    val url = new URL(baseUrl, c.pathname)
+    BinaryContent(mime, new UrlBag(url))
+  }
+
+  def render(engine: ViewEngine, parcel: Parcel): NodeSeq = RAISE.notImplementedYetDefect
+}
+// case class MaterialView(url: URL, pathname: Option[String] = None) extends View() {
+//   private val _pathname = pathname getOrElse UrlUtils.takeLeafName(url)
+//   val guard = PathnameGuard(_pathname)
+
+//   val mimetype = MimeType.text_html // TODO
+
+//   def apply(engine: ViewEngine, parcel: Parcel): Content =
+//     BinaryContent(MimeType.text_html, new UrlBag(url))
+
+//   def render(engine: ViewEngine, parcel: Parcel): NodeSeq = RAISE.notImplementedYetDefect
+// }
 
 case class AssetView(baseUrl: URL) extends View() {
   val guard = new Guard {

@@ -19,7 +19,7 @@ import arcadia.scenario._
 /*
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
- * @version Sep. 20, 2017
+ * @version Sep. 23, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -42,6 +42,8 @@ object WebApplication {
   )
 
   lazy val empty = plain(PlatformContext.empty)
+
+  val materialSuffixes = Set("html", "png", "jpg", "jpeg", "gif", "css", "js")
 
   def plain(platform: PlatformContext) = {
     val basedir = platform.getDevelopDirectory
@@ -187,6 +189,9 @@ object WebApplication {
     protected def is_html(p: T): Boolean
     protected def is_template(p: T): Boolean
     protected def is_directory(p: T): Boolean
+    // protected def is_material(p: T): Boolean =
+    //   StringUtils.getSuffix(to_url(p).toString).
+    //     fold(false)(x => materialSuffixes.contains(x.toLowerCase))
     protected def name(p: T): String
     protected def namebody(p: T): String = StringUtils.pathLastComponentBody(name(p))
     protected def getNameSuffix(p: T): Option[String] = StringUtils.getSuffix(name(p))
@@ -214,7 +219,8 @@ object WebApplication {
     def apply(platform: PlatformContext): WebApplication = {
       case class Z(views: Vector[(Guard, View)] = Vector.empty) {
         def r: Seq[Slot] = views.map(Slot(_)) ++ Vector(
-          Slot(AssetView(base_url).gv)
+          Slot(AssetView(base_url).gv),
+          Slot(MaterialView(base_url).gv)
         )
         def +(rhs: T) = {
           if (is_html(rhs))
@@ -223,6 +229,8 @@ object WebApplication {
             copy(views = views :+ template_view(rhs))
           else if (is_directory(rhs))
             copy(views = views ++ directory_view(rhs))
+          // else if (is_material(rhs))
+          //   copy(views = views :+ MaterialView(to_url(rhs)).gv)
           else
             this
         }

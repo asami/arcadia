@@ -1,11 +1,12 @@
 package arcadia
 
+import com.asamioffice.goldenport.text.UPathString
 import arcadia.model._
 
 /*
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
- * @version Sep. 21, 2017
+ * @version Sep. 23, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Guard {
@@ -22,7 +23,10 @@ object CommandGuard {
 }
 
 case class PathnameGuard(pathname: String) extends Guard {
-  def isAccept(p: Parcel) = p.getOperationName == Some(pathname) // TODO
+  val operationName = UPathString.getPathnameBody(pathname)
+  def isAccept(p: Parcel) = p.getOperationName.fold(false)(op =>
+    op == pathname || op == operationName
+  )
 }
 
 case class OperationNameGuard(pathname: String) extends Guard {

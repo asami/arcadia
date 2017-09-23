@@ -15,7 +15,7 @@ import org.goldenport.record.v2.util.RecordUtils
 /*
  * @since   Aug.  1, 2017
  *  version Aug. 29, 2017
- * @version Sep. 21, 2017
+ * @version Sep. 23, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -178,7 +178,8 @@ abstract class Renderer(
       <span data-toggle="tooltip" title={s"$jst(JST) $gmt(GMT)"}>{label}</span>
     record.getFormTimestamp(column.name) map { x => 
       print(
-        DateTimeUtils.toSimpleString24Jst(x),
+//        DateTimeUtils.toSimpleString24Jst(x),
+        DateTimeUtils.toSimpleStringJst(x),
         DateTimeUtils.toSimpleStringJst(x),
         DateTimeUtils.toSimpleStringGmt(x)
       )
