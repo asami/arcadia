@@ -2,7 +2,7 @@ organization := "org.goldenport"
 
 name := "arcadia"
 
-version := "0.0.2"
+version := "0.0.3"
 
 scalaVersion := "2.10.3"
 // crossScalaVersions := Seq("2.10.39.2", "2.9.1")
@@ -22,6 +22,8 @@ libraryDependencies += "org.goldenport" %% "goldenport-record" % "1.2.1"
 libraryDependencies += "com.typesafe.play" %% "play-json" % "2.2.2" % "provided" exclude("org.scala-stm", "scala-stm_2.10.0")
 
 libraryDependencies += "org.scalatra.scalate" %% "scalate-core" % "1.8.0"
+
+libraryDependencies += "org.fusesource.scalamd" %% "scalamd" % "1.6"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "2.0" % "test"
 
