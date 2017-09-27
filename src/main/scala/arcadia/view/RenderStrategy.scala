@@ -2,16 +2,20 @@ package arcadia.view
 
 import scala.xml.{NodeSeq, Group, Elem, Node, Text}
 import java.util.Locale
-import org.goldenport.record.v2.{Record, Schema}
+import org.goldenport.exception.RAISE
+import org.goldenport.record.v2.{Record, Schema, Column}
+import org.goldenport.record.v2.util.SchemaBuilder
 import org.goldenport.value._
 import org.goldenport.util.MapUtils
 import arcadia._
+import arcadia.context._
+import arcadia.domain.DomainEntityType
 import arcadia.view.ViewEngine._
 
 /*
  * @since   Jul. 31, 2017
  *  version Aug. 29, 2017
- * @version Sep. 21, 2017
+ * @version Sep. 27, 2017
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -20,11 +24,12 @@ case class RenderStrategy(
   locale: Locale,
   sectionLevel: Option[Int],
   theme: RenderTheme,
-  tableKind: TableKind,
+  schema: SchemaRule,
   application: WebApplicationRule,
   partials: Partials,
   components: Components,
-  context: Option[ViewContext]
+  renderContext: RenderContext,
+  viewContext: Option[ViewContext]
 ) {
   def html = copy(scope = Html)
   def section = copy(scope = Section)
@@ -40,12 +45,35 @@ case class RenderStrategy(
 
   def tiny = copy(size = TinySize)
 
-  def withContext(engine: ViewEngine, parcel: Parcel) = copy(context = Some(ViewContext(engine, parcel)))
+  def tableKind = renderContext.tableKind
+
+  def withViewContext(engine: ViewEngine, parcel: Parcel) = copy(viewContext = Some(ViewContext(engine, parcel)))
   def withThemePartials(t: RenderTheme, p: Partials) = copy(
     theme = t,
     partials = p
   )
   def withApplicationRule(p: WebApplicationRule) = copy(application = p)
+  def withEntityType(p: Option[DomainEntityType]) = copy(renderContext = renderContext.withEntityType(p))
+  def withEntityType(p: DomainEntityType) = copy(renderContext = renderContext.withEntityType(p))
+
+  def forComponent(engine: ViewEngine, parcel: Parcel) = forView(engine, parcel)
+  def forView(engine: ViewEngine, parcel: Parcel) =
+    if (viewContext.fold(false)(_.isMatch(engine, parcel)))
+      this
+    else
+      copy(viewContext = Some(ViewContext(engine, parcel)))
+
+  def execute[T](pf: ExecutionContext => T): T = {
+    val a = for (vc <- viewContext; ctx <- vc.parcel.context) yield pf(ctx)
+    a getOrElse RAISE.noReachDefect
+  }
+
+  def resolveSchema: Schema = schema.resolve(renderContext)
+  def format(column: Column, rec: Record): String = {
+    rec.getOne(column.name).map {
+      case m => m.toString // TODO
+    }.getOrElse("")
+  }
 }
 
 sealed trait RenderScope {
@@ -165,6 +193,7 @@ case object PaperDashboardTheme extends RenderTheme {
     case StandardTable => _table_container_standard(body)
     case TabularTable => _table_container_card(body) // TODO
     case PropertyTable => _table_container_standard(body) // TODO
+    case EntityTable => _table_container_standard(body) // TODO
     case FormTable => _table_container_standard(body) // TODO
     case DashboardTable => _table_container_card(body)
   }
@@ -200,8 +229,91 @@ sealed trait TableKind {
 case object StandardTable extends TableKind
 case object TabularTable extends TableKind
 case object PropertyTable extends TableKind
+case object EntityTable extends TableKind
 case object FormTable extends TableKind
 case object DashboardTable extends TableKind
+
+sealed trait OperationMode {
+}
+case object MediaOperationMode extends OperationMode
+case object ConsoleOperationMode extends OperationMode
+
+sealed trait ScreenKind {
+}
+case object WebScreen extends ScreenKind
+case object TabletScreen extends ScreenKind
+case object PhoneScreen extends ScreenKind
+
+sealed trait UsageKind {
+}
+case object ListUsage extends UsageKind
+case object DetailUsage extends UsageKind
+case object CreateUsage extends UsageKind
+case object UpdateUsage extends UsageKind
+case object DeleteUsage extends UsageKind
+
+case class OperationScreenEntityUsageSchemaRule(rules: Map[OperationMode, ScreenEntityUsageSchemarRule]) {
+  def get(p: OperationMode) = rules.get(p)
+}
+object OperationScreenEntityUsageSchemaRule {
+  val empty = OperationScreenEntityUsageSchemaRule(Map.empty)
+}
+
+case class ScreenEntityUsageSchemarRule(rules: Map[ScreenKind, EntityUsageSchemaRule]) {
+  def get(p: ScreenKind) = rules.get(p)
+}
+object ScreenEntityUsageSchemarRule {
+  val empty = ScreenEntityUsageSchemarRule(Map.empty)
+}
+
+case class EntityUsageSchemaRule(rules: Map[DomainEntityType, UsageSchemaRule]) {
+  def get(p: Option[DomainEntityType]): Option[UsageSchemaRule] = p.flatMap(rules.get)
+}
+object EntityUsageSchemaRule {
+  val empty = EntityUsageSchemaRule(Map.empty)
+}
+
+case class UsageSchemaRule(rules: Map[UsageKind, Schema]) {
+  def get(p: UsageKind) = rules.get(p)
+}
+object UsageSchemaRule {
+  val empty = UsageSchemaRule(Map.empty)
+}
+
+case class SchemaRule(
+  byOperationMode: OperationScreenEntityUsageSchemaRule,
+  byScreen: ScreenEntityUsageSchemarRule, // MediaOperationMode
+  byEntity: EntityUsageSchemaRule, // WebScreen
+  byUsage: UsageSchemaRule, // common
+  default: Schema // AtomFeed
+) {
+  def resolve(p: RenderContext): Schema = resolve(
+    p.operationKind, p.screenKind, p.entityType, p.usageKind
+  )
+
+  def resolve(
+    op: OperationMode,
+    screen: ScreenKind,
+    entitytype: Option[DomainEntityType],
+    usage: UsageKind
+  ): Schema = {
+    val byscreen = byOperationMode.get(op) getOrElse byScreen
+    val byentity = byscreen.get(screen) getOrElse byEntity
+    val byusage = byentity.get(entitytype) getOrElse byUsage
+    byusage.get(usage) getOrElse default
+  }
+}
+object SchemaRule {
+  val empty = SchemaRule(
+    OperationScreenEntityUsageSchemaRule.empty,
+    ScreenEntityUsageSchemarRule.empty,
+    EntityUsageSchemaRule.empty,
+    UsageSchemaRule.empty,
+    SchemaBuilder.create(
+      // TODO
+    )
+  )
+}
 
 /*
  * Partial
@@ -271,7 +383,29 @@ object Components {
   val empty = Components(Vector.empty)
 }
 
+case class RenderContext(
+  operationKind: OperationMode,
+  screenKind: ScreenKind,
+  usageKind: UsageKind,
+  tableKind: TableKind,
+  entityType: Option[DomainEntityType]
+) {
+  def withEntityType(p: Option[DomainEntityType]) = copy(entityType = p)
+  def withEntityType(p: DomainEntityType) = copy(entityType = Some(p))
+}
+object RenderContext {
+  val empty = RenderContext(
+    MediaOperationMode,
+    WebScreen,
+    DetailUsage,
+    StandardTable,
+    None
+  )
+}
+
 case class ViewContext(
   engine: ViewEngine,
   parcel: Parcel
-)
+) {
+  def isMatch(e: ViewEngine, p: Parcel) = engine == e && parcel == p
+}

@@ -1,9 +1,10 @@
 package arcadia.model
 
-import scala.xml.{NodeSeq, Group}
+import scala.xml.{NodeSeq, Group, Text}
 import java.net.URI
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2.{Record, Schema}
+import org.goldenport.record.v2._
+import org.goldenport.record.v2.util.RecordUtils
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.util.StringUtils
 import arcadia._
@@ -14,7 +15,7 @@ import arcadia.domain._
 /*
  * @since   Jul. 29, 2017
  *  version Aug. 30, 2017
- * @version Sep. 21, 2017
+ * @version Sep. 27, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -47,16 +48,44 @@ trait IComponentModel { self: Model =>
   def caption: Option[I18NElement]
 }
 
-trait IEntityDetailModel { self: Model =>
+trait IAtomicModel { self: Model =>
+  protected def view_Bindings(strategy: RenderStrategy): Map[String, AnyRef] = Map.empty
 }
 
-trait IEntityListModel { self: Model =>
+trait IOrganismModel extends IAtomicModel { self: Model =>
+}
+
+trait IMoleculeModel extends IAtomicModel { self: Model =>
+}
+
+trait IAtomModel extends IAtomicModel { self: Model =>
+}
+
+trait ISheetModel extends IRecordModel { self: Model =>
+}
+
+trait ITableModel extends IRecordsModel { self: Model =>
+  def tableKind: TableKind
+  def thead: TableHeadModel
+  def tbody: TableBodyModel
+}
+
+trait IEntityDetailModel extends ISheetModel { self: Model =>
+}
+
+trait IEntityListModel extends ITableModel { self: Model =>
 }
 
 trait IRecordModel { self: Model =>
+  def getEntityType: Option[DomainEntityType]
+  def getSchema: Option[Schema]
+  def record: Record
 }
 
 trait IRecordsModel { self: Model =>
+  def getEntityType: Option[DomainEntityType]
+  def getSchema: Option[Schema]
+  def records: List[Record]
 }
 
 trait IDashboardModel { self: Model =>
@@ -74,17 +103,42 @@ trait IQueueSetModel { self: Model =>
 trait IFormModel { self: Model =>
 }
 
+case object EmptyModel extends Model {
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy): NodeSeq = RAISE.notImplementedYetDefect
+  protected def view_Bindings(strategy: RenderStrategy): Map[String, AnyRef] = Map.empty
+}
+
+sealed trait ValueModel extends Model with IAtomicModel
+case class SingleValueModel(datatype: DataType, v: Option[Any]) extends ValueModel {
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy): NodeSeq = Text(v.toString) // TODO
+}
+case class MultipleValueModel(datatype: DataType, v: List[Any]) extends Model with ValueModel {
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy): NodeSeq = Text(v.toString) // TODO
+}
+object ValueModel {
+  def create(column: Column, rec: Record): ValueModel =
+    if (column.isSingle)
+      SingleValueModel(column.datatype, rec.getOne(column.name))
+    else
+      MultipleValueModel(column.datatype, rec.effectiveList(column.name))
+
+  def create(p: String): ValueModel = SingleValueModel(XString, Some(p))
+}
+
 case class IndexModel(
   pageName: Option[I18NString],
   headline: Option[I18NElement],
-  entitys: List[(String, EntityListModel)],
+  entities: List[(String, EntityListModel)],
   carousel: Option[CarouselModel]
 ) extends Model with IPageModel {
   def toRecord: Record = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy): NodeSeq = RAISE.notImplementedYetDefect
   protected def view_Bindings(strategy: RenderStrategy): Map[String, AnyRef] = Map.empty
 
-  def getEntityList(name: String): Option[EntityListModel] = entitys.find(_._1 == name).map(_._2)
+  def getEntityList(name: String): Option[EntityListModel] = entities.find(_._1 == name).map(_._2)
 }
 
 case class CarouselModel()
@@ -138,11 +192,12 @@ trait DashboardModelBase extends Model with IDashboardModel with IPageModel with
 
 case class EntityDetailModel(
   caption: Option[I18NElement],
-  schema: Option[Schema],
-  klass: DomainEntityType,
+  entityType: DomainEntityType,
+  getSchema: Option[Schema],
   record: Record
 ) extends Model with IEntityDetailModel with IComponentModel {
-   protected def view_Bindings(strategy: RenderStrategy) = Map(
+  def getEntityType = Some(entityType)
+  protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_OBJECT -> ViewObject.create(record),
     PROP_VIEW_RECORD -> ViewRecord.create(record)
   )
@@ -154,23 +209,32 @@ object EntityDetailModel {
     klass: DomainEntityType,
     record: Record
   ): EntityDetailModel = EntityDetailModel(
-    Some(I18NElement(klass.v)), None, klass, record
+    Some(I18NElement(klass.v)), klass, None, record
   )
 }
 
 case class EntityListModel(
   caption: Option[I18NElement],
-  klass: DomainEntityType,
-  schema: Option[Schema],
+  entityType: DomainEntityType,
+  getSchema: Option[Schema],
   records: List[Record],
   transfer: Transfer
 ) extends Model with IEntityListModel with IComponentModel {
+  def getEntityType = Some(entityType)
   protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_LIST -> records.map(ViewObject.create),
     PROP_VIEW_RECORD -> records.map(ViewRecord.create)
   )
   def toRecord: Record = throw new UnsupportedOperationException()
-  def render(strategy: RenderStrategy): NodeSeq = throw new UnsupportedOperationException()
+  def render(strategy: RenderStrategy): NodeSeq = new Renderer(
+    strategy, None, None, None, caption
+  ){
+    protected def render_Content: NodeSeq = table(EntityTable, getSchema, records)
+  }.apply
+  lazy val effectiveSchema = getSchema.getOrElse(RecordUtils.buildSchema(records))
+  lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
+  lazy val tbody: TableBodyModel = TableBodyModel(Some(effectiveSchema), records, tableKind)
+  val tableKind: TableKind = StandardTable
 }
 object EntityListModel {
   def apply(
@@ -190,9 +254,10 @@ object EntityListModel {
 
 case class PropertySheetModel(
   caption: Option[I18NElement],
-  schema: Option[Schema],
+  getSchema: Option[Schema],
   record: Record
 ) extends Model with IRecordModel with IComponentModel {
+  def getEntityType = None
   protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORD -> ViewRecord.create(record)
   )
@@ -200,15 +265,24 @@ case class PropertySheetModel(
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, caption
   ){
-    protected def render_Content: NodeSeq = property_sheet(schema, record)
+    protected def render_Content: NodeSeq = property_sheet(getSchema, record)
   }.apply
+}
+object PropertySheetModel {
+  def apply(caption: String, schema: Schema, record: Record): PropertySheetModel = PropertySheetModel(
+    Some(I18NElement(caption)), Some(schema), record
+  )
+  def apply(record: Record): PropertySheetModel = PropertySheetModel(
+    None, None, record
+  )
 }
 
 case class PropertyTableModel(
   caption: Option[I18NElement],
-  schema: Option[Schema],
+  getSchema: Option[Schema],
   records: List[Record]
-) extends Model with IRecordModel with IComponentModel {
+) extends Model with ITableModel with IComponentModel {
+  def getEntityType = None
   protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORDS -> records.map(ViewRecord.create)
   )
@@ -216,16 +290,26 @@ case class PropertyTableModel(
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, caption
   ){
-    protected def render_Content: NodeSeq = property_table(schema, records)
+    protected def render_Content: NodeSeq = property_table(getSchema, records)
   }.apply
+  lazy val effectiveSchema = getSchema.getOrElse(RecordUtils.buildSchema(records))
+  lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
+  lazy val tbody: TableBodyModel = TableBodyModel(Some(effectiveSchema), records, tableKind)
+  val tableKind: TableKind = StandardTable
+}
+object PropertyTableModel {
+  def apply(records: List[Record]): PropertyTableModel = PropertyTableModel(
+    None, None, records
+  )
 }
 
 case class TableModel(
   caption: Option[I18NElement],
-  schema: Option[Schema],
+  getSchema: Option[Schema],
   records: List[Record],
   tableKind: TableKind
 ) extends Model with IRecordsModel with IComponentModel {
+  def getEntityType = None
   protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORDS -> records.map(ViewRecord.create)
   )
@@ -233,8 +317,11 @@ case class TableModel(
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, caption
   ){
-    protected def render_Content: NodeSeq = table(tableKind, schema, records)
+    protected def render_Content: NodeSeq = table(tableKind, getSchema, records)
   }.apply
+  lazy val effectiveSchema = getSchema.getOrElse(RecordUtils.buildSchema(records))
+  lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
+  lazy val tbody: TableBodyModel = TableBodyModel(Some(effectiveSchema), records, tableKind)
 }
 object TableModel {
   def apply(records: Seq[Record]): TableModel = TableModel(None, None, records.toList, StandardTable)
@@ -244,11 +331,117 @@ object TableModel {
     TableModel(Some(caption), Some(schema), records.toList, StandardTable)
 }
 
+case class TableHeadModel(
+  schema: Schema,
+  tableKind: TableKind
+) extends Model with IOrganismModel {
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy): NodeSeq = new Renderer(
+    strategy, None, None, None, None
+  ){
+    protected def render_Content: NodeSeq = table_head(tableKind, schema)
+  }.apply
+}
+
+case class TableHeadRecordModel(
+  schema: Schema,
+  tableKind: TableKind
+) extends Model with IRecordModel with IOrganismModel {
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy): NodeSeq = new Renderer(
+    strategy, None, None, None, None
+  ){
+    protected def render_Content: NodeSeq = table_head_record(tableKind, schema)
+  }.apply
+  def getEntityType = None
+  def record = toRecord
+  def getSchema = Some(schema)
+}
+
+case class TableBodyModel(
+  getSchema: Option[Schema],
+  records: List[Record],
+  tableKind: TableKind
+) extends Model with IRecordsModel with IOrganismModel {
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy): NodeSeq = new Renderer(
+    strategy, None, None, None, None
+  ){
+    protected def render_Content: NodeSeq = {
+      val s = getSchema.getOrElse(RecordUtils.buildSchema(records))
+      table_body(tableKind, s, records)
+    }
+  }.apply
+  def getEntityType = None
+  def record = toRecord
+}
+
+case class TableBodyRecordsModel(
+  getSchema: Option[Schema],
+  records: List[Record],
+  tableKind: TableKind
+) extends Model with IRecordModel with IOrganismModel {
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy): NodeSeq = new Renderer(
+    strategy, None, None, None, None
+  ){
+    protected def render_Content: NodeSeq = table(tableKind, getSchema, records)
+  }.apply
+  def getEntityType = None
+  def record = toRecord
+}
+
+case class TableBodyRecordModel(
+  getSchema: Option[Schema],
+  record: Record,
+  tableKind: TableKind
+) extends Model with IRecordModel with IOrganismModel {
+  def toRecord: Record = record
+  def render(strategy: RenderStrategy): NodeSeq = new Renderer(
+    strategy, None, None, None, None
+  ){
+    protected def render_Content: NodeSeq = {
+      val s = getSchema.getOrElse(RecordUtils.buildSchema(record))
+      table_body_record(tableKind, s, record)
+    }
+  }.apply
+  def getEntityType = None
+}
+
+case class TableHeadRecordDataModel(
+  value: ValueModel,
+  tableKind: TableKind
+) extends Model with IMoleculeModel {
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy): NodeSeq = new Renderer(
+    strategy, None, None, None, None
+  ){
+    protected def render_Content: NodeSeq = table_body_record_data(tableKind, value)
+  }.apply
+  def getEntityType = None
+  def record = toRecord
+}
+
+case class TableBodyRecordDataModel(
+  value: ValueModel,
+  tableKind: TableKind
+) extends Model with IMoleculeModel {
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy): NodeSeq = new Renderer(
+    strategy, None, None, None, None
+  ){
+    protected def render_Content: NodeSeq = table_body_record_data(tableKind, value)
+  }.apply
+  def getEntityType = None
+  def record = toRecord
+}
+
 case class RecordModel(
   caption: Option[I18NElement],
-  schema: Option[Schema],
+  getSchema: Option[Schema],
   record: Record
 ) extends Model with IRecordModel with IComponentModel {
+  def getEntityType = None
   protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORD -> ViewRecord.create(record)
   )
@@ -256,7 +449,7 @@ case class RecordModel(
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, caption
   ){
-    protected def render_Content: NodeSeq = table_record(schema, record)
+    protected def render_Content: NodeSeq = table_record(getSchema, record)
   }.apply
 }
 object RecordModel {
@@ -267,9 +460,10 @@ object RecordModel {
 
 case class RecordsModel(
   caption: Option[I18NElement],
-  schema: Option[Schema],
+  getSchema: Option[Schema],
   records: List[Record]
 ) extends Model with IRecordsModel with IComponentModel {
+  def getEntityType = None
   protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORDS -> records.map(ViewRecord.create)
   )
@@ -277,7 +471,7 @@ case class RecordsModel(
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, caption
   ){
-    protected def render_Content: NodeSeq = table_records(schema, records)
+    protected def render_Content: NodeSeq = table_records(getSchema, records)
   }.apply
 }
 object RecordsModel {

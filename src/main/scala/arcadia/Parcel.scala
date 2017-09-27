@@ -6,12 +6,12 @@ import org.goldenport.record.v2.Record
 import arcadia.context._
 import arcadia.domain._
 import arcadia.model.Model
-import arcadia.view.{RenderStrategy, Partials}
+import arcadia.view.{ViewEngine, RenderStrategy, Partials}
 
 /*
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
- * @version Sep. 21, 2017
+ * @version Sep. 27, 2017
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -26,6 +26,12 @@ case class Parcel(
   // def withPartials(p: Partials) = render.fold(this)(r => copy(render = Some(r.copy(partials = p))))
 
   def withApplicationRule(p: WebApplicationRule) = copy(render = render.map(_.withApplicationRule(p)))
+
+  def forComponent(model: Model) = withModel(model).copy(command = None)
+  def forView(engine: ViewEngine) =
+    render.map(x => copy(render = Some(x.forView(engine, this)))) getOrElse {
+      RAISE.noReachDefect
+    }
 
   def getEffectiveModel: Option[Model] = model orElse command.flatMap(_.getModel)
   def toMessage: String = {

@@ -15,7 +15,7 @@ import org.goldenport.record.v2.util.RecordUtils
 /*
  * @since   Aug.  1, 2017
  *  version Aug. 29, 2017
- * @version Sep. 23, 2017
+ * @version Sep. 26, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -116,16 +116,32 @@ abstract class Renderer(
     <table class={theme_table.className.table(kind)}>{
       seq(
         caption.map(x => <caption class={theme_table.className.caption(kind)}>{nodeseq(x)}</caption>),
-        Some(<thead class={theme_table.className.thead(kind)}>{table_head(kind, schema)}</thead>),
-        Some(<tbody class={theme_table.className.tbody(kind)}>{table_records(kind, schema, records)}</tbody>),
+        Some(table_head(kind, schema)),
+        Some(table_body(kind, schema, records)),
         None.map(x => <tfoot class={theme_table.className.tfoot(kind)}></tfoot>)
       )
     }</table>
   )
 
-  protected def table_head(kind: TableKind, schema: Schema): Elem = <tr class={theme_table.className.theadTr(kind)}>{
-    for (c <- schema.columns) yield <th class={theme_table.className.theadTh(kind)}>{c.label(locale)}</th>
-  }</tr>
+  protected def table_head(kind: TableKind, schema: Schema): Elem =
+    <thead class={theme_table.className.thead(kind)}>{table_head_record(kind, schema)}</thead>
+
+  protected def table_head_record(kind: TableKind, schema: Schema): Elem =
+    <tr classw={theme_table.className.theadTr(kind)}>{
+      for (c <- schema.columns) yield <th class={theme_table.className.theadTh(kind)}>{c.label(locale)}</th>
+    }</tr>
+
+  protected def table_body(kind: TableKind, schema: Schema, records: Seq[Record]): Elem =
+    <tbody class={theme_table.className.tbody(kind)}>{table_body_records(kind, schema, records)}</tbody>
+
+  protected def table_body_records(kind: TableKind, schema: Schema, records: Seq[Record]): Group =
+    Group(records.toList.map(table_body_record(kind, schema, _)))
+
+  protected def table_body_record(kind: TableKind, schema: Schema, record: Record): Elem = 
+    table_record(kind, schema, record)
+
+  protected def table_body_record_data(kind: TableKind, value: ValueModel): Elem =
+    table_data(value)
 
   protected def table_records(schema: Option[Schema], records: Seq[Record]): Group =
     schema.fold(
@@ -158,8 +174,29 @@ abstract class Renderer(
   protected def table_data(kind: TableKind, column: Column, record: Record): Elem =
     <td class={theme_table.className.tbodyTd(kind)}>{table_value(column, record)}</td>
 
+  protected def table_data(v: ValueModel): Elem =
+    <td class={theme_table.className.tbodyTd(strategy.tableKind)}>{table_value(v)}</td>
+
   protected def table_value(column: Column, record: Record): Node =
     get_table_value(column, record).getOrElse(Text(""))
+
+  protected def table_value(v: ValueModel): Node = v match {
+    case SingleValueModel(d, x) => table_value_single_option(d, x)
+    case MultipleValueModel(d, xs) => RAISE.notImplementedYetDefect
+  }
+
+  protected def table_value_single_option(datatype: DataType, v: Option[Any]): Node =
+    v.map(table_value_single(datatype, _)).getOrElse(Text(""))
+
+  protected def table_value_single(datatype: DataType, v: Any): Node =
+    datatype match {
+      case XDateTime => table_value_datetime(v)
+      case XDate => table_value_date(v)
+      case XTime => table_value_time(v)
+      case XEverforthid => table_value_everforthid(v)
+      case XLink => table_value_link(v)
+      case _ => table_value_string(v)
+    }
 
   protected def get_table_value(column: Column, record: Record): Option[Node] = {
     // TODO datetime formatting
@@ -173,53 +210,76 @@ abstract class Renderer(
     }
   }
 
-  protected def table_get_value_datetime(column: Column, record: Record): Option[Node] = {
-    def print(label: String, jst: String, gmt: String) = 
-      <span data-toggle="tooltip" title={s"$jst(JST) $gmt(GMT)"}>{label}</span>
-    record.getFormTimestamp(column.name) map { x => 
-      print(
-//        DateTimeUtils.toSimpleString24Jst(x),
-        DateTimeUtils.toSimpleStringJst(x),
-        DateTimeUtils.toSimpleStringJst(x),
-        DateTimeUtils.toSimpleStringGmt(x)
-      )
-    }
-  }
+  protected def table_get_value_datetime(column: Column, record: Record): Option[Node] =
+    record.getFormTimestamp(column.name).map(table_value_datetime)
 
   protected def table_get_value_date(column: Column, record: Record): Option[Node] =
-    record.getFormDate(column.name) flatMap {
-      case m: java.util.Date => Some(Text(DateUtils.toIsoDateString(m)))
-//      case m: DateTime => DateUtils.toIsoDateString(m)
-//      case m: LocalDate => DateUtils.toIsoDateString(m)
-      case m => table_get_value_string(column, record)
-    }
+    record.getFormDate(column.name).map(table_value_date)
+//     record.getFormDate(column.name) flatMap {
+//       case m: java.util.Date => Some(Text(DateUtils.toIsoDateString(m)))
+// //      case m: DateTime => DateUtils.toIsoDateString(m)
+// //      case m: LocalDate => DateUtils.toIsoDateString(m)
+//       case m => table_get_value_string(column, record)
+//     }
 
   protected def table_get_value_time(column: Column, record: Record): Option[Node] =
     table_get_value_string(column, record) // XXX
 
   protected def table_get_value_everforthid(column: Column, record: Record): Option[Node] =
-    record.getString(column.name) map { id =>
-      val s = id.takeRight(3)
-//      <a href={id} data-toggle="tooltip" title={id} data-placement="auto right">{s}</a>
-      val text = s"""<a href="$id">$id</a>"""
-      <span data-toggle="popover" data-content={text} data-html="true">{s}</span>
-    }
+    record.getString(column.name).map(table_value_everforthid)
 
   protected def table_get_value_link(column: Column, record: Record): Option[Node] =
-    record.getFormString(column.name) map { x =>
-      val s = try {
-        val a = new URI(x)
-        StringUtils.pathLastComponentBody(a.getPath())
-      } catch {
-        case NonFatal(e) => x
-      }
-      <span data-toggle="tooltip" title={x}>{s}</span>
-    }
+    record.getFormString(column.name).map(table_value_link)
 
   protected def table_get_value_string(column: Column, record: Record): Option[Node] =
     record.getString(column.name).map(Text(_))
 
+  protected def table_value_datetime(x: Any): Node = {
+    def print(label: String, jst: String, gmt: String) =
+      <span data-toggle="tooltip" title={s"$jst(JST) $gmt(GMT)"}>{label}</span>
+    x match {
+      case m: java.sql.Timestamp =>
+        print(
+          //        DateTimeUtils.toSimpleString24Jst(x),
+          DateTimeUtils.toSimpleStringJst(m),
+          DateTimeUtils.toSimpleStringJst(m),
+          DateTimeUtils.toSimpleStringGmt(m)
+        )
+    }
+  }
+
+  protected def table_value_date(x: Any): Node = x match {
+    case m: java.util.Date => Text(DateUtils.toIsoDateString(m))
+  }
+
+  protected def table_value_time(x: Any): Node =
+    table_value_string(x) // TODO
+
+  protected def table_value_everforthid(x: Any): Node = {
+    val id = x.toString
+    val s = id.takeRight(3)
+    //      <a href={id} data-toggle="tooltip" title={id} data-placement="auto right">{s}</a>
+    val text = s"""<a href="$id">$id</a>"""
+    <span data-toggle="popover" data-content={text} data-html="true">{s}</span>
+  }
+
+  protected def table_value_link(p: Any): Node = {
+    val x = p.toString
+    val s = try {
+      val a = new URI(x)
+      StringUtils.pathLastComponentBody(a.getPath())
+    } catch {
+      case NonFatal(e) => x
+    }
+    <span data-toggle="tooltip" title={x}>{s}</span>
+  }
+
+  protected def table_value_string(x: Any): Node = Text(x.toString)
+
   protected def property_table(schema: Option[Schema], records: Seq[Record]): NodeSeq =
+    table(PropertyTable, schema, records)
+
+  protected def property_table(schema: Schema, records: Seq[Record]): NodeSeq =
     table(PropertyTable, schema, records)
 
   protected def property_sheet(schema: Option[Schema], record: Record): NodeSeq =

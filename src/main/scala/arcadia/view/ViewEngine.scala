@@ -12,7 +12,7 @@ import arcadia.context._
 /*
  * @since   Jul.  8, 2017
  *  version Aug. 30, 2017
- * @version Sep. 21, 2017
+ * @version Sep. 27, 2017
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -27,12 +27,21 @@ class ViewEngine(
 
   lazy val slots: Vector[Slot] = rule.slots ++ extend.toVector.flatMap(_.slots)
 
+  lazy val components: Vector[Slot] = {
+    val a: Vector[Slot] = rule.components.toSlots
+    val b: Vector[Slot] = extend.toVector.flatMap(_.components)
+    a ++ b
+  }
+
   lazy val layouts: Map[LayoutKind, LayoutView] = MapUtils.complements(rule.layouts, extend.map(_.layouts))
 
   lazy val partials: Partials = rule.partials.complements(extend.map(_.partials))
 
   def findView(parcel: Parcel): Option[View] =
     slots.find(_.isAccept(parcel)).map(_.view)
+
+  def findComponent(parcel: Parcel): Option[View] =
+    components.find(_.isAccept(parcel)).map(_.view)
 
   def getLayout(parcel: Parcel): Option[LayoutView] = {
     val uselayout = parcel.command.flatMap(_.getUseLayout).getOrElse(true)
@@ -56,7 +65,8 @@ class ViewEngine(
     a.allowReload = true // TODO
     a.importStatements = a.importStatements ::: List(
       "import arcadia.view._",
-      "import arcadia.model._"
+      "import arcadia.model._",
+      "import arcadia.domain._"
     )
     a
   }
@@ -92,6 +102,12 @@ class ViewEngine(
   def renderOption(p: Parcel): Option[NodeSeq] = findView(p).
     fold(
       extend.toStream.flatMap(_.renderOption(p)).headOption
+    )(page =>
+      Some(page.render(this, p)))
+
+  def renderComponentOption(p: Parcel): Option[NodeSeq] = findComponent(p).
+    fold(
+      extend.toStream.flatMap(_.renderComponentOption(p)).headOption
     )(page =>
       Some(page.render(this, p)))
 
@@ -134,6 +150,7 @@ class ViewEngine(
 }
 object ViewEngine {
   final val PROP_VIEW_MODEL = "model"
+  final val PROP_VIEW_SERVICE = "service"
   final val PROP_VIEW_OBJECT = "o"
   final val PROP_VIEW_LIST = "list"
   final val PROP_VIEW_RECORD = "record"
@@ -189,5 +206,4 @@ object ViewEngine {
   case object DefaultLayout extends LayoutKind {
     val name = "default"
   }
-
 }

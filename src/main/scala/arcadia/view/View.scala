@@ -5,46 +5,85 @@ import java.net.URL
 import org.fusesource.scalate._
 import org.goldenport.exception.RAISE
 import org.goldenport.Strings
+import org.goldenport.record.v2._
+import org.goldenport.bag.{ChunkBag, UrlBag}
+import org.goldenport.util.{StringUtils, UrlUtils}
 import com.asamioffice.goldenport.io.UURL
 import arcadia._
 import arcadia.context._
-import arcadia.model.Model
-import org.goldenport.bag.{ChunkBag, UrlBag}
-import org.goldenport.util.{StringUtils, UrlUtils}
+import arcadia.model._
+import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL}
 
 /*
  * @since   Jul. 15, 2017
  *  version Aug. 30, 2017
- * @version Sep. 23, 2017
+ * @version Sep. 27, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
   def guard: Guard
-  def apply(engine: ViewEngine, parcel: Parcel): Content
-  def render(engine: ViewEngine, parcel: Parcel): NodeSeq
+  def apply(engine: ViewEngine, parcel: Parcel): Content =
+    execute_apply(engine, parcel.forView(engine))
+  def render(engine: ViewEngine, parcel: Parcel): NodeSeq =
+    execute_render(engine, parcel.forView(engine))
+  def render(strategy: RenderStrategy): NodeSeq = strategy.viewContext.
+    map(x => render(x.engine, x.parcel)) getOrElse {
+      RAISE.noReachDefect
+    }
   def gv: (Guard, View) = (guard, this)
+
+  protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content
+  protected def execute_render(engine: ViewEngine, parcel: Parcel): NodeSeq
+}
+
+trait ModelViewBase[T <: Model] extends View {
+  def model: T
+  def guard: Guard = ModelNameGuard(model.featureName)
+  protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content = {
+    val p = parcel.forComponent(model)
+    def s = _strategy(engine, p)
+    engine.applyOption(p) getOrElse {
+      StringContent(MimeType.text_html, None, model.render(s).toString)
+    }
+  }
+  protected def execute_render(engine: ViewEngine, parcel: Parcel): NodeSeq = {
+    val p = parcel.forComponent(model)
+    def s = _strategy(engine, p)
+    engine.renderComponentOption(p) getOrElse model.render(s)
+  }
+
+  private def _strategy(engine: ViewEngine, parcel: Parcel) = parcel.render.map(_.forComponent(engine, parcel)) getOrElse {
+    RAISE.noReachDefect
+  }
 }
 
 abstract class TemplateViewBase(template: TemplateSource) extends View() {
-  def apply(engine: ViewEngine, parcel: Parcel): Content = {
+  protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content = {
     val bindings = _build_bindings(engine, parcel)
     val s = engine.layout(template, bindings)
     StringContent(MimeType.text_html, None, s)
   }
 
-  def render(engine: ViewEngine, parcel: Parcel): NodeSeq = {
+  protected def execute_render(engine: ViewEngine, parcel: Parcel): NodeSeq = {
     val bindings = _build_bindings(engine, parcel)
     engine.render(template, bindings)
   }
 
   private def _build_bindings(engine: ViewEngine, parcel: Parcel): Map[String, AnyRef] = {
     val strategy0 = parcel.render getOrElse PlainHtml
-    val strategy = strategy0.withContext(engine, parcel)
-    _model_bindings(strategy, parcel) ++ property_Bindings(strategy)
+    val strategy = strategy0.withViewContext(engine, parcel)
+    _model_bindings(strategy, parcel) ++ property_Bindings(strategy) ++ _service_bindings(strategy, parcel)
   }
 
+  private def _service_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
+    (parcel.context orElse strategy.viewContext.flatMap(_.parcel.context)).
+      map(x => Map(PROP_VIEW_SERVICE -> ViewService(x, strategy))).
+      getOrElse(Map.empty)
+
   private def _model_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
-    parcel.getEffectiveModel.map(model_bindings(strategy, _)) getOrElse Map.empty
+    parcel.getEffectiveModel.map(model_bindings(strategy, _)) getOrElse {
+      Map(PROP_VIEW_MODEL -> ViewModel(EmptyModel, strategy))
+    }
 
   protected def model_bindings(strategy: RenderStrategy, model: Model): Map[String, AnyRef] =
     model.viewBindings(strategy)
@@ -87,10 +126,10 @@ case class HtmlView(url: URL, pathname: Option[String] = None) extends View() {
   private val _pathname = pathname getOrElse UrlUtils.takeLeafName(url)
   val guard = PathnameGuard(_pathname)
 
-  def apply(engine: ViewEngine, parcel: Parcel): Content =
+  protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content =
     StringContent(MimeType.text_html, None, new UrlBag(url).toText) // UTF-8
 
-  def render(engine: ViewEngine, parcel: Parcel): NodeSeq = RAISE.notImplementedYetDefect
+  protected def execute_render(engine: ViewEngine, parcel: Parcel): NodeSeq = RAISE.notImplementedYetDefect
 }
 
 case class MaterialView(baseUrl: URL) extends View() {
@@ -103,7 +142,7 @@ case class MaterialView(baseUrl: URL) extends View() {
     }
   }
 
-  def apply(engine: ViewEngine, parcel: Parcel): Content = {
+  protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content = {
     val c = parcel.takeCommand[MaterialCommand]
     val mime = {
       val a = for {
@@ -117,7 +156,7 @@ case class MaterialView(baseUrl: URL) extends View() {
     BinaryContent(mime, new UrlBag(url))
   }
 
-  def render(engine: ViewEngine, parcel: Parcel): NodeSeq = RAISE.notImplementedYetDefect
+  protected def execute_render(engine: ViewEngine, parcel: Parcel): NodeSeq = RAISE.notImplementedYetDefect
 }
 // case class MaterialView(url: URL, pathname: Option[String] = None) extends View() {
 //   private val _pathname = pathname getOrElse UrlUtils.takeLeafName(url)
@@ -141,7 +180,7 @@ case class AssetView(baseUrl: URL) extends View() {
     }
   }
 
-  def apply(engine: ViewEngine, parcel: Parcel): Content = {
+  protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content = {
     val c = parcel.takeCommand[AssetsCommand]
     val mime = {
       val a = for {
@@ -155,7 +194,7 @@ case class AssetView(baseUrl: URL) extends View() {
     BinaryContent(mime, new UrlBag(url))
   }
 
-  def render(engine: ViewEngine, parcel: Parcel): NodeSeq = RAISE.notImplementedYetDefect
+  protected def execute_render(engine: ViewEngine, parcel: Parcel): NodeSeq = RAISE.notImplementedYetDefect
 }
 object AssetView {
   def fromHtmlFilenameOrUri(p: String): AssetView = {
@@ -183,3 +222,72 @@ object ComponentView {
   def create(name: String, template: TemplateSource): ComponentView =
     ComponentView(ModelNameGuard(name), template)
 }
+
+trait TableViewBase extends ModelViewBase[ITableModel with Model] {
+  // lazy val schema: Schema = model.schema getOrElse {
+  //   strategy.withEntityType(model.getEntityType).resolveSchema
+  // }
+  // lazy val thead: THeadView = THeadView.create(this)
+  // lazy val tbody: TBodyView = TBodyView.create(this)
+}
+
+case class TableView(model: ITableModel with Model) extends TableViewBase {
+}
+
+case class THeadView(model: TableHeadModel) extends ModelViewBase[TableHeadModel] {
+}
+
+case class TBodyView(model: TableBodyModel) extends ModelViewBase[TableBodyModel] {
+}
+
+case class TrView(model: IRecordModel with Model) extends ModelViewBase[IRecordModel with Model] {
+}
+
+case class ThView(model: TableHeadRecordDataModel) extends ModelViewBase[TableHeadRecordDataModel] {
+}
+
+case class TdView(model: TableBodyRecordDataModel) extends ModelViewBase[TableBodyRecordDataModel] {
+}
+
+// case class THeadView(elements: List[TrView], strategy: RenderStrategy) extends ModelViewBase[{
+//   def foreach(p: TrView => Unit): Unit = elements.foreach(p)
+// }
+// object THeadView {
+//   def create(p: ITableView): THeadView = {
+//     val a = for (c <- p.schema.columns) yield {
+//       ThView(c.label(p.strategy.locale), p.strategy)
+//     }
+//     val tr = TrView(a.toList, p.strategy)
+//     THeadView(List(tr), p.strategy)
+//   }
+// }
+
+// case class TBodyView(elements: List[TrView], strategy: RenderStrategy) {
+//   def foreach(p: TrView => Unit): Unit = elements.foreach(p)
+// }
+// object TBodyView {
+//   def create(p: ITableView): TBodyView = {
+//     val a = for (x <- p.model.records) yield {
+//       val b = for (c <- p.schema.columns) yield {
+//         TdView(p.strategy.format(c, x), p.strategy)
+//       }
+//       TrView(b.toList, p.strategy)
+//     }
+//     TBodyView(a, p.strategy)
+//   }
+// }
+
+// case class TrView(elements: List[TrViewElement], strategy: RenderStrategy) {
+//   def foreach(p: TrViewElement => Unit): Unit = elements.foreach(p)
+// }
+
+// trait TrViewElement extends {
+// }
+
+// case class ThView(v: String, strategy: RenderStrategy) extends TrViewElement {
+//   override def toString(): String = v
+// }
+
+// case class TdView(v: String, strategy: RenderStrategy) extends TrViewElement {
+//   override def toString(): String = v
+// }

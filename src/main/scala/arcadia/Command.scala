@@ -11,7 +11,7 @@ import arcadia.scenario.Scenario
 /*
  * @since   Jul. 16, 2017
  *  version Aug. 29, 2017
- * @version Sep. 23, 2017
+ * @version Sep. 25, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Command {
@@ -61,18 +61,18 @@ object EntityListCommand {
 
 case class PropertySheetCommand(
   caption: Option[I18NElement],
-  schema: Option[Schema],
+  schema: Schema,
   record: Record
 ) extends Command {
-  override lazy val getModel = Some(PropertySheetModel(caption, schema, record))
+  override lazy val getModel = Some(PropertySheetModel(caption, Some(schema), record))
 }
 
 case class PropertyTableCommand(
   caption: Option[I18NElement],
-  schema: Option[Schema],
+  schema: Schema,
   records: List[Record]
 ) extends Command {
-  override lazy val getModel = Some(PropertyTableModel(caption, schema, records))
+  override lazy val getModel = Some(PropertyTableModel(caption, Some(schema), records))
 }
 
 case class RecordCommand(

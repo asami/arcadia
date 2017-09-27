@@ -3,16 +3,18 @@ package arcadia.view
 import scala.xml._
 import org.goldenport.exception.RAISE
 import arcadia._
+import arcadia.context.{Query => CQuery}
+import arcadia.domain._
 import arcadia.model._
 
 /*
  * @since   Aug.  2, 2017
- * @version Sep. 20, 2017
+ * @version Sep. 26, 2017
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
   lazy val locale = strategy.locale
-  private lazy val _view_engine = strategy.context.map(_.engine).getOrElse {
+  private lazy val _view_engine = strategy.viewContext.map(_.engine).getOrElse {
     RAISE.noReachDefect
   }
 
@@ -23,6 +25,7 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
     case m: IPageModel => render_html(m)
     case m: ISectionModel => render_section(m)
     case m: IComponentModel => render_component(m)
+    case m: IAtomicModel => render_atomic(m)
   }
 
   protected def render_html(p: IPageModel): NodeSeq = model.render(strategy.html)
@@ -50,6 +53,17 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
     }.apply
   }
 
+  protected def render_atomic(p: IAtomicModel with Model): NodeSeq = {
+    val str = strategy.content
+    val pagename = None
+    val headline = None
+    val title = None
+    val caption = None
+    new Renderer(str, pagename, headline, title, caption) {
+      protected def render_Content = p.render(str)
+    }.apply
+  }
+
   /*
    * Partial
    */
@@ -65,13 +79,14 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   def contentContent: NodeSeq = model match {
     case m: ISectionModel => render_view_section(m)
     case m: IComponentModel => render_view_component(m)
+    case m: IAtomicModel => render_view_atomic(m)
     case _ => <div>No content</div>
   }
   def partial(p: PartialKind): NodeSeq = _render_partial(strategy.partials.get(p))
 
   private def _render_partial(p: Option[PartialView]): NodeSeq = 
     p.map { view =>
-      strategy.context.fold {
+      strategy.viewContext.fold {
         RAISE.noReachDefect
       } { c =>
         view.render(c.engine, c.parcel)
@@ -88,6 +103,11 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
     _view_engine.renderOption(parcel) getOrElse render_component(p)
   }
 
+  protected def render_view_atomic(p: IAtomicModel with Model): NodeSeq = {
+    val parcel = Parcel(p, strategy)
+    _view_engine.renderOption(parcel) getOrElse render_atomic(p)
+  }
+
   /*
    * Attributes
    */
@@ -98,7 +118,7 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   /*
    * View
    */
-  def entity(name: String): ViewEntityList = {
+  def entityList(name: String): ViewEntityList = {
     model match {
       case m: IndexModel =>
         val a = m.getEntityList(name) getOrElse EntityListModel.empty(name)
@@ -108,7 +128,7 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   }
 
   def assets: String =
-    strategy.context.flatMap(_.parcel.context.map(_.assets)) getOrElse {
+    strategy.viewContext.flatMap(_.parcel.context.map(_.assets)) getOrElse {
       "assets"
     }
 }

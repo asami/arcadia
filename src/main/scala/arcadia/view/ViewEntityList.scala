@@ -4,11 +4,10 @@ import arcadia.model._
 
 /*
  * @since   Aug.  6, 2017
- * @version Sep. 20, 2017
+ * @version Sep. 24, 2017
  * @author  ASAMI, Tomoharu
  */
-
-case class ViewEntityList(model: EntityListModel, strategy: RenderStrategy) {
+case class ViewEntityList(model: EntityListModel, strategy: RenderStrategy) extends IViewTable {
   def first: ViewObject = apply(0)
   def second: ViewObject = apply(1)
   def third: ViewObject = apply(2)
