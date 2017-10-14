@@ -1,18 +1,19 @@
 package arcadia.view
 
+import scala.xml._
 import org.goldenport.record.v2._
 import arcadia.model._
 
 /*
  * @since   Sep. 24, 2017
- * @version Sep. 26, 2017
+ * @version Oct.  4, 2017
  * @author  ASAMI, Tomoharu
  */
 trait IViewTable {
   def model: ITableModel with Model
   def strategy: RenderStrategy
   def tableKind: TableKind = model.tableKind
-  def render = TableView(model).render(strategy)
+  def render: NodeSeq = TableView(model).render(strategy)
   lazy val schema: Schema = model.getSchema getOrElse {
     strategy.withEntityType(model.getEntityType).resolveSchema
   }
@@ -24,7 +25,7 @@ case class ViewTable(model: ITableModel with Model, strategy: RenderStrategy) ex
 }
 
 case class ViewTHead(model: TableHeadModel, elements: List[ViewTHeadTr], strategy: RenderStrategy) {
-  def render = THeadView(model).render(strategy)
+  def render: NodeSeq = THeadView(model).render(strategy)
   def foreach(p: ViewTHeadTr => Unit): Unit = elements.foreach(p)
 }
 object ViewTHead {
@@ -41,7 +42,7 @@ object ViewTHead {
 }
 
 case class ViewTBody(model: TableBodyModel, elements: List[ViewTBodyTr], strategy: RenderStrategy) {
-  def render = TBodyView(model).render(strategy)
+  def render: NodeSeq = TBodyView(model).render(strategy)
   def foreach(p: ViewTBodyTr => Unit): Unit = elements.foreach(p)
 }
 object ViewTBody {
@@ -60,12 +61,12 @@ object ViewTBody {
 }
 
 case class ViewTHeadTr(model: TableHeadRecordModel, elements: List[ViewTrElement], strategy: RenderStrategy) {
-  def render = TrView(model).render(strategy)
+  def render: NodeSeq = TrView(model).render(strategy)
   def foreach(p: ViewTrElement => Unit): Unit = elements.foreach(p)
 }
 
 case class ViewTBodyTr(model: TableBodyRecordModel, elements: List[ViewTrElement], strategy: RenderStrategy) {
-  def render = TrView(model).render(strategy)
+  def render: NodeSeq = TrView(model).render(strategy)
   def foreach(p: ViewTrElement => Unit): Unit = elements.foreach(p)
 }
 
@@ -73,11 +74,11 @@ trait ViewTrElement {
 }
 
 case class ViewTh(model: TableHeadRecordDataModel, v: String, strategy: RenderStrategy) extends ViewTrElement {
-  def render = ThView(model).render(strategy)
+  def render: NodeSeq = ThView(model).render(strategy)
   override def toString(): String = v
 }
 
 case class ViewTd(model: TableBodyRecordDataModel, v: String, strategy: RenderStrategy) extends ViewTrElement {
-  def render = TdView(model).render(strategy)
+  def render: NodeSeq = TdView(model).render(strategy)
   override def toString(): String = v
 }

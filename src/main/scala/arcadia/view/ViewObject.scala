@@ -10,8 +10,8 @@ import arcadia.domain._
 /*
  * @since   Jul.  9, 2017
  *  version Aug. 30, 2017
- *  version Aug. 30, 2017
- * @version Sep.  4, 2017
+ *  version Sep.  4, 2017
+ * @version Oct. 12, 2017
  * @author  ASAMI, Tomoharu
  */
 case class ViewObject(v: DomainObject) {
@@ -172,7 +172,7 @@ case class ViewObject(v: DomainObject) {
 object ViewObject {
   val empty = {
     val rec = Record.dataAppS(
-      KEY_OBJECT_ID -> DomainObjectId.undefined
+      KEY_DOMAIN_OBJECT_ID -> DomainObjectId.undefined
     )
     create(rec)
   }

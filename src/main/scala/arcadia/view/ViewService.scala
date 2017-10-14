@@ -8,7 +8,7 @@ import arcadia.model._
 
 /*
  * @since   Sep. 25, 2017
- * @version Sep. 27, 2017
+ * @version Oct. 10, 2017
  * @author  ASAMI, Tomoharu
  */
 case class ViewService(context: ExecutionContext, strategy: RenderStrategy) {
@@ -20,6 +20,10 @@ case class ViewService(context: ExecutionContext, strategy: RenderStrategy) {
   def putJson(uri: String, query: Map[String, Any] = Map.empty, form: Map[String, Any] = Map.empty): JsValue = put(uri, query, form).json
   def delete(uri: String, query: Map[String, Any] = Map.empty, form: Map[String, Any] = Map.empty): ViewResponse = ViewResponse(context.delete(uri, query, form), strategy)
   def deleteJson(uri: String, query: Map[String, Any] = Map.empty, form: Map[String, Any] = Map.empty): JsValue = delete(uri, query, form).json
+
+  def getEntity(entitytype: String, id: String): Option[ViewEntity] = strategy.execute { ctx =>
+    ctx.getEntity(DomainEntityType(entitytype), StringDomainObjectId(id)).map(ViewEntity(_, strategy))
+  }
 
   def readEntityList(
     name: String,

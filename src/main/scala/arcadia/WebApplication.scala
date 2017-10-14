@@ -5,8 +5,11 @@ import scala.xml.NodeSeq
 import java.io.File
 import java.net.URL
 import java.util.Locale
+import play.api.libs.json._
+import scalax.io._
 import org.fusesource.scalate._
 import org.fusesource.scalate.support.URLTemplateSource
+import org.goldenport.exception.RAISE
 import org.goldenport.values.{Version, PathName}
 import org.goldenport.bag.{ProjectVersionDirectoryBag, UrlBag}
 import org.goldenport.util.StringUtils
@@ -14,12 +17,14 @@ import arcadia.context._
 import arcadia.controller._
 import arcadia.view._
 import arcadia.view.ViewEngine._
+import arcadia.view.tag.Tags
 import arcadia.scenario._
 
 /*
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
- * @version Sep. 23, 2017
+ *  version Sep. 30, 2017
+ * @version Oct. 14, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -38,7 +43,9 @@ object WebApplication {
   val standardControllerRule = ControllerEngine.Rule.create(
     ResourceDetailController.gc,
     ResourceListController.gc,
-    IndexController.gc
+    IndexController.gc,
+    LoginController.gc,
+    LogoutController.gc
   )
 
   lazy val empty = plain(PlatformContext.empty)
@@ -83,7 +90,7 @@ object WebApplication {
     )
     val scenario = ScenarioEngine.Rule.empty
     val config = WebApplicationConfig.create("Plain")
-    WebApplication("plain", None, config, standardControllerRule, view)
+    WebApplication("plain", None, config, ControllerEngine.Rule.empty, view)
   }
 
   // val bootstrap = {
@@ -197,6 +204,8 @@ object WebApplication {
     protected def getNameSuffix(p: T): Option[String] = StringUtils.getSuffix(name(p))
     protected def to_url(p: T): URL
     protected def to_template_source(p: T): TemplateSource
+    protected def to_content_string(p: T): String = Resource.fromURL(to_url(p)).string
+    protected def to_content_json(p: T): JsValue = Json.parse(to_content_string(p))
     protected def get_pathnode(path: PathName): Option[T] =
       get_pathnode(root_node, path)
     protected def get_pathnode(p: T, path: PathName): Option[T] = {
@@ -208,7 +217,7 @@ object WebApplication {
       }
       go(root_node, path.components)
     }
-    protected def get_node(p: T, s: String): Option[T] = to_children(p).find(x => name(x) == s)
+    protected def get_node(p: T, s: String): Option[T] = to_children(p).find(x => name(x) === s)
     protected def root_node: T
     protected def root_children: List[T] = to_children(root_node)
     protected def to_children(p: T): List[T]
@@ -249,29 +258,27 @@ object WebApplication {
           Vector.empty // TODO
         }
       }
+      val config = build_config
       val view = {
         val applicationslots = root_children./:(Z())(_+_).r
         val layouts = build_layouts
         val partials = build_partials
         val comps = build_components
         val compslots = comps.toSlots
-        val theme = PaperDashboardTheme // TODO
+        val theme = config.theme.flatMap(RenderTheme.get)
         val slots = applicationslots ++ compslots
-        ViewEngine.Rule.create(theme, slots, layouts, partials, comps)
+        val tags = Tags.empty // TODO
+        ViewEngine.Rule.create(theme, slots, layouts, partials, comps, tags)
       }
-      val scenariorule = ScenarioEngine.Rule.create() // TODO
-      val scenario = new ScenarioEngine(platform, scenariorule)
       val controller = {
-        WebApplication.standardControllerRule.append(
-          ScenarioController(scenario).gc
-        )
+        val controllers = build_controllers
+        ControllerEngine.Rule(controllers)
       }
-      val config = build_config
       WebApplication(applicationName, version, config, controller, view)
     }
 
     private def _is_view(s: String, t: T): Boolean =
-      s == namebody(t) && _is_view(t)
+      s === namebody(t) && _is_view(t)
 
     private def _is_view(t: T): Boolean = getNameSuffix(t).fold(false)(suffix =>
       WebModule.templateSuffixes.contains(suffix) ||
@@ -333,6 +340,28 @@ object WebApplication {
       }
       get_pathnode(PathName("WEB-INF/components")).
         map(x => to_children(x)./:(Z())(_+_).r).getOrElse(Components.empty)
+    }
+
+    protected def build_controllers: Vector[ControllerEngine.Slot] = {
+      case class Z(cs: Vector[ControllerEngine.Slot] = Vector.empty) {
+        def r = cs
+        def +(rhs: T) = {
+          getNameSuffix(rhs).map {
+            case "json" => copy(cs = cs :+ _json_controller(rhs))
+            case _ => this
+          }.getOrElse(this)
+        }
+      }
+      get_pathnode(PathName("WEB-INF/controllers")).
+        map(x => to_children(x)./:(Z())(_+_).r).getOrElse(Vector.empty)
+    }
+
+    private def _json_controller(rhs: T): ControllerEngine.Slot = {
+      val name = namebody(rhs)
+      val json = to_content_json(rhs)
+      OperationController.get(name, json).map(x => ControllerEngine.Slot(x.gc)) getOrElse {
+        RAISE.notImplementedYetDefect
+      }
     }
   }
 }

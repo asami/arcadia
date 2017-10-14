@@ -6,7 +6,8 @@ import org.goldenport.values.ResourceName
 
 /*
  * @since   Aug. 30, 2017
- * @version Sep. 20, 2017
+ *  version Sep. 20, 2017
+ * @version Oct. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 trait DomainObject {
@@ -19,12 +20,12 @@ trait DomainObject {
 }
 
 case class RecordDomainObject(rec: Record) extends DomainObject {
-  def id: DomainObjectId = StringDomainObjectId(rec.asString(KEY_OBJECT_ID))
-  def name: String = rec.getString(KEY_OBJECT_NAME) getOrElse ""
-  def title: Option[String] = rec.getString(KEY_OBJECT_TITLE)
-  def content: Option[String] = rec.getString(KEY_OBJECT_CONTENT)
-  def imageIcon: Option[URI] = rec.getUri(KEY_OBJECT_IMAGE_ICON)
-  def imagePrimary: Option[URI] = rec.getUri(KEY_OBJECT_IMAGE_PRIMARY)
+  def id: DomainObjectId = StringDomainObjectId(rec.asString(KEY_DOMAIN_OBJECT_ID))
+  def name: String = rec.getString(KEY_DOMAIN_OBJECT_NAME) getOrElse ""
+  def title: Option[String] = rec.getString(KEY_DOMAIN_OBJECT_TITLE)
+  def content: Option[String] = rec.getString(KEY_DOMAIN_OBJECT_CONTENT)
+  def imageIcon: Option[URI] = rec.getUri(KEY_DOMAIN_OBJECT_IMAGE_ICON)
+  def imagePrimary: Option[URI] = rec.getUri(KEY_DOMAIN_OBJECT_IMAGE_PRIMARY)
 }
 
 trait DomainObjectId {
@@ -47,4 +48,10 @@ case class DomainEntityType(v: String) {
 object DomainEntityType {
 }
 
-case class DomainEntityId(klass: DomainEntityType, id: DomainObjectId)
+case class DomainEntityId(
+  entityType: DomainEntityType,
+  id: DomainObjectId,
+  getPresentationId: Option[String]
+) {
+  def presentationId: String = getPresentationId getOrElse id.s
+}

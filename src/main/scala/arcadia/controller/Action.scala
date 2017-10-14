@@ -1,6 +1,9 @@
 package arcadia.controller
 
+import play.api.libs.json._
+import org.goldenport.exception.RAISE
 import org.goldenport.i18n.{I18NString, I18NElement}
+import org.goldenport.json.JsonUtils
 import arcadia._
 import arcadia.context._
 import arcadia.model._
@@ -10,11 +13,50 @@ import arcadia.scenario.ScenarioEngine
 /*
  * @since   Jul. 16, 2017
  *  version Aug. 29, 2017
- * @version Sep. 21, 2017
+ *  version Sep. 21, 2017
+ * @version Oct. 14, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Action {
   def apply(parcel: Parcel): Parcel
+}
+object Action {
+  import org.goldenport.json.JsonUtils.Implicits._
+  implicit val OperationActionReads = Json.reads[OperationAction]
+  implicit val GetEntityActionReads = Json.reads[GetEntityAction]
+  implicit val ReadEntityListActionReads = Json.reads[ReadEntityListAction]
+
+  implicit object ActionReads extends Reads[Action] {
+    def reads(json: JsValue): JsResult[Action] = parseJsValue(json)
+  }
+
+  def parseJsValue(json: JsValue): JsResult[Action] =
+    json match {
+      case m: JsObject => parseJsObject(m)
+      case _ => JsError(s"Not js object")
+    }
+
+  def parseJsObject(json: JsObject): JsResult[Action] =
+    (json \ "action").asOpt[String] match {
+      case Some(s) => s match {
+        case "operation" => Json.fromJson[OperationAction](json)
+        case "get-entity" => Json.fromJson[GetEntityAction](json)
+        case "read-entity-list" => Json.fromJson[ReadEntityListAction](json)
+        case _ => JsError(s"Unknown action '$s'")
+      }
+      case None => JsError(s"No action")
+    }
+
+  def parse(json: JsValue): Action =
+    Json.fromJson[Action](json) match {
+      case JsSuccess(s, _) => s
+      case m: JsError => throw new IllegalArgumentException(m.toString)
+    }
+
+  def toAction(json: JsValue): Action = Json.fromJson[Action](json) match {
+      case JsSuccess(s, _) => s
+      case m: JsError => BrokenAction(m)
+  }
 }
 
 case class IndexAction(
@@ -84,4 +126,63 @@ case class ScenarioAction(
   engine: ScenarioEngine
 ) extends Action {
   def apply(parcel: Parcel): Parcel = engine.apply(parcel)
+}
+
+case class OperationAction(
+  operation: String,
+  query: Option[Map[String, Any]],
+  form: Option[Map[String, Any]],
+  model: Option[String]
+) extends Action {
+  def apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
+    def param = ModelParameter(model)
+    val r = context.get(operation, query, form)
+    Model.get(param, r).map(parcel.withModel(_)).getOrElse {
+      RAISE.noReachDefect
+    }
+  }
+}
+
+case class GetEntityAction(
+  entityType: String,
+  id: String
+) extends Action {
+  def apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
+    val r = context.getEntity(DomainEntityType(entityType), StringDomainObjectId(id))
+    r.fold(parcel)(parcel.withModel)
+  }
+}
+
+case class ReadEntityListAction(
+  entity: String,
+  query: Option[Map[String, Any]],
+  form: Option[Map[String, Any]]
+) extends Action {
+  def apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
+    val q = Query(DomainEntityType(entity), parameters = query.getOrElse(Map.empty))
+    val r = context.readEntityList(q)
+    parcel.withModel(r)
+  }
+}
+
+case class LoginAction(
+) extends Action {
+  def apply(parcel: Parcel): Parcel = parcel.withContent(RedirectContent())
+}
+
+case class LogoutAction(
+) extends Action {
+  def apply(parcel: Parcel): Parcel = parcel.withContent(RedirectContent())
+}
+
+case class BrokenAction(
+  message: I18NString,
+  json: Option[JsValue],
+  jsonError: Option[JsError]
+) extends Action {
+  def apply(parcel: Parcel): Parcel = parcel
+}
+object BrokenAction {
+  def apply(msg: String, json: JsValue): BrokenAction = BrokenAction(I18NString(msg), Some(json), None)
+  def apply(p: JsError): BrokenAction = BrokenAction(JsonUtils.messageI18N(p), None, Some(p))
 }

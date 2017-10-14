@@ -11,7 +11,8 @@ import arcadia.scenario.Scenario
 /*
  * @since   Jul. 16, 2017
  *  version Aug. 29, 2017
- * @version Sep. 25, 2017
+ *  version Sep. 25, 2017
+ * @version Oct. 14, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Command {
@@ -22,6 +23,15 @@ trait Command {
 }
 
 case class IndexCommand() extends Command {
+}
+
+case class LoginCommand(
+  access_token: String
+) extends Command {
+}
+
+case class LogoutCommand(
+) extends Command {
 }
 
 case class AssetsCommand(pathname: String) extends Command {
@@ -92,6 +102,21 @@ object RecordsCommand {
 }
 
 case class ScenarioCommand(
-  scenario: Scenario
-) {
+  path: List[String],
+  query: Map[String, List[String]],
+  form: Map[String, List[String]],
+  exception: Option[Throwable] = None
+) extends Command {
+  import ScenarioCommand._
+  val queryRecord = Record.create(query)
+  val formRecord = Record.create(form)
+
+  def name: String = path.head
+  def entityName: String = path(1)
+  def getSubmit: Option[String] = formRecord.getString(PROP_SUBMIT)
+  def getScenario: Option[Scenario] = formRecord.getString(PROP_SCENARIO).map(Scenario.unmarshall)
+}
+object ScenarioCommand {
+  val PROP_SUBMIT = "Submit"
+  val PROP_SCENARIO = "$scenario"
 }

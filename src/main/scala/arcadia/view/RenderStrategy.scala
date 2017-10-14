@@ -15,7 +15,8 @@ import arcadia.view.ViewEngine._
 /*
  * @since   Jul. 31, 2017
  *  version Aug. 29, 2017
- * @version Sep. 27, 2017
+ *  version Sep. 27, 2017
+ * @version Oct. 14, 2017
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -31,9 +32,13 @@ case class RenderStrategy(
   renderContext: RenderContext,
   viewContext: Option[ViewContext]
 ) {
-  def html = copy(scope = Html)
-  def section = copy(scope = Section)
-  def sectionDown = scope match {
+  def tableKind = renderContext.tableKind
+  def isLogined = executeOption(_.isLogined) getOrElse false
+  def getOperationName: Option[String] = executeOption(_.getOperationName).flatten
+
+  def withScopeHtml = copy(scope = Html)
+  def withScopeSection = copy(scope = Section)
+  def withScopeSectionDown = scope match {
     case Html => copy(scope = Section)
     case Body => copy(scope = Section)
     case Section =>
@@ -41,11 +46,9 @@ case class RenderStrategy(
       copy(sectionLevel = sl)
     case Content => this
   }
-  def content = copy(scope = Content)
+  def withScopeContent = copy(scope = Content)
 
-  def tiny = copy(size = TinySize)
-
-  def tableKind = renderContext.tableKind
+  def withSizeTiny = copy(size = TinySize)
 
   def withViewContext(engine: ViewEngine, parcel: Parcel) = copy(viewContext = Some(ViewContext(engine, parcel)))
   def withThemePartials(t: RenderTheme, p: Partials) = copy(
@@ -63,12 +66,14 @@ case class RenderStrategy(
     else
       copy(viewContext = Some(ViewContext(engine, parcel)))
 
-  def execute[T](pf: ExecutionContext => T): T = {
-    val a = for (vc <- viewContext; ctx <- vc.parcel.context) yield pf(ctx)
-    a getOrElse RAISE.noReachDefect
-  }
+  def execute[T](pf: ExecutionContext => T): T =
+    executeOption(pf) getOrElse RAISE.noReachDefect
+
+  def executeOption[T](pf: ExecutionContext => T): Option[T] =
+    viewContext.flatMap(_.parcel.executeOption(pf))
 
   def resolveSchema: Schema = schema.resolve(renderContext)
+
   def format(column: Column, rec: Record): String = {
     rec.getOne(column.name).map {
       case m => m.toString // TODO
@@ -90,7 +95,8 @@ case object SmallSize extends RenderSize // 12pt
 case object VerySmallSize extends RenderSize // 10pt
 case object TinySize extends RenderSize // 8pt
 
-sealed trait RenderTheme {
+sealed trait RenderTheme extends ClassNamedValueInstance {
+  def name_Suffix = "Theme"
   object head {
     def charset(strategy: RenderStrategy): Node = <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     def keywords(strategy: RenderStrategy): Node = <meta name="keywords" content="TBD"/>
@@ -99,10 +105,14 @@ sealed trait RenderTheme {
     def author(strategy: RenderStrategy): Node = <meta name="author" content="TBD"/>
     def theme(strategy: RenderStrategy): Node = Group(Nil)
   }
+  object body {
+    def className(strategy: RenderStrategy): String = body_ClassName(strategy)
+  }
   object table {
     def container(kind: TableKind, schema: Schema, records: Seq[Record]
 , body: => Node): Node = table_Container(kind, schema, records, body)
     object className {
+      import org.goldenport.Strings.blankopt
       def caption(kind: TableKind) = table_ClassName_Caption(kind)
       def table(kind: TableKind) = table_ClassName_Table(kind)
       def thead(kind: TableKind) = table_ClassName_Thead(kind)
@@ -111,6 +121,7 @@ sealed trait RenderTheme {
       def theadTr(kind: TableKind) = table_ClassName_TheadTr(kind)
       def theadTh(kind: TableKind) = table_ClassName_TheadTh(kind)
       def tbodyTr(kind: TableKind) = table_ClassName_TbodyTr(kind)
+      def getTbodyTr(kind: TableKind) = blankopt(table_ClassName_TbodyTr(kind))
       def tbodyTd(kind: TableKind) = table_ClassName_TbodyTd(kind)
       def tfootTr(kind: TableKind) = table_ClassName_TfootTr(kind)
       def tfootTd(kind: TableKind) = table_ClassName_TfootTd(kind)
@@ -145,6 +156,7 @@ sealed trait RenderTheme {
     def content(view: ViewModel): Node = navigation_Content(view)
   }
 
+  protected def body_ClassName(strategy: RenderStrategy): String = ""
   protected def table_Container(kind: TableKind, schema: Schema, records: Seq[Record]
 , body: => Node): Node = body
   protected def table_ClassName_Caption(kind: TableKind): String = ""
@@ -185,9 +197,11 @@ sealed trait RenderTheme {
     </li>
   )
 }
-case object PlainTheme extends RenderTheme {
+object RenderTheme extends EnumerationClass[RenderTheme] {
+  val elements = Vector(PlainTheme, PaperDashboardTheme, MatrialKitTheme, NowUiKitTheme)
 }
-case object PaperDashboardTheme extends RenderTheme {
+
+sealed trait BootstrapRenderThemaBase extends RenderTheme {
   override protected def table_Container(kind: TableKind, schema: Schema, records: Seq[Record]
 , body: => Node): Node = kind match {
     case StandardTable => _table_container_standard(body)
@@ -221,17 +235,55 @@ case object PaperDashboardTheme extends RenderTheme {
     </li>
   )
 }
-case object MatrialKitTheme extends RenderTheme {
+
+case object PlainTheme extends RenderTheme {
+}
+case object PaperDashboardTheme extends BootstrapRenderThemaBase {
+}
+case object MatrialKitTheme extends BootstrapRenderThemaBase {
+}
+case object NowUiKitTheme extends BootstrapRenderThemaBase {
+  override def body_ClassName(strategy: RenderStrategy): String = {
+    def default = "landing-page sidebar-collapse"
+    strategy.getOperationName.map {
+      case "index" => "index-page sidebar-collapse"
+      case "login" => "login-page sidebar-collapse"
+      case "logout" => "login-page sidebar-collapse"
+      case _ => default
+    }.getOrElse(default)
+  }
 }
 
-sealed trait TableKind {
+sealed trait TableKind extends NamedValueInstance {
 }
-case object StandardTable extends TableKind
-case object TabularTable extends TableKind
-case object PropertyTable extends TableKind
-case object EntityTable extends TableKind
-case object FormTable extends TableKind
-case object DashboardTable extends TableKind
+object TableKind extends EnumerationClass[TableKind] {
+  val elements = Vector(
+    StandardTable,
+    TabularTable,
+    PropertyTable,
+    EntityTable,
+    FormTable,
+    DashboardTable
+  )
+}
+case object StandardTable extends TableKind {
+  val name = "standard"
+}
+case object TabularTable extends TableKind {
+  val name = "tabular"
+}
+case object PropertyTable extends TableKind {
+  val name = "property"
+}
+case object EntityTable extends TableKind {
+  val name = "entity"
+}
+case object FormTable extends TableKind {
+  val name = "form"
+}
+case object DashboardTable extends TableKind {
+  val name = "dashboard"
+}
 
 sealed trait OperationMode {
 }

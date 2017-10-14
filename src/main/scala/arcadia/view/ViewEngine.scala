@@ -1,18 +1,22 @@
 package arcadia.view
 
-import scala.xml.NodeSeq
+import scala.xml._
 import org.fusesource.scalate._
 import org.fusesource.scalate.support.URLTemplateSource
+import org.goldenport.exception.RAISE
 import org.goldenport.record.v2._
 import org.goldenport.value._
 import org.goldenport.util.MapUtils
 import arcadia._
 import arcadia.context._
+import arcadia.view.tag._
+import arcadia.model.ErrorModel
 
 /*
  * @since   Jul.  8, 2017
  *  version Aug. 30, 2017
- * @version Sep. 27, 2017
+ *  version Sep. 30, 2017
+ * @version Oct. 14, 2017
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -36,6 +40,8 @@ class ViewEngine(
   lazy val layouts: Map[LayoutKind, LayoutView] = MapUtils.complements(rule.layouts, extend.map(_.layouts))
 
   lazy val partials: Partials = rule.partials.complements(extend.map(_.partials))
+
+  lazy val tags: Tags = rule.tags.complements(extend.map(_.tags)).complements(Tags.embeded)
 
   def findView(parcel: Parcel): Option[View] =
     slots.find(_.isAccept(parcel)).map(_.view)
@@ -71,12 +77,14 @@ class ViewEngine(
     a
   }
 
+  private val _tag_engine = new TagEngine(tags)
+
   // def apply(parcel: Parcel): Content = rule.findView(parcel).map(_.apply(this, parcel)) getOrElse {
   //   WebViewNotFoundFault(parcel.toMessage).RAISE
   // }
 
   def apply(p: Parcel): Content = applyOption(p) getOrElse {
-    throw new IllegalStateException(p.toMessage) // WebViewNotFoundFault(p.toMessage).RAISE
+    throw new IllegalStateException(p.toMessage) // TODO WebViewNotFoundFault(p.toMessage).RAISE
   }
 
   def applyOption(p: Parcel): Option[Content] = {
@@ -87,29 +95,47 @@ class ViewEngine(
     val parcel = p.withRenderStrategy(render)
     findView(p).fold {
       extend.toStream.flatMap(_.applyOption(p)).headOption orElse {
-        p.getEffectiveModel map { m =>
+        val model = p.getEffectiveModel orElse Some(ErrorModel.notFound(parcel, "View and Model is not found."))
+        model map { m =>
           getLayout(parcel).map(_.apply(this, parcel)) getOrElse {
-            StringContent(MimeType.text_html, None, m.render(render).toString)
+            m.apply(render)
           }
         }
       }
     } { content =>
       val page = getLayout(parcel).getOrElse(content)
-      Some(page.apply(this, parcel))
+      Some(page.apply(this, parcel.withView(content)))
     }
   }
 
-  def renderOption(p: Parcel): Option[NodeSeq] = findView(p).
+  private def _apply_option(p: Parcel): Option[Content] = findView(p).
     fold(
-      extend.toStream.flatMap(_.renderOption(p)).headOption
+      extend.toStream.flatMap(_._apply_option(p)).headOption
     )(page =>
-      Some(page.render(this, p)))
+      Some(page.apply(this, p)))
 
-  def renderComponentOption(p: Parcel): Option[NodeSeq] = findComponent(p).
-    fold(
-      extend.toStream.flatMap(_.renderComponentOption(p)).headOption
-    )(page =>
-      Some(page.render(this, p)))
+  def applySectionOption(p: Parcel): Option[Content] = {
+    val parcel = p.sectionScope
+    _apply_option(parcel)
+  }
+
+  def applyComponentOption(p: Parcel): Option[Content] = {
+    val parcel = p.componentScope
+    findComponent(parcel).
+      fold(
+        extend.toStream.flatMap(_.applyComponentOption(parcel)).headOption
+      )(page =>
+        Some(page.apply(this, parcel)))
+  }
+
+  def applyAtomicOption(p: Parcel): Option[Content] = {
+    val parcel = p.componentScope
+    _apply_option(parcel)
+  }
+
+  def renderSectionOption(p: Parcel): Option[NodeSeq] = applySectionOption(p).map(_.asXml)
+  def renderComponentOption(p: Parcel): Option[NodeSeq] = applyComponentOption(p).map(_.asXml)
+  def renderAtomicOption(p: Parcel): Option[NodeSeq] = applyAtomicOption(p).map(_.asXml)
 
   def shutdown(): Unit = _template_engine.shutdown()
 
@@ -147,6 +173,33 @@ class ViewEngine(
   //   val bindings = Map(PROP_VIEW_LIST -> rs.map(ViewObject.create).toList)
   //   _template_engine.layout(source, bindings)
   // }
+
+  def eval(parcel: Parcel, p: Content): Content = _tag_engine.call(parcel).apply(p)
+
+  // def eval(p: NodeSeq): NodeSeq = p match {
+  //   case m: Text => m
+  //   case m: Elem =>
+  //     val xs = m.child.flatMap(_eval)
+  //     _eval_element(m, xs) getOrElse Group(Nil)
+  //   case m if m.length > 0 => Group(m.toList.flatMap(_eval))
+  //   case m => m
+  // }
+
+  // private def _eval(p: Node): Option[Node] = p match {
+  //   case m: Text => Some(m)
+  //   case m: Elem =>
+  //     val xs = m.child.flatMap(_eval)
+  //     _eval_element(m, xs)
+  //   case m if m.length > 0 => Some(Group(m.toList.flatMap(_eval)))
+  //   case m => Some(m)
+  // }
+
+  // private def _eval_element(p: Elem, children: Seq[Node]): Option[Node] = {
+  //   if (p.label == "model")
+  //     Some(Text("MODEL Component"))
+  //   else
+  //     Some(p.copy(child = children))
+  // }
 }
 object ViewEngine {
   final val PROP_VIEW_MODEL = "model"
@@ -161,7 +214,8 @@ object ViewEngine {
     slots: Vector[ViewEngine.Slot], // pages, components
     layouts: Map[LayoutKind, LayoutView],
     partials: Partials,
-    components: Components
+    components: Components,
+    tags: Tags
   ) {
     // def findView(parcel: Parcel): Option[View] =
     //   slots.find(_.isAccept(parcel)).map(_.view)
@@ -176,19 +230,21 @@ object ViewEngine {
   }
   object Rule {
     def create(
-      theme: RenderTheme,
+      theme: Option[RenderTheme],
       slots: Seq[Slot],
       layouts: Map[LayoutKind, LayoutView],
       partials: Partials,
-      components: Components
-    ): Rule = Rule(Some(theme), slots.toVector, layouts, partials, components)
+      components: Components,
+      tags: Tags
+    ): Rule = Rule(theme, slots.toVector, layouts, partials, components, tags)
 
     def create(head: (Guard, View), tail: (Guard, View)*): Rule = Rule(
       None,
       (head +: tail.toVector).map(Slot(_)),
       Map.empty,
       Partials.empty,
-      Components.empty
+      Components.empty,
+      Tags.empty
     )
   }
 

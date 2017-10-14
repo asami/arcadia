@@ -7,7 +7,8 @@ import org.goldenport.exception.RAISE
 import org.goldenport.Strings
 import org.goldenport.record.v2._
 import org.goldenport.bag.{ChunkBag, UrlBag}
-import org.goldenport.util.{StringUtils, UrlUtils}
+import org.goldenport.io.UrlUtils
+import org.goldenport.util.StringUtils
 import com.asamioffice.goldenport.io.UURL
 import arcadia._
 import arcadia.context._
@@ -17,39 +18,35 @@ import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL}
 /*
  * @since   Jul. 15, 2017
  *  version Aug. 30, 2017
- * @version Sep. 27, 2017
+ *  version Sep. 30, 2017
+ * @version Oct.  6, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
   def guard: Guard
-  def apply(engine: ViewEngine, parcel: Parcel): Content =
+  def apply(engine: ViewEngine, parcel: Parcel): Content = 
     execute_apply(engine, parcel.forView(engine))
   def render(engine: ViewEngine, parcel: Parcel): NodeSeq =
-    execute_render(engine, parcel.forView(engine))
+    execute_apply(engine, parcel.forView(engine)).asXml
   def render(strategy: RenderStrategy): NodeSeq = strategy.viewContext.
     map(x => render(x.engine, x.parcel)) getOrElse {
       RAISE.noReachDefect
     }
   def gv: (Guard, View) = (guard, this)
 
-  protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content
-  protected def execute_render(engine: ViewEngine, parcel: Parcel): NodeSeq
+  protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content =
+    engine.eval(parcel, execute_Apply(engine, parcel))
+
+  protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content
 }
 
 trait ModelViewBase[T <: Model] extends View {
   def model: T
   def guard: Guard = ModelNameGuard(model.featureName)
-  protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content = {
+  protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content = {
     val p = parcel.forComponent(model)
     def s = _strategy(engine, p)
-    engine.applyOption(p) getOrElse {
-      StringContent(MimeType.text_html, None, model.render(s).toString)
-    }
-  }
-  protected def execute_render(engine: ViewEngine, parcel: Parcel): NodeSeq = {
-    val p = parcel.forComponent(model)
-    def s = _strategy(engine, p)
-    engine.renderComponentOption(p) getOrElse model.render(s)
+    engine.applyComponentOption(p) getOrElse model.apply(s)
   }
 
   private def _strategy(engine: ViewEngine, parcel: Parcel) = parcel.render.map(_.forComponent(engine, parcel)) getOrElse {
@@ -58,15 +55,9 @@ trait ModelViewBase[T <: Model] extends View {
 }
 
 abstract class TemplateViewBase(template: TemplateSource) extends View() {
-  protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content = {
+  protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content = {
     val bindings = _build_bindings(engine, parcel)
-    val s = engine.layout(template, bindings)
-    StringContent(MimeType.text_html, None, s)
-  }
-
-  protected def execute_render(engine: ViewEngine, parcel: Parcel): NodeSeq = {
-    val bindings = _build_bindings(engine, parcel)
-    engine.render(template, bindings)
+    XmlContent(engine.render(template, bindings))
   }
 
   private def _build_bindings(engine: ViewEngine, parcel: Parcel): Map[String, AnyRef] = {
@@ -126,10 +117,8 @@ case class HtmlView(url: URL, pathname: Option[String] = None) extends View() {
   private val _pathname = pathname getOrElse UrlUtils.takeLeafName(url)
   val guard = PathnameGuard(_pathname)
 
-  protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content =
-    StringContent(MimeType.text_html, None, new UrlBag(url).toText) // UTF-8
-
-  protected def execute_render(engine: ViewEngine, parcel: Parcel): NodeSeq = RAISE.notImplementedYetDefect
+  protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content =
+    StringContent(new UrlBag(url).toText, StaticPageExpires) // UTF-8
 }
 
 case class MaterialView(baseUrl: URL) extends View() {
@@ -142,7 +131,7 @@ case class MaterialView(baseUrl: URL) extends View() {
     }
   }
 
-  protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content = {
+  protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content = {
     val c = parcel.takeCommand[MaterialCommand]
     val mime = {
       val a = for {
@@ -153,10 +142,8 @@ case class MaterialView(baseUrl: URL) extends View() {
       a.getOrElse(MimeType.application_octet_stream)
     }
     val url = new URL(baseUrl, c.pathname)
-    BinaryContent(mime, new UrlBag(url))
+    BinaryContent(mime, new UrlBag(url), StaticPageExpires)
   }
-
-  protected def execute_render(engine: ViewEngine, parcel: Parcel): NodeSeq = RAISE.notImplementedYetDefect
 }
 // case class MaterialView(url: URL, pathname: Option[String] = None) extends View() {
 //   private val _pathname = pathname getOrElse UrlUtils.takeLeafName(url)
@@ -180,7 +167,7 @@ case class AssetView(baseUrl: URL) extends View() {
     }
   }
 
-  protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content = {
+  protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content = {
     val c = parcel.takeCommand[AssetsCommand]
     val mime = {
       val a = for {
@@ -191,10 +178,8 @@ case class AssetView(baseUrl: URL) extends View() {
       a.getOrElse(MimeType.application_octet_stream)
     }
     val url = new URL(baseUrl, c.pathname)
-    BinaryContent(mime, new UrlBag(url))
+    BinaryContent(mime, new UrlBag(url), AssetsExpires)
   }
-
-  protected def execute_render(engine: ViewEngine, parcel: Parcel): NodeSeq = RAISE.notImplementedYetDefect
 }
 object AssetView {
   def fromHtmlFilenameOrUri(p: String): AssetView = {

@@ -9,7 +9,8 @@ import arcadia.model._
 
 /*
  * @since   Aug.  2, 2017
- * @version Sep. 26, 2017
+ *  version Sep. 30, 2017
+ * @version Oct. 14, 2017
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -28,10 +29,10 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
     case m: IAtomicModel => render_atomic(m)
   }
 
-  protected def render_html(p: IPageModel): NodeSeq = model.render(strategy.html)
+  protected def render_html(p: IPageModel): NodeSeq = model.render(strategy.withScopeHtml)
 
   protected def render_section(p: ISectionModel with Model): NodeSeq = {
-    val str = strategy.section
+    val str = strategy.withScopeSection
     val pagename = p.title.map(_.toI18NString)
     val headline = None
     val title = p.title
@@ -43,7 +44,7 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   }
 
   protected def render_component(p: IComponentModel with Model): NodeSeq = {
-    val str = strategy.content
+    val str = strategy.withScopeContent
     val pagename = p.caption.map(_.toI18NString)
     val headline = None
     val title = None
@@ -54,7 +55,7 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   }
 
   protected def render_atomic(p: IAtomicModel with Model): NodeSeq = {
-    val str = strategy.content
+    val str = strategy.withScopeContent
     val pagename = None
     val headline = None
     val title = None
@@ -76,7 +77,16 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   def navigation: NodeSeq = _render_partial(strategy.partials.navigation)
   def navigationContent: NodeSeq = strategy.theme.navigation.content(this)
   def content: NodeSeq = _render_partial(strategy.partials.content)
-  def contentContent: NodeSeq = model match {
+
+  def contentContent: NodeSeq =
+    strategy.viewContext.
+      flatMap(_content_content_from_view).
+      getOrElse(_content_content_from_model)
+
+  private def _content_content_from_view(p: ViewContext): Option[NodeSeq] =
+    p.parcel.view.map(_.render(strategy.withScopeContent))
+
+  private def _content_content_from_model: NodeSeq = model match {
     case m: ISectionModel => render_view_section(m)
     case m: IComponentModel => render_view_component(m)
     case m: IAtomicModel => render_view_atomic(m)
@@ -94,23 +104,29 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
     }.getOrElse(Group(Nil))
 
   protected def render_view_section(p: ISectionModel with Model): NodeSeq = {
-    val parcel = Parcel(p, strategy)
-    _view_engine.renderOption(parcel) getOrElse render_section(p)
+    val parcel = Parcel(p, strategy.withScopeContent)
+    _view_engine.renderSectionOption(parcel) getOrElse render_section(p)
   }
 
   protected def render_view_component(p: IComponentModel with Model): NodeSeq = {
-    val parcel = Parcel(p, strategy)
-    _view_engine.renderOption(parcel) getOrElse render_component(p)
+    val parcel = Parcel(p, strategy.withScopeContent)
+    _view_engine.renderComponentOption(parcel) getOrElse render_component(p)
   }
 
   protected def render_view_atomic(p: IAtomicModel with Model): NodeSeq = {
-    val parcel = Parcel(p, strategy)
-    _view_engine.renderOption(parcel) getOrElse render_atomic(p)
+    val parcel = Parcel(p, strategy.withScopeContent)
+    _view_engine.renderAtomicOption(parcel) getOrElse render_atomic(p)
   }
+
+  /*
+   * Theme
+   */
+  def bodyClassName: String = strategy.theme.body.className(strategy)
 
   /*
    * Attributes
    */
+  def isLogined: Boolean = strategy.isLogined
   def applicationTitle: NodeSeq = strategy.application.applicationTitle(locale)
   def applicationLogo: NodeSeq = strategy.application.applicationLogo(locale)
   def isActiveFeature(p: String): Boolean = model.isActiveFeature(p)

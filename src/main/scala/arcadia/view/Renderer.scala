@@ -7,15 +7,19 @@ import java.net.URI
 import org.joda.time.DateTime
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2._
-import arcadia.model._
-import org.goldenport.i18n.{I18NString, I18NElement}
-import org.goldenport.util.{DateTimeUtils, DateUtils, StringUtils}
 import org.goldenport.record.v2.util.RecordUtils
+import org.goldenport.i18n.{I18NString, I18NElement}
+import org.goldenport.xml.XmlUtils
+import org.goldenport.xml.dom.DomUtils
+import org.goldenport.util.{DateTimeUtils, DateUtils, StringUtils, SeqUtils}
+import arcadia.model._
+import arcadia.domain._
 
 /*
  * @since   Aug.  1, 2017
  *  version Aug. 29, 2017
- * @version Sep. 26, 2017
+ *  version Sep. 26, 2017
+ * @version Oct. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -25,6 +29,7 @@ abstract class Renderer(
   title: Option[I18NElement],
   caption: Option[I18NElement]
 ) {
+  import Renderer._
   lazy val l10n_page_name = pageName.map(string)
   lazy val l10n_headline = headline.map(nodeseq)
   lazy val l10n_title = title.map(nodeseq)
@@ -76,6 +81,14 @@ abstract class Renderer(
 
   protected def nodeseq(s: I18NElement): NodeSeq = s.apply(locale)
 
+  protected def error(
+    code: Int,
+    message: Option[I18NElement],
+    exception: Option[Throwable],
+    topUri: Option[URI],
+    backUri: Option[URI]
+  ): NodeSeq = <div>ERROR: {code}</div> // TODO
+
   protected def text(p: String): Text = Text(p)
 
   protected def seq(head: Option[NodeSeq], tail: Option[NodeSeq]*): Seq[NodeSeq] =
@@ -98,6 +111,15 @@ abstract class Renderer(
     )
   }</table>
 
+  protected def table(p: TableCommand): NodeSeq = {
+    val records = p.records getOrElse Nil
+    val kind = p.kind getOrElse strategy.tableKind
+    val schema = p.schema getOrElse build_schema(records)
+    val entitytype = p.entityType
+    val t = Table(kind, schema, entitytype, records)
+    table(t)
+  }
+
   protected def table(kind: TableKind, schema: Option[Schema], records: Seq[Record]): NodeSeq =
     schema.fold(table(records))(table(kind, _, records))
 
@@ -112,16 +134,21 @@ abstract class Renderer(
   protected def table(schema: Schema, records: Seq[Record]): NodeSeq =
     table(strategy.tableKind, schema, records)
   
-  protected def table(kind: TableKind, schema: Schema, records: Seq[Record]): NodeSeq = theme_table.container(kind, schema, records,
-    <table class={theme_table.className.table(kind)}>{
+  protected def table(kind: TableKind, schema: Schema, records: Seq[Record]): NodeSeq =
+    table(TableCommand(Some(kind), Some(schema), None, Some(records)))
+
+  protected def table(p: Table): NodeSeq = theme_table.container(p.kind, p.schema, p.records,
+    <table class={theme_table.className.table(p.kind)}>{
       seq(
-        caption.map(x => <caption class={theme_table.className.caption(kind)}>{nodeseq(x)}</caption>),
-        Some(table_head(kind, schema)),
-        Some(table_body(kind, schema, records)),
-        None.map(x => <tfoot class={theme_table.className.tfoot(kind)}></tfoot>)
+        caption.map(x => <caption class={theme_table.className.caption(p.kind)}>{nodeseq(x)}</caption>),
+        Some(table_head(p)),
+        Some(table_body(p)),
+        None.map(x => <tfoot class={theme_table.className.tfoot(p.kind)}></tfoot>)
       )
     }</table>
   )
+
+  protected def table_head(p: Table): Elem = table_head(p.kind, p.schema)
 
   protected def table_head(kind: TableKind, schema: Schema): Elem =
     <thead class={theme_table.className.thead(kind)}>{table_head_record(kind, schema)}</thead>
@@ -131,11 +158,20 @@ abstract class Renderer(
       for (c <- schema.columns) yield <th class={theme_table.className.theadTh(kind)}>{c.label(locale)}</th>
     }</tr>
 
+  protected def table_body(p: Table): Elem =
+    <tbody class={theme_table.className.tbody(p.kind)}>{table_body_records(p)}</tbody>
+
   protected def table_body(kind: TableKind, schema: Schema, records: Seq[Record]): Elem =
     <tbody class={theme_table.className.tbody(kind)}>{table_body_records(kind, schema, records)}</tbody>
 
+  protected def table_body_records(p: Table): Group =
+    Group(p.records.toList.map(table_body_record(p, _)))
+
   protected def table_body_records(kind: TableKind, schema: Schema, records: Seq[Record]): Group =
     Group(records.toList.map(table_body_record(kind, schema, _)))
+
+  protected def table_body_record(p: Table, record: Record): Elem = 
+    table_record(p, record)
 
   protected def table_body_record(kind: TableKind, schema: Schema, record: Record): Elem = 
     table_record(kind, schema, record)
@@ -156,6 +192,19 @@ abstract class Renderer(
   protected def table_records(kind: TableKind, schema: Schema, records: Seq[Record]): Group =
     Group(for (rec <- records) yield table_record(kind, schema, rec))
 
+  protected def table_record(p: Table, record: Record): Elem = {
+    val attrs = SeqUtils.buildTupleVector(
+      Vector(
+        "class" -> theme_table.className.getTbodyTr(p.kind),
+        "data-url" -> table_data_url(p, record)
+      )
+    )
+    val children = for (c <- p.schema.columns) yield {
+      table_data(p.kind, c, record)
+    }
+    XmlUtils.element("tr", attrs, children)
+  }
+
   protected def table_record(schema: Option[Schema], record: Record): Elem =
     schema.fold(
       table_record(build_schema(record), record)
@@ -170,6 +219,18 @@ abstract class Renderer(
     <tr class={theme_table.className.tbodyTr(kind)}>{
       for (c <- schema.columns) yield table_data(kind, c, record)
     }</tr>
+
+  protected def table_data_url(p: Table, record: Record): Option[URI] =
+    for {
+      entitytype <- p.entityType
+      id <- record.getOne(PROP_DOMAIN_OBJECT_ID)
+    } yield {
+      val domainid = domain_entity_id(entitytype, id)
+      new URI(s"${entitytype.v}/${domainid.presentationId}.html")
+    }
+
+  protected def domain_entity_id(entitytype: DomainEntityType, id: Any): DomainEntityId =
+    DomainEntityId(entitytype, StringDomainObjectId(id.toString), None) // TODO
 
   protected def table_data(kind: TableKind, column: Column, record: Record): Elem =
     <td class={theme_table.className.tbodyTd(kind)}>{table_value(column, record)}</td>
@@ -195,6 +256,8 @@ abstract class Renderer(
       case XTime => table_value_time(v)
       case XEverforthid => table_value_everforthid(v)
       case XLink => table_value_link(v)
+      case XImageLink => table_value_image_link(v)
+      case XHtml => table_value_html(v)
       case _ => table_value_string(v)
     }
 
@@ -206,6 +269,8 @@ abstract class Renderer(
       case XTime => table_get_value_time(column, record)
       case XEverforthid => table_get_value_everforthid(column, record)
       case XLink => table_get_value_link(column, record)
+      case XImageLink => table_get_value_image_link(column, record)
+      case XHtml => table_get_value_html(column, record)
       case _ => table_get_value_string(column, record)
     }
   }
@@ -230,6 +295,12 @@ abstract class Renderer(
 
   protected def table_get_value_link(column: Column, record: Record): Option[Node] =
     record.getFormString(column.name).map(table_value_link)
+
+  protected def table_get_value_image_link(column: Column, record: Record): Option[Node] =
+    record.getFormString(column.name).map(table_value_image_link)
+
+  protected def table_get_value_html(column: Column, record: Record): Option[Node] =
+    record.getFormString(column.name).map(table_value_html)
 
   protected def table_get_value_string(column: Column, record: Record): Option[Node] =
     record.getString(column.name).map(Text(_))
@@ -272,6 +343,23 @@ abstract class Renderer(
       case NonFatal(e) => x
     }
     <span data-toggle="tooltip" title={x}>{s}</span>
+  }
+
+  protected def table_value_image_link(p: Any): Node = {
+    val x = p.toString
+    val s = try {
+      val a = new URI(x)
+      StringUtils.pathLastComponentBody(a.getPath())
+    } catch {
+      case NonFatal(e) => x
+    }
+    <span data-toggle="tooltip" title={x}>{s}</span>
+  }
+
+  protected def table_value_html(p: Any): Node = p match {
+    case m: String => DomUtils.toXml(DomUtils.parseHtmlFragment(m))
+    case m: Node => m
+    case m: org.w3c.dom.Node => DomUtils.toXml(m)
   }
 
   protected def table_value_string(x: Any): Node = Text(x.toString)
@@ -389,4 +477,28 @@ abstract class Renderer(
 
   protected final def build_schema(rs: Seq[Record]): Schema =
     RecordUtils.buildSchema(rs)
+}
+
+object Renderer {
+  case class TableCommand(
+    kind: Option[TableKind],
+    schema: Option[Schema],
+    entityType: Option[DomainEntityType],
+    records: Option[Seq[Record]]
+  )
+  object TableCommand {
+    def apply(
+      kind: TableKind,
+      schema: Option[Schema],
+      entitytype: DomainEntityType,
+      records: Seq[Record]
+    ): TableCommand = TableCommand(Some(kind), schema, Some(entitytype), Some(records))
+  }
+
+  case class Table(
+    kind: TableKind,
+    schema: Schema,
+    entityType: Option[DomainEntityType],
+    records: Seq[Record]
+  )
 }

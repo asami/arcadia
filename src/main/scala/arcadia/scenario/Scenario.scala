@@ -4,6 +4,7 @@ import java.net.URI
 import play.api.libs.json._
 import org.goldenport.exception.RAISE
 import org.goldenport.value.{NamedValueInstance, EnumerationClass}
+import org.goldenport.io.UriUtils
 import org.goldenport.util.StringUtils
 import org.goldenport.record.v2.{Record, Schema}
 import org.goldenport.record.v2.util.RecordUtils
@@ -14,15 +15,18 @@ import arcadia.domain._
 
 /*
  * @since   Sep. 16, 2017
- * @version Sep. 21, 2017
+ * @version Oct.  7, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Scenario {
+  def scenarioClass: ScenarioClass
+  def scenarioName = scenarioClass.name
   def state: State
   def method: Method = state.method
   def schema: Schema = getSchema getOrElse RAISE.noReachDefect // ScenarioDefect
   def getSchema: Option[Schema] = None
-//  def start(parcel: Parcel): Parcel
+  def start(parcel: Parcel): Parcel
+  def execute(evt: Event): Parcel = apply(evt)._2.parcel
   def apply(evt: Event): (Scenario, Event) = {
     val p = StateTransitionParcel(evt, this, state)
     val r = state.apply(p)
@@ -33,6 +37,10 @@ trait Scenario {
 }
 object Scenario {
   val scenarios = Vector(CreateEntityScenario)
+  val scenarios_stream = scenarios.toStream
+
+  def get(parcel: Parcel, cmd: ScenarioCommand): Option[Scenario] =
+    scenarios_stream.flatMap(_.get(parcel, cmd)).headOption
 
   def unmarshall(p: String): Scenario = unmarshallOption(p) getOrElse {
     RAISE.noReachDefect
@@ -43,6 +51,7 @@ object Scenario {
 
 trait ScenarioClass {
   def name: String = StringUtils.classNameToHypenName("Scenario", this)
+  def get(parcel: Parcel, cmd: ScenarioCommand): Option[Scenario]
   def unmarshallOption(p: String): Option[Scenario]
 }
 
@@ -51,8 +60,11 @@ case class CreateEntityScenario(
   override val schema: Schema,
   data: Record
 ) extends Scenario {
+  val scenarioClass = CreateEntityScenario
   override def getSchema = Some(schema)
   def withState(p: State) = copy(state = p)
+  def start(parcel: Parcel): Parcel = CreateEntityScenario.start(parcel, schema, data)
+
   // def start(parcel: Parcel): Parcel = {
   //   val submit = Submit() // TODO
   //   val state = ???
@@ -64,7 +76,7 @@ case class CreateEntityScenario(
   def marshall = Record.dataApp(
       "name" -> CreateEntityScenario.name,
       "state" -> state.marshall,
-      "schema" -> schema.marshall,
+      "schema" -> schema.marshallRecord,
       "data" -> data
   ).toJsonString
 }
@@ -152,10 +164,23 @@ object CreateEntityScenario extends ScenarioClass {
   // def apply(schema: Schema, data: Record): CreateEntityScenario =
   //   CreateEntityScenario(schema, data)
 
+  def get(parcel: Parcel, cmd: ScenarioCommand): Option[Scenario] = {
+    if (cmd.name == name) {
+      def data = cmd.formRecord
+      parcel.context.flatMap(_.
+        getEntitySchema(cmd.entityName).map(init(_, data)))
+    } else {
+      None
+    }
+  }
+
+  def init(schema: Schema, data: Record): CreateEntityScenario =
+    CreateEntityScenario(State.input, schema, data)
+
   def start(parcel: Parcel, schema: Schema, data: Record): Parcel = {
     val state = State.input
     val scenario = CreateEntityScenario(state, schema, data)
-    val uri = parcel.controllerUri
+    val uri = UriUtils.addPath(parcel.controllerUri, name)
     val submits = Submits(Vector(
       Submit(OkSubmitKind),
       Submit(CancelSubmitKind)
@@ -302,10 +327,14 @@ object Event {
   val EVENT_BACK = "back"
   val EVENT_EXCEPTION = "exception"
 
-  def get(parcel: Parcel): Option[Event] = {
-    val name: String = parcel.eventName
-    def data = parcel.inputFormParameters
-    def e = parcel.exception
+  def get(parcel: Parcel, cmd: ScenarioCommand): Option[Event] = {
+    val name: String = cmd.getSubmit getOrElse {
+      RAISE.noReachDefect
+    }
+    def data = cmd.formRecord
+    def e = cmd.exception getOrElse {
+      RAISE.noReachDefect
+    }
     name match {
       case EVENT_INPUT => Some(InputEvent(parcel, data))
       case EVENT_OK => Some(OkEvent(parcel))
@@ -315,6 +344,20 @@ object Event {
       case _ => None
     }
   }
+
+  // def get(parcel: Parcel): Option[Event] = {
+  //   val name: String = parcel.eventName
+  //   def data = parcel.inputFormParameters
+  //   def e = parcel.exception
+  //   name match {
+  //     case EVENT_INPUT => Some(InputEvent(parcel, data))
+  //     case EVENT_OK => Some(OkEvent(parcel))
+  //     case EVENT_CANCEL => Some(CancelEvent(parcel))
+  //     case EVENT_BACK => Some(BackEvent(parcel))
+  //     case EVENT_EXCEPTION => Some(ExceptionEvent(parcel, e))
+  //     case _ => None
+  //   }
+  // }
 }
 
 case class InputEvent(parcel: Parcel, data: Record) extends Event {

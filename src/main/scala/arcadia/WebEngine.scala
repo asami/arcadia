@@ -6,11 +6,14 @@ import org.goldenport.record.v2.Record
 import arcadia.context._
 import arcadia.controller.ControllerEngine
 import arcadia.view.ViewEngine
+import arcadia.controller._
+import arcadia.scenario._
 
 /*
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
- * @version Sep.  2, 2017
+ *  version Sep.  2, 2017
+ * @version Oct. 14, 2017
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -20,18 +23,38 @@ class WebEngine(
 ) {
   val rule: WebApplicationRule = extend./:(application.config.toRule)(_ complement _.application.config.toRule)
   val view: ViewEngine = new ViewEngine(platform, application.view, extend.map(_.view))
-  val controller: ControllerEngine = new ControllerEngine(application.controller, extend.map(_.controller))
+  val scenariorule = ScenarioEngine.Rule.create() // TODO
+  val scenario = new ScenarioEngine(platform, scenariorule)
+  val systemcontroller = WebApplication.standardControllerRule.append(
+    ScenarioController(scenario).gc
+  )
+  val controller: ControllerEngine = new ControllerEngine(
+    application.controller,
+    extend.map(_.controller),
+    systemcontroller
+  )
 
   def apply(p: Parcel): Content = {
-    val parcel = p.withApplicationRule(rule)
+    val parcel = p.withApplicationRule(rule).
+      withApplicationConfig(application.config)
     val a = controller.apply(parcel)
-    view.apply(a)
+    a.content getOrElse {
+      val r = view.apply(a)
+      if (r.expiresPeriod.isDefined)
+        r
+      else
+        r.expiresKind.fold(r) { x =>
+          application.config.getExpiresPeriod(x).fold(r)(r.withExpiresPeriod)
+        }
+    }
   }
 
   def render(p: Parcel): String = {
     apply(p) match {
       case m: StringContent => m.string
       case m: BinaryContent => RAISE.noReachDefect
+      case m: XmlContent => m.xml.toString
+      case m: RedirectContent => RAISE.noReachDefect
     }
   }
 
