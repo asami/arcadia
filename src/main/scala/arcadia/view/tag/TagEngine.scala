@@ -12,7 +12,7 @@ import arcadia.model.Model
 
 /*
  * @since   Sep. 30, 2017
- * @version Oct. 14, 2017
+ * @version Oct. 16, 2017
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -71,6 +71,7 @@ object Tags {
   val empty = Tags(Vector.empty)
   val embeded = Tags(Vector(
     TableTag,
+    GridTag,
     ModelTag
   ))
 }

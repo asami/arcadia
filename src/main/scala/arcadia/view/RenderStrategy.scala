@@ -2,28 +2,28 @@ package arcadia.view
 
 import scala.xml.{NodeSeq, Group, Elem, Node, Text}
 import java.util.Locale
+import java.net.URI
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2.{Record, Schema, Column}
-import org.goldenport.record.v2.util.SchemaBuilder
+import org.goldenport.record.v2._
+import org.goldenport.record.v2.util.{SchemaBuilder, RecordUtils}
 import org.goldenport.value._
 import org.goldenport.util.MapUtils
 import arcadia._
 import arcadia.context._
-import arcadia.domain.DomainEntityType
+import arcadia.domain._
 import arcadia.view.ViewEngine._
 
 /*
  * @since   Jul. 31, 2017
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
- * @version Oct. 14, 2017
+ * @version Oct. 18, 2017
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
   scope: RenderScope,
   size: RenderSize,
   locale: Locale,
-  sectionLevel: Option[Int],
   theme: RenderTheme,
   schema: SchemaRule,
   application: WebApplicationRule,
@@ -32,7 +32,9 @@ case class RenderStrategy(
   renderContext: RenderContext,
   viewContext: Option[ViewContext]
 ) {
-  def tableKind = renderContext.tableKind
+  def tableKind = renderContext.tableKind getOrElse theme.default.tableKind
+  def tableKind(p: Option[TableKind]) = renderContext.tableKind orElse p getOrElse theme.default.tableKind
+  def cardKind = renderContext.cardKind getOrElse theme.default.cardKind
   def isLogined = executeOption(_.isLogined) getOrElse false
   def getOperationName: Option[String] = executeOption(_.getOperationName).flatten
 
@@ -41,9 +43,7 @@ case class RenderStrategy(
   def withScopeSectionDown = scope match {
     case Html => copy(scope = Section)
     case Body => copy(scope = Section)
-    case Section =>
-      val sl: Option[Int] = sectionLevel.map(_ + 1) orElse Some(1)
-      copy(sectionLevel = sl)
+    case Section => copy(renderContext = renderContext.sectionDown)
     case Content => this
   }
   def withScopeContent = copy(scope = Content)
@@ -72,7 +72,7 @@ case class RenderStrategy(
   def executeOption[T](pf: ExecutionContext => T): Option[T] =
     viewContext.flatMap(_.parcel.executeOption(pf))
 
-  def resolveSchema: Schema = schema.resolve(renderContext)
+  def resolveSchema(p: Renderer.TableOrder): Schema = schema.resolve(this, p)
 
   def format(column: Column, rec: Record): String = {
     rec.getOne(column.name).map {
@@ -96,7 +96,14 @@ case object VerySmallSize extends RenderSize // 10pt
 case object TinySize extends RenderSize // 8pt
 
 sealed trait RenderTheme extends ClassNamedValueInstance {
-  def name_Suffix = "Theme"
+  protected def name_Suffix = "Theme"
+  object default {
+    def noImageIcon: URI = new URI("assets/img/no-image-icon.png")
+    def noUserImageIcon: URI = new URI("assets/img/no-user-image-icon.png")
+    def usageKind: UsageKind = default_UsageKind
+    def tableKind: TableKind = default_TableKind
+    def cardKind: CardKind = default_CardKind
+  }
   object head {
     def charset(strategy: RenderStrategy): Node = <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     def keywords(strategy: RenderStrategy): Node = <meta name="keywords" content="TBD"/>
@@ -156,6 +163,9 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
     def content(view: ViewModel): Node = navigation_Content(view)
   }
 
+  protected def default_UsageKind: UsageKind = ListUsage
+  protected def default_TableKind: TableKind = ListTable
+  protected def default_CardKind: CardKind = BootstrapCard
   protected def body_ClassName(strategy: RenderStrategy): String = ""
   protected def table_Container(kind: TableKind, schema: Schema, records: Seq[Record]
 , body: => Node): Node = body
@@ -198,13 +208,20 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
   )
 }
 object RenderTheme extends EnumerationClass[RenderTheme] {
-  val elements = Vector(PlainTheme, PaperDashboardTheme, MatrialKitTheme, NowUiKitTheme)
+  val elements = Vector(
+    PlainTheme,
+    PaperDashboardTheme,
+    MatrialKitTheme,
+    NowUiKitTheme
+  )
 }
 
 sealed trait BootstrapRenderThemaBase extends RenderTheme {
   override protected def table_Container(kind: TableKind, schema: Schema, records: Seq[Record]
 , body: => Node): Node = kind match {
     case StandardTable => _table_container_standard(body)
+    case ListTable => _table_container_list(body)
+    case GridTable => _table_container_grid(body)
     case TabularTable => _table_container_card(body) // TODO
     case PropertyTable => _table_container_standard(body) // TODO
     case EntityTable => _table_container_standard(body) // TODO
@@ -216,6 +233,10 @@ sealed trait BootstrapRenderThemaBase extends RenderTheme {
     <div class="content table-responsive table-full-width">
       {body}
     </div>
+
+  private def _table_container_list(body: => Node): Node = {body}
+
+  private def _table_container_grid(body: => Node): Node = {body}
 
   private def _table_container_card(body: => Node): Node = 
     <div class="content table-responsive table-full-width" style="font-size:8px">
@@ -236,13 +257,21 @@ sealed trait BootstrapRenderThemaBase extends RenderTheme {
   )
 }
 
+trait Bootstrap3RenderThemaBase extends BootstrapRenderThemaBase {
+}
+
+trait Bootstrap4RenderThemaBase extends BootstrapRenderThemaBase {
+}
+
 case object PlainTheme extends RenderTheme {
 }
-case object PaperDashboardTheme extends BootstrapRenderThemaBase {
+case object PaperDashboardTheme extends Bootstrap3RenderThemaBase {
+  override protected def default_TableKind: TableKind = StandardTable
+  override protected def default_CardKind: CardKind = PaperDashboardCard
 }
-case object MatrialKitTheme extends BootstrapRenderThemaBase {
+case object MatrialKitTheme extends Bootstrap3RenderThemaBase {
 }
-case object NowUiKitTheme extends BootstrapRenderThemaBase {
+case object NowUiKitTheme extends Bootstrap4RenderThemaBase {
   override def body_ClassName(strategy: RenderStrategy): String = {
     def default = "landing-page sidebar-collapse"
     strategy.getOperationName.map {
@@ -259,6 +288,8 @@ sealed trait TableKind extends NamedValueInstance {
 object TableKind extends EnumerationClass[TableKind] {
   val elements = Vector(
     StandardTable,
+    ListTable,
+    GridTable,
     TabularTable,
     PropertyTable,
     EntityTable,
@@ -268,6 +299,12 @@ object TableKind extends EnumerationClass[TableKind] {
 }
 case object StandardTable extends TableKind {
   val name = "standard"
+}
+case object ListTable extends TableKind {
+  val name = "list"
+}
+case object GridTable extends TableKind {
+  val name = "grid"
 }
 case object TabularTable extends TableKind {
   val name = "tabular"
@@ -283,6 +320,21 @@ case object FormTable extends TableKind {
 }
 case object DashboardTable extends TableKind {
   val name = "dashboard"
+}
+
+sealed trait CardKind extends NamedValueInstance {
+}
+object CardKind extends EnumerationClass[CardKind] {
+  val elements = Vector(
+    BootstrapCard, // Bootstrap4
+    PaperDashboardCard // Creative-Tim PaperDashboard
+  )
+}
+case object BootstrapCard extends CardKind {
+  val name = "bootstrap"
+}
+case object PaperDashboardCard extends CardKind {
+  val name = "paper-dashboard"
 }
 
 sealed trait OperationMode {
@@ -339,30 +391,69 @@ case class SchemaRule(
   byUsage: UsageSchemaRule, // common
   default: Schema // AtomFeed
 ) {
-  def resolve(p: RenderContext): Schema = resolve(
-    p.operationKind, p.screenKind, p.entityType, p.usageKind
-  )
+  def resolve(p: RenderStrategy, t: Renderer.TableOrder): Schema = {
+    val ctx = p.renderContext
+    ctx.schema getOrElse {
+      val entitytype = ctx.entityType orElse t.entityType
+      val usagekind = ctx.usageKind getOrElse p.theme.default.usageKind
+      val schema = t.schema.getOrElse(RecordUtils.buildSchema(t.records.getOrElse(Nil)))
+      resolve(
+        ctx.operationKind,
+        ctx.screenKind,
+        entitytype,
+        usagekind,
+        schema
+      )
+    }
+  }
 
   def resolve(
     op: OperationMode,
     screen: ScreenKind,
     entitytype: Option[DomainEntityType],
-    usage: UsageKind
+    usage: UsageKind,
+    schema: Schema
   ): Schema = {
     val byscreen = byOperationMode.get(op) getOrElse byScreen
     val byentity = byscreen.get(screen) getOrElse byEntity
     val byusage = byentity.get(entitytype) getOrElse byUsage
-    byusage.get(usage) getOrElse default
+    val systemschema = byusage.get(usage) getOrElse default
+    _converge(schema, systemschema)
+  }
+
+  private def _converge(app: Schema, system: Schema): Schema = {
+    case class Z(r: Vector[Column] = Vector.empty) {
+      def +(rhs: Column) = {
+        system.getColumn(rhs.name).fold(this) { c =>
+          val c1 = if (rhs.datatype == XString && c.datatype != XString)
+            rhs.copy(datatype = c.datatype)
+          else
+            rhs
+          copy(r = r :+ c1)
+        }
+      }
+    }
+    val columns = app.columns./:(Z())(_+_).r
+    app.copy(columns = columns)
   }
 }
 object SchemaRule {
+  import SchemaBuilder._
   val empty = SchemaRule(
     OperationScreenEntityUsageSchemaRule.empty,
     ScreenEntityUsageSchemarRule.empty,
     EntityUsageSchemaRule.empty,
     UsageSchemaRule.empty,
     SchemaBuilder.create(
-      // TODO
+      CLT(PROP_DOMAIN_OBJECT_ID, "Id", XEverforthid), // TODO generic platform entity id
+//      CLiT(PROP_DOMAIN_OBJECT_NAME, "Name", "名前", XString),
+      CLiT(PROP_DOMAIN_OBJECT_TITLE, "Title", "タイトル", XString),
+//      CLiT(PROP_DOMAIN_OBJECT_SUBTITLE, "Sub Title", "サブタイトル", XString),
+//      CLiT(PROP_DOMAIN_OBJECT_SUMMARY, "Summary", "概要", XString),
+      CLiT(PROP_DOMAIN_OBJECT_CONTENT, "Content", "内容", XString),
+      CLiT(PROP_DOMAIN_OBJECT_IMAGE_ICON, "Icon", "アイコン", XImageLink), // TODO XImage
+      CLiT(PROP_DOMAIN_OBJECT_IMAGE_PRIMARY, "Image", "画像", XImageLink) // TODO XImage
+//      CLiT(PROP_DOMAIN_OBJECT_IMAGE_SECONDARY, "Image", "画像", XImageLink)
     )
   )
 }
@@ -438,10 +529,17 @@ object Components {
 case class RenderContext(
   operationKind: OperationMode,
   screenKind: ScreenKind,
-  usageKind: UsageKind,
-  tableKind: TableKind,
-  entityType: Option[DomainEntityType]
+  usageKind: Option[UsageKind],
+  tableKind: Option[TableKind],
+  cardKind: Option[CardKind],
+  sectionLevel: Option[Int],
+  entityType: Option[DomainEntityType],
+  schema: Option[Schema]
 ) {
+  def sectionDown = {
+    val sl: Option[Int] = sectionLevel.map(_ + 1) orElse Some(1)
+    copy(sectionLevel = sl)
+  }
   def withEntityType(p: Option[DomainEntityType]) = copy(entityType = p)
   def withEntityType(p: DomainEntityType) = copy(entityType = Some(p))
 }
@@ -449,8 +547,11 @@ object RenderContext {
   val empty = RenderContext(
     MediaOperationMode,
     WebScreen,
-    DetailUsage,
-    StandardTable,
+    None,
+    None,
+    None,
+    None,
+    None,
     None
   )
 }

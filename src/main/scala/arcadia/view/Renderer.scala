@@ -3,7 +3,7 @@ package arcadia.view
 import scala.xml.{NodeSeq, Group, Elem, Node, Text}
 import scala.util.control.NonFatal
 import java.util.Locale
-import java.net.URI
+import java.net.{URI, URL}
 import org.joda.time.DateTime
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2._
@@ -19,7 +19,7 @@ import arcadia.domain._
  * @since   Aug.  1, 2017
  *  version Aug. 29, 2017
  *  version Sep. 26, 2017
- * @version Oct. 13, 2017
+ * @version Oct. 18, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -30,16 +30,16 @@ abstract class Renderer(
   caption: Option[I18NElement]
 ) {
   import Renderer._
-  lazy val l10n_page_name = pageName.map(string)
-  lazy val l10n_headline = headline.map(nodeseq)
-  lazy val l10n_title = title.map(nodeseq)
-  lazy val l10n_caption = caption.map(nodeseq)
-  lazy val effective_page_name = l10n_page_name orElse l10n_headline orElse l10n_title orElse l10n_caption
-  lazy val effective_headline = l10n_headline orElse l10n_headline
+  protected lazy val l10n_page_name = pageName.map(string)
+  protected lazy val l10n_headline = headline.map(nodeseq)
+  protected lazy val l10n_title = title.map(nodeseq)
+  protected lazy val l10n_caption = caption.map(nodeseq)
+  protected lazy val effective_page_name = l10n_page_name orElse l10n_headline orElse l10n_title orElse l10n_caption
+  protected lazy val effective_headline = l10n_headline orElse l10n_headline
   def locale = strategy.locale
   def theme = strategy.theme
-  lazy val theme_head = theme.head
-  lazy val theme_table = theme.table
+  protected lazy val theme_head = theme.head
+  protected lazy val theme_table = theme.table
 
   def apply: NodeSeq = strategy.scope match {
     case Html => render_html
@@ -78,7 +78,7 @@ abstract class Renderer(
   protected def head_theme: Node = theme_head.theme(strategy)
 
   protected def string(s: I18NString): String = s.apply(locale)
-
+  protected def node(s: I18NString): Node = Text(s.apply(locale))
   protected def nodeseq(s: I18NElement): NodeSeq = s.apply(locale)
 
   protected def error(
@@ -111,10 +111,11 @@ abstract class Renderer(
     )
   }</table>
 
-  protected def table(p: TableCommand): NodeSeq = {
+  protected def table(p: TableOrder): NodeSeq = {
     val records = p.records getOrElse Nil
     val kind = p.kind getOrElse strategy.tableKind
-    val schema = p.schema getOrElse build_schema(records)
+    val schema = strategy.resolveSchema(p)
+//    val schema = p.schema getOrElse build_schema(records)
     val entitytype = p.entityType
     val t = Table(kind, schema, entitytype, records)
     table(t)
@@ -135,9 +136,19 @@ abstract class Renderer(
     table(strategy.tableKind, schema, records)
   
   protected def table(kind: TableKind, schema: Schema, records: Seq[Record]): NodeSeq =
-    table(TableCommand(Some(kind), Some(schema), None, Some(records)))
+    table(TableOrder(Some(kind), Some(schema), None, Some(records)))
 
-  protected def table(p: Table): NodeSeq = theme_table.container(p.kind, p.schema, p.records,
+  protected def table(p: Table): NodeSeq =
+    p.kind match {
+      case StandardTable => table_standard(p)
+      case ListTable => table_list(p)
+      case GridTable => grid(p)
+      case _ => table_standard(p)
+    }
+
+  protected def table_list(p: Table): NodeSeq = table_standard(p)
+
+  protected def table_standard(p: Table): NodeSeq = theme_table.container(p.kind, p.schema, p.records,
     <table class={theme_table.className.table(p.kind)}>{
       seq(
         caption.map(x => <caption class={theme_table.className.caption(p.kind)}>{nodeseq(x)}</caption>),
@@ -148,7 +159,10 @@ abstract class Renderer(
     }</table>
   )
 
-  protected def table_head(p: Table): Elem = table_head(p.kind, p.schema)
+  protected def table_head(p: Table): Node = p.kind match {
+    case ListTable => Group(Nil)
+    case _ => table_head(p.kind, p.schema)
+  }
 
   protected def table_head(kind: TableKind, schema: Schema): Elem =
     <thead class={theme_table.className.thead(kind)}>{table_head_record(kind, schema)}</thead>
@@ -170,7 +184,7 @@ abstract class Renderer(
   protected def table_body_records(kind: TableKind, schema: Schema, records: Seq[Record]): Group =
     Group(records.toList.map(table_body_record(kind, schema, _)))
 
-  protected def table_body_record(p: Table, record: Record): Elem = 
+  protected def table_body_record(p: Table, record: Record): Node = 
     table_record(p, record)
 
   protected def table_body_record(kind: TableKind, schema: Schema, record: Record): Elem = 
@@ -192,18 +206,11 @@ abstract class Renderer(
   protected def table_records(kind: TableKind, schema: Schema, records: Seq[Record]): Group =
     Group(for (rec <- records) yield table_record(kind, schema, rec))
 
-  protected def table_record(p: Table, record: Record): Elem = {
-    val attrs = SeqUtils.buildTupleVector(
-      Vector(
-        "class" -> theme_table.className.getTbodyTr(p.kind),
-        "data-url" -> table_data_url(p, record)
-      )
-    )
-    val children = for (c <- p.schema.columns) yield {
-      table_data(p.kind, c, record)
+  protected def table_record(p: Table, record: Record): Node =
+    p.kind match {
+      case ListTable => table_record_list(p, record)
+      case _ => table_record_standard(p, record)
     }
-    XmlUtils.element("tr", attrs, children)
-  }
 
   protected def table_record(schema: Option[Schema], record: Record): Elem =
     schema.fold(
@@ -219,6 +226,43 @@ abstract class Renderer(
     <tr class={theme_table.className.tbodyTr(kind)}>{
       for (c <- schema.columns) yield table_data(kind, c, record)
     }</tr>
+
+  protected def table_record_standard(p: Table, record: Record): Elem = {
+    val attrs = SeqUtils.buildTupleVector(
+      Vector(
+        "class" -> theme_table.className.getTbodyTr(p.kind),
+        "data-href" -> table_data_url(p, record)
+      )
+    )
+    val children = for (c <- p.schema.columns) yield {
+      table_data(p.kind, c, record)
+    }
+    XmlUtils.element("tr", attrs, children)
+  }
+
+  protected def table_record_list(p: Table, record: Record): Node = {
+    val attrs = SeqUtils.buildTupleVector(
+      Vector(
+        "class" -> theme_table.className.getTbodyTr(p.kind),
+        "data-href" -> table_data_url(p, record)
+      )
+    )
+    val icon: Picture = picture_icon(record)
+    val title = get_title(record).map(nodeseq).getOrElse(Text(""))
+    val subtitle = get_subtitle(record).map(nodeseq).getOrElse(Text(""))
+    val content: Node = get_content_summary(record) getOrElse Text("")
+    val row1 = List(
+      <td class={theme_table.className.tbodyTd(p.kind)} rowspan="2">{table_value_img_picture{icon}}</td>,
+      <td class={theme_table.className.tbodyTd(p.kind)}>{title}</td>
+    )
+    val row2 = List(
+      <td class={theme_table.className.tbodyTd(p.kind)}>{content}</td>
+    )
+    Group(List(
+      XmlUtils.element("tr", attrs, row1),
+      XmlUtils.element("tr", attrs, row2)
+    ))
+  }
 
   protected def table_data_url(p: Table, record: Record): Option[URI] =
     for {
@@ -294,10 +338,10 @@ abstract class Renderer(
     record.getString(column.name).map(table_value_everforthid)
 
   protected def table_get_value_link(column: Column, record: Record): Option[Node] =
-    record.getFormString(column.name).map(table_value_link)
+    record.getFormOne(column.name).map(table_value_link)
 
   protected def table_get_value_image_link(column: Column, record: Record): Option[Node] =
-    record.getFormString(column.name).map(table_value_image_link)
+    record.getFormOne(column.name).map(table_value_image_link)
 
   protected def table_get_value_html(column: Column, record: Record): Option[Node] =
     record.getFormString(column.name).map(table_value_html)
@@ -345,18 +389,63 @@ abstract class Renderer(
     <span data-toggle="tooltip" title={x}>{s}</span>
   }
 
-  protected def table_value_image_link(p: Any): Node = {
-    val x = p.toString
-    val s = try {
-      val a = new URI(x)
-      StringUtils.pathLastComponentBody(a.getPath())
-    } catch {
-      case NonFatal(e) => x
-    }
-    <span data-toggle="tooltip" title={x}>{s}</span>
+  protected def table_value_image_link(p: Any): Node = p match {
+    case m: String => table_value_image_link_string(m)
+    case m: URI => table_value_image_link_uri(m)
+    case m: URL => table_value_image_link_url(m)
+    case m: Picture => table_value_image_link_picture(m)
+    case m => table_value_image_link_string(m.toString)
+  }
+
+  protected def table_value_image_link_string(p: String): Node =
+    table_value_image_link_uri(new URI(p))
+
+  protected def table_value_image_link_url(p: URL): Node =
+    table_value_image_link_uri(p.toURI)
+
+  protected def table_value_image_link_uri(p: URI): Node = {
+    val s = StringUtils.pathLastComponentBody(p.getPath())
+    <span data-toggle="tooltip" title={p.toString}>{s}</span>
+  }
+
+  protected def table_value_image_link_picture(p: Picture): Node = {
+    val src = p.src.toString
+    val a = p.alt.map(string).getOrElse(src)
+    val s = StringUtils.pathLastComponentBody(a)
+    <span data-toggle="tooltip" title={src}>{s}</span>
+  }
+
+  protected def table_value_img(p: Any): Node = p match {
+    case m: String => table_value_img_string(m)
+    case m: URI => table_value_img_uri(m)
+    case m: URL => table_value_img_url(m)
+    case m: Picture => table_value_img_picture(m)
+    case m => table_value_img_string(m.toString)
+  }
+
+  protected def table_value_img_string(p: String): Node =
+    table_value_img_uri(new URI(p))
+
+  protected def table_value_img_url(p: URL): Node =
+    table_value_img_uri(p.toURI)
+
+  protected def table_value_img_uri(p: URI): Node =
+    <img src={p.toString}></img>
+
+  protected def table_value_img_picture(p: Picture): Node = {
+    val alt: String = p.alt.map(string).getOrElse("")
+    val style = "width: 256px" // TODO media
+    <img src={p.src.toString} alt={alt} style={style}></img>
   }
 
   protected def table_value_html(p: Any): Node = p match {
+    case m: String => DomUtils.toXml(DomUtils.parseHtmlFragment(m))
+    case m: Node => m
+    case m: org.w3c.dom.Node => DomUtils.toXml(m)
+  }
+
+  // TODO summarize
+  protected def table_value_html_summary(p: Any): Node = p match {
     case m: String => DomUtils.toXml(DomUtils.parseHtmlFragment(m))
     case m: Node => m
     case m: org.w3c.dom.Node => DomUtils.toXml(m)
@@ -440,27 +529,121 @@ abstract class Renderer(
     }
   }
 
-  protected def card(
-    imagetop: Option[ImageAlt],
-    header: Option[TitleDescription],
-    footer: Option[TitleDescription],
+  protected def grid(p: Table): Elem = {
+    val ncolumns = 6
+    val width = 12 / ncolumns
+    <div class="container"> { // container-fluid
+      for (row <- p.records.grouped(ncolumns)) yield {
+        <div class="row"> {
+          for (x <- row) yield {
+            <div class={s"col-sm-${width}"}> {
+              card(x)
+            } </div>
+          }
+        } </div>
+      }
+    } </div>
+  }
+
+  protected def card(rec: Record): Elem = {
+    val icon = picture_icon(rec)
+    val title = get_title(rec)
+    val subtitle = get_subtitle(rec)
+    val header = TitleLine(title, subtitle).toOption
+    val content = get_content(rec) getOrElse (Text("-"))
+    val c = Card(icon, header, content)
+    card(c)
+  }
+
+  def card(
+    imagetop: Option[Picture],
+    header: Option[TitleLine],
+    footer: Option[TitleLine],
     content: NodeSeq
-  ): Elem = {
+  ): Elem = card(Card(imagetop, header, footer, content))
+
+  protected def card(card: Card): Elem =
+    strategy.cardKind match {
+      case BootstrapCard => card_bootstrap(card)
+      case PaperDashboardCard => card_paperdashboard(card)
+    }
+
+  // Bootstrap 4
+  protected def card_bootstrap(card: Card): Elem = {
+    def img(p: Picture): Elem = XmlUtils.element("img",
+      SeqUtils.buildTupleVector(
+        Vector(
+          "class" -> "card-img-top",
+          "src" -> p.src.toString
+        ),
+        Vector(
+          "alt" -> p.alt.map(node)
+        )
+      ),
+      Nil
+    )
+    <div class="card"> {
+      card.imagetop.map(i =>
+        i.href.fold {
+          img(i)
+        } { href =>
+          <a href={href.toString} target="_blank">{img(i)}</a>
+        }
+      ) ++ card.header.map(h =>
+        <div class="card-header">{
+          card_title_bootstrap(h)
+        }</div>
+      ) ++ <div class="card-block">{
+        <div class="card-text">{card.content}</div>
+      }</div> ++ card.footer.map(f =>
+        <div class="card-footer">{
+          card_title_bootstrap(f)
+        }</div>
+      )
+    } </div>
+  }
+
+  def card_title_bootstrap(p: TitleLine): List[Node] = {
+    List(
+      p.title.map(t => <h4 class="card-title">{t(locale)}</h4>),
+      p.subTitle.map(d => <p class="card-subtitle">{d(locale)}</p>)
+    ).flatten
+  }
+
+  protected def card_paperdashboard(card: Card): Elem = {
+    def img(p: Picture): Elem = XmlUtils.element("img",
+      SeqUtils.buildTupleVector(
+        Vector(
+          "class" -> "card-img-top",
+          "src" -> p.src.toString
+        ),
+        Vector(
+          "alt" -> p.alt.map(node)
+        )
+      ),
+      Nil
+    )
     <div class="card">{
-      header.map(h =>
+      card.imagetop.map(i =>
+        i.href.fold {
+          img(i)
+        } { href =>
+          <a href={href.toString} target="_blank">{img(i)}</a>
+        }
+      ) ++ card.header.map(h =>
         <div class="header">{
           List(
             h.title.map(t => <h4 class="title">{t(locale)}</h4>),
-            h.description.map(d => <p class="category">{d(locale)}</p>)
+            h.subTitle.map(d => <p class="category">{d(locale)}</p>)
           ).flatten
         }</div>
       ) ++ <div class="content">{
-        content ++ List(
-          footer.map(f =>
+        card.content ++ List(
+          card.footer.map(f =>
             <div class="footer">{
               List(
                 f.title.map(t => <h4 class="title">{t(locale)}</h4>),
-                f.description.map(d => <p class="category">{d(locale)}</p>)
+                f.subTitle.map(d => <p class="category">{d(locale)}</p>)
               ).flatten
             }</div>
           )
@@ -468,6 +651,29 @@ abstract class Renderer(
       }</div>
     }</div>
   }
+
+  def get_title(rec: Record): Option[I18NElement] =
+    rec.getString(KEY_DOMAIN_OBJECT_TITLE).map(I18NElement.parse)
+
+  def get_subtitle(rec: Record): Option[I18NElement] =
+    rec.getString(KEY_DOMAIN_OBJECT_SUBTITLE).map(I18NElement.parse)
+
+  def get_content(rec: Record): Option[Node] =
+    rec.getString(KEY_DOMAIN_OBJECT_CONTENT).map(table_value_html)
+
+  def get_content_summary(rec: Record): Option[Node] =
+    rec.getString(KEY_DOMAIN_OBJECT_CONTENT).map(table_value_html_summary)
+
+  def picture_icon(rec: Record): Picture =
+    rec.getOne(KEY_DOMAIN_OBJECT_IMAGE_ICON).fold {
+      Picture(theme.default.noImageIcon)
+    } {
+      case m: URL => Picture(m.toURI)
+      case m: URI => Picture(m)
+      case m: String => Picture(new URI(m))
+      case m: Picture => m
+      case m => RAISE.noReachDefect
+    }
 
   /*
    * Utilities
@@ -480,19 +686,40 @@ abstract class Renderer(
 }
 
 object Renderer {
-  case class TableCommand(
+  case class TableOrder(
     kind: Option[TableKind],
     schema: Option[Schema],
     entityType: Option[DomainEntityType],
     records: Option[Seq[Record]]
   )
-  object TableCommand {
+  object TableOrder {
     def apply(
       kind: TableKind,
       schema: Option[Schema],
       entitytype: DomainEntityType,
       records: Seq[Record]
-    ): TableCommand = TableCommand(Some(kind), schema, Some(entitytype), Some(records))
+    ): TableOrder = TableOrder(Some(kind), schema, Some(entitytype), Some(records))
+
+    def apply(
+      kind: TableKind,
+      schema: Option[Schema],
+      entitytype: Option[DomainEntityType],
+      records: Seq[Record]
+    ): TableOrder = TableOrder(Some(kind), schema, entitytype, Some(records))
+
+    def apply(
+      kind: Option[TableKind],
+      schema: Option[Schema],
+      entitytype: DomainEntityType,
+      records: Seq[Record]
+    ): TableOrder = TableOrder(kind, schema, Some(entitytype), Some(records))
+
+    def apply(
+      kind: Option[TableKind],
+      schema: Option[Schema],
+      entitytype: Option[DomainEntityType],
+      records: Seq[Record]
+    ): TableOrder = TableOrder(kind, schema, entitytype, Some(records))
   }
 
   case class Table(

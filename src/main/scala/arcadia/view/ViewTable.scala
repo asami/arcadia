@@ -6,17 +6,21 @@ import arcadia.model._
 
 /*
  * @since   Sep. 24, 2017
- * @version Oct.  4, 2017
+ * @version Oct. 18, 2017
  * @author  ASAMI, Tomoharu
  */
 trait IViewTable {
-  def model: ITableModel with Model
+  def model: ITableModel
   def strategy: RenderStrategy
-  def tableKind: TableKind = model.tableKind
+  def tableKind: TableKind = strategy.tableKind(model.tableKind)
   def render: NodeSeq = TableView(model).render(strategy)
-  lazy val schema: Schema = model.getSchema getOrElse {
-    strategy.withEntityType(model.getEntityType).resolveSchema
+  lazy val schema: Schema = {
+    val cmd = Renderer.TableOrder(tableKind, model.getSchema, model.getEntityType, model.records)
+    strategy.resolveSchema(cmd)
   }
+  // lazy val schema: Schema = model.getSchema getOrElse {
+  //   strategy.withEntityType(model.getEntityType).resolveSchema
+  // }
   lazy val thead: ViewTHead = ViewTHead.create(this)
   lazy val tbody: ViewTBody = ViewTBody.create(this)
 }

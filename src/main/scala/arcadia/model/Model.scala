@@ -18,7 +18,7 @@ import arcadia.domain._
  * @since   Jul. 29, 2017
  *  version Aug. 30, 2017
  *  version Sep. 27, 2017
- * @version Oct. 14, 2017
+ * @version Oct. 18, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -58,6 +58,9 @@ trait Model {
     }
     r./:(Z())(_+_).r
   }
+
+  protected final def get_table_kind(s: Option[TableKind], p: Option[String]): Option[TableKind] =
+    p.fold(s)(TableKind.get)
 
   protected final def as_table_kind(s: TableKind, p: Option[String]): TableKind =
     p.fold(s)(x => TableKind.get(x) getOrElse s)
@@ -111,9 +114,19 @@ trait ISheetModel extends IRecordModel {
 }
 
 trait ITableModel extends IRecordsModel {
-  def tableKind: TableKind
+  def tableKind: Option[TableKind]
+  def getEntityType: Option[DomainEntityType]
+  def records: List[Record]
   def thead: TableHeadModel
   def tbody: TableBodyModel
+  def withSchemaKind(
+    schema: Option[List[String]],
+    kind: Option[String]
+  ): ITableModel
+  def withSchemaKind(
+    schema: Option[List[String]],
+    kind: TableKind
+  ): ITableModel
   def withCaptionSchemaKind(
     caption: Option[String],
     schema: Option[List[String]],
@@ -336,10 +349,10 @@ case class EntityListModel(
   getSchema: Option[Schema],
   records: List[Record],
   transfer: Transfer,
-  tableKind: TableKind = StandardTable,
+  tableKind: Option[TableKind] = None,
   expiresKind: Option[ExpiresKind] = Some(AgilePageExpires)
 ) extends Model with IEntityListModel with IComponentModel {
-  def getEntityType = Some(entityType)
+  override def getEntityType: Option[DomainEntityType] = Some(entityType)
   protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_LIST -> records.map(ViewObject.create),
     PROP_VIEW_RECORD -> records.map(ViewRecord.create)
@@ -348,6 +361,22 @@ case class EntityListModel(
 
   def get(i: Int): Option[EntityDetailModel] = records.lift(i).map(EntityDetailModel(entityType, _))
 
+  def withSchemaKind(
+    schema: Option[List[String]],
+    kind: Option[String]
+  ): EntityListModel = copy(
+    getSchema = as_schema(getSchema, schema),
+    tableKind = get_table_kind(tableKind, kind)
+  )
+
+  def withSchemaKind(
+    schema: Option[List[String]],
+    kind: TableKind
+  ): EntityListModel = copy(
+    getSchema = as_schema(getSchema, schema),
+    tableKind = Some(kind)
+  )
+
   def withCaptionSchemaKind(
     caption: Option[String],
     schema: Option[List[String]],
@@ -355,13 +384,13 @@ case class EntityListModel(
   ): EntityListModel = copy(
     caption = as_caption(this.caption, caption),
     getSchema = as_schema(getSchema, schema),
-    tableKind = as_table_kind(tableKind, kind)
+    tableKind = get_table_kind(tableKind, kind)
   )
 
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, caption
   ){
-    protected def render_Content: NodeSeq = table(Renderer.TableCommand(tableKind, getSchema, entityType, records))
+    protected def render_Content: NodeSeq = table(Renderer.TableOrder(tableKind, getSchema, getEntityType, records))
   }.apply
   lazy val effectiveSchema = getSchema.getOrElse(RecordUtils.buildSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
@@ -432,12 +461,28 @@ case class PropertyTableModel(
   caption: Option[I18NElement],
   getSchema: Option[Schema],
   records: List[Record],
-  tableKind: TableKind = StandardTable,
+  tableKind: Option[TableKind] = None,
   expiresKind: Option[ExpiresKind] = None
 ) extends ITableModel with IComponentModel {
   def getEntityType = None
   protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORDS -> records.map(ViewRecord.create)
+  )
+
+  def withSchemaKind(
+    schema: Option[List[String]],
+    kind: Option[String]
+  ): PropertyTableModel = copy(
+    getSchema = as_schema(getSchema, schema),
+    tableKind = get_table_kind(tableKind, kind)
+  )
+
+  def withSchemaKind(
+    schema: Option[List[String]],
+    kind: TableKind
+  ): PropertyTableModel = copy(
+    getSchema = as_schema(getSchema, schema),
+    tableKind = Some(kind)
   )
 
   def withCaptionSchemaKind(
@@ -447,7 +492,7 @@ case class PropertyTableModel(
   ): PropertyTableModel = copy(
     caption = as_caption(this.caption, caption),
     getSchema = as_schema(getSchema, schema),
-    tableKind = as_table_kind(tableKind, kind)
+    tableKind = get_table_kind(tableKind, kind)
   )
 
   def toRecord: Record = throw new UnsupportedOperationException()
@@ -476,12 +521,27 @@ case class TableModel(
   caption: Option[I18NElement],
   getSchema: Option[Schema],
   records: List[Record],
-  tableKind: TableKind,
+  tableKind: Option[TableKind],
   expiresKind: Option[ExpiresKind] = None
 ) extends ITableModel with IComponentModel {
   def getEntityType = None
   protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORDS -> records.map(ViewRecord.create)
+  )
+  def withSchemaKind(
+    schema: Option[List[String]],
+    kind: Option[String]
+  ): TableModel = copy(
+    getSchema = as_schema(getSchema, schema),
+    tableKind = get_table_kind(tableKind, kind)
+  )
+
+  def withSchemaKind(
+    schema: Option[List[String]],
+    kind: TableKind
+  ): TableModel = copy(
+    getSchema = as_schema(getSchema, schema),
+    tableKind = Some(kind)
   )
 
   def withCaptionSchemaKind(
@@ -491,37 +551,37 @@ case class TableModel(
   ): TableModel = copy(
     caption = as_caption(this.caption, caption),
     getSchema = as_schema(getSchema, schema),
-    tableKind = as_table_kind(tableKind, kind)
+    tableKind = get_table_kind(tableKind, kind)
   )
 
   def toRecord: Record = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, caption
   ){
-    protected def render_Content: NodeSeq = table(tableKind, getSchema, records)
+    protected def render_Content: NodeSeq = table(strategy.tableKind(tableKind), getSchema, records)
   }.apply
   lazy val effectiveSchema = getSchema.getOrElse(RecordUtils.buildSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
   lazy val tbody: TableBodyModel = TableBodyModel(Some(effectiveSchema), records, tableKind)
 }
 object TableModel {
-  def apply(records: Seq[Record]): TableModel = TableModel(None, None, records.toList, StandardTable)
+  def apply(records: Seq[Record]): TableModel = TableModel(None, None, records.toList, None)
   def apply(caption: I18NElement, records: Seq[Record]): TableModel =
-    TableModel(Some(caption), None, records.toList, StandardTable)
+    TableModel(Some(caption), None, records.toList, None)
   def apply(caption: I18NElement, schema: Schema, records: Seq[Record]): TableModel =
-    TableModel(Some(caption), Some(schema), records.toList, StandardTable)
+    TableModel(Some(caption), Some(schema), records.toList, None)
 }
 
 case class TableHeadModel(
   schema: Schema,
-  tableKind: TableKind,
+  tableKind: Option[TableKind],
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IOrganismModel {
   def toRecord: Record = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ){
-    protected def render_Content: NodeSeq = table_head(tableKind, schema)
+    protected def render_Content: NodeSeq = table_head(strategy.tableKind(tableKind), schema)
   }.apply
 }
 
@@ -544,7 +604,7 @@ case class TableHeadRecordModel(
 case class TableBodyModel(
   getSchema: Option[Schema],
   records: List[Record],
-  tableKind: TableKind,
+  tableKind: Option[TableKind],
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IRecordsModel with IOrganismModel {
   def toRecord: Record = RAISE.notImplementedYetDefect
@@ -553,7 +613,7 @@ case class TableBodyModel(
   ){
     protected def render_Content: NodeSeq = {
       val s = getSchema.getOrElse(RecordUtils.buildSchema(records))
-      table_body(tableKind, s, records)
+      table_body(strategy.tableKind(tableKind), s, records)
     }
   }.apply
   def getEntityType = None
@@ -674,9 +734,9 @@ object RecordsModel {
 
 case class TableCardModel(
   records: TableModel,
-  imageTop: Option[ImageAlt] = None,
-  header: Option[TitleDescription] = None,
-  footer: Option[TitleDescription] = None,
+  imageTop: Option[Picture] = None,
+  header: Option[TitleLine] = None,
+  footer: Option[TitleLine] = None,
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IComponentModel {
   val caption = None
@@ -693,7 +753,7 @@ case class TableCardModel(
 }
 object TableCardModel {
   def apply(title: I18NElement, schema: Schema, records: Seq[Record]): TableCardModel =
-    TableCardModel(TableModel(None, Some(schema), records.toList, DashboardTable), None, Some(TitleDescription(title)))
+    TableCardModel(TableModel(None, Some(schema), records.toList, Some(DashboardTable)), None, Some(TitleLine(title)))
 }
 
 case class PropertyFormModel(
@@ -719,21 +779,44 @@ case class PropertyFormModel(
 /*
  *
  */
-case class TitleDescription(
+case class TitleLine(
   title: Option[I18NElement],
-  description: Option[I18NElement]
-)
-object TitleDescription {
-  def apply(title: I18NElement): TitleDescription = TitleDescription(Some(title), None)
+  subTitle: Option[I18NElement]
+) {
+  def toOption: Option[TitleLine] =
+    if (title.isEmpty)
+      None
+    else
+      Some(this)
+}
+object TitleLine {
+  def apply(title: I18NElement): TitleLine = TitleLine(Some(title), None)
 }
 
-case class ImageAlt(
+case class Picture( // HTML5 picture
+  // TODO source
+  // TODO map/area
   src: URI,
   alt: Option[I18NString],
-  href: Option[URI]
+  href: Option[URI],
+  size: Option[Int],
+  height: Option[Int],
+  width: Option[Int]
 )
-object ImageAlt {
-  def apply(src: URI): ImageAlt = ImageAlt(src, None, None)
+object Picture {
+  def apply(src: URI): Picture = Picture(src, None, None, None, None, None)
+}
+
+case class Card(
+  imagetop: Option[Picture],
+  header: Option[TitleLine],
+  footer: Option[TitleLine],
+  content: NodeSeq
+)
+object Card {
+  def apply(pic: Picture, header: TitleLine, content: NodeSeq): Card = Card(Some(pic), Some(header), None, content)
+
+  def apply(pic: Picture, header: Option[TitleLine], content: NodeSeq): Card = Card(Some(pic), header, None, content)
 }
 
 case class Submits(submits: Vector[Submit])

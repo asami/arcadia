@@ -11,7 +11,7 @@ import arcadia.model._
 
 /*
  * @since   Oct. 11, 2017
- * @version Oct. 11, 2017
+ * @version Oct. 16, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -55,9 +55,10 @@ case object GridTag extends Tag with SelectByName {
   val name = "grid"
 
   protected def eval_Expression(p: Expression): XmlContent = {
-    val kind = p.take("type", "standard")
     val column = p.getStringList("column")
-    val model = p.model
-    p.applyModel(model) // TODO
+    val model = p.model match {
+      case m: ITableModel => m.withSchemaKind(column, GridTable)
+    }
+    p.applyModel(model)
   }
 }
