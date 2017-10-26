@@ -19,7 +19,7 @@ import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL}
  * @since   Jul. 15, 2017
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
- * @version Oct.  6, 2017
+ * @version Oct. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -29,7 +29,7 @@ abstract class View() {
   def render(engine: ViewEngine, parcel: Parcel): NodeSeq =
     execute_apply(engine, parcel.forView(engine)).asXml
   def render(strategy: RenderStrategy): NodeSeq = strategy.viewContext.
-    map(x => render(x.engine, x.parcel)) getOrElse {
+    map(x => render(x.engine, x.parcel.withRenderStrategy(strategy))) getOrElse {
       RAISE.noReachDefect
     }
   def gv: (Guard, View) = (guard, this)

@@ -10,7 +10,7 @@ import arcadia.model._
 /*
  * @since   Aug.  2, 2017
  *  version Sep. 30, 2017
- * @version Oct. 14, 2017
+ * @version Oct. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -23,11 +23,13 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
    * Render
    */
   def render: NodeSeq = model match {
-    case m: IPageModel => render_html(m)
+    case m: IPageModel => render_page(m)
     case m: ISectionModel => render_section(m)
     case m: IComponentModel => render_component(m)
     case m: IAtomicModel => render_atomic(m)
   }
+
+  protected def render_page(p: IPageModel): NodeSeq = model.render(strategy)
 
   protected def render_html(p: IPageModel): NodeSeq = model.render(strategy.withScopeHtml)
 
@@ -121,7 +123,7 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   /*
    * Theme
    */
-  def bodyClassName: String = strategy.theme.body.className(strategy)
+  def bodyClassName: String = strategy.theme.body.cssClass(strategy)
 
   /*
    * Attributes

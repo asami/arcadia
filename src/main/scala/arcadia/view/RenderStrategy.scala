@@ -17,12 +17,10 @@ import arcadia.view.ViewEngine._
  * @since   Jul. 31, 2017
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
- * @version Oct. 18, 2017
+ * @version Oct. 25, 2017
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
-  scope: RenderScope,
-  size: RenderSize,
   locale: Locale,
   theme: RenderTheme,
   schema: SchemaRule,
@@ -32,23 +30,25 @@ case class RenderStrategy(
   renderContext: RenderContext,
   viewContext: Option[ViewContext]
 ) {
+  def scope = renderContext.scope
+  def size = renderContext.size getOrElse NormalSize
   def tableKind = renderContext.tableKind getOrElse theme.default.tableKind
   def tableKind(p: Option[TableKind]) = renderContext.tableKind orElse p getOrElse theme.default.tableKind
   def cardKind = renderContext.cardKind getOrElse theme.default.cardKind
   def isLogined = executeOption(_.isLogined) getOrElse false
   def getOperationName: Option[String] = executeOption(_.getOperationName).flatten
 
-  def withScopeHtml = copy(scope = Html)
-  def withScopeSection = copy(scope = Section)
+  def withScopeHtml = if (scope == Html) this else copy(renderContext = renderContext.withScopeHtml)
+  def withScopeSection = if (scope == Section) this else copy(renderContext = renderContext.withScopeSection)
   def withScopeSectionDown = scope match {
-    case Html => copy(scope = Section)
-    case Body => copy(scope = Section)
+    case Html => copy(renderContext = renderContext.withScopeSection)
+    case Body => copy(renderContext = renderContext.withScopeSection)
     case Section => copy(renderContext = renderContext.sectionDown)
     case Content => this
   }
-  def withScopeContent = copy(scope = Content)
+  def withScopeContent = if (scope == Content) this else copy(renderContext = renderContext.withScopeContent)
 
-  def withSizeTiny = copy(size = TinySize)
+  def withSizeTiny = if (size == TinySize) this else copy(renderContext = renderContext.withSizeTiny)
 
   def withViewContext(engine: ViewEngine, parcel: Parcel) = copy(viewContext = Some(ViewContext(engine, parcel)))
   def withThemePartials(t: RenderTheme, p: Partials) = copy(
@@ -58,6 +58,7 @@ case class RenderStrategy(
   def withApplicationRule(p: WebApplicationRule) = copy(application = p)
   def withEntityType(p: Option[DomainEntityType]) = copy(renderContext = renderContext.withEntityType(p))
   def withEntityType(p: DomainEntityType) = copy(renderContext = renderContext.withEntityType(p))
+  def withUsageKind(p: UsageKind) = copy(renderContext = renderContext.withUsageKind(p))
 
   def forComponent(engine: ViewEngine, parcel: Parcel) = forView(engine, parcel)
   def forView(engine: ViewEngine, parcel: Parcel) =
@@ -66,6 +67,8 @@ case class RenderStrategy(
     else
       copy(viewContext = Some(ViewContext(engine, parcel)))
 
+  def getEntityType = renderContext.entityType
+
   def execute[T](pf: ExecutionContext => T): T =
     executeOption(pf) getOrElse RAISE.noReachDefect
 
@@ -73,6 +76,8 @@ case class RenderStrategy(
     viewContext.flatMap(_.parcel.executeOption(pf))
 
   def resolveSchema(p: Renderer.TableOrder): Schema = schema.resolve(this, p)
+
+  def resolveSchema(entitytype: DomainEntityType, s: Schema): Schema = schema.resolve(this, entitytype, s)
 
   def format(column: Column, rec: Record): String = {
     rec.getOne(column.name).map {
@@ -89,11 +94,20 @@ case object Section extends RenderScope
 case object Content extends RenderScope
 
 sealed trait RenderSize {
+  def cssClass: String
 }
-case object NormalSize extends RenderSize // 14pt
-case object SmallSize extends RenderSize // 12pt
-case object VerySmallSize extends RenderSize // 10pt
-case object TinySize extends RenderSize // 8pt
+case object NormalSize extends RenderSize { // 14pt
+  val cssClass = "arcadia-normal-size"
+}
+case object SmallSize extends RenderSize { // 12pt
+  val cssClass = "arcadia-small-size"
+}
+case object VerySmallSize extends RenderSize { // 10pt
+  val cssClass = "arcadia-very-small-size"
+}
+case object TinySize extends RenderSize { // 8pt
+  val cssClass = "arcadia-tiny-size"
+}
 
 sealed trait RenderTheme extends ClassNamedValueInstance {
   protected def name_Suffix = "Theme"
@@ -113,25 +127,24 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
     def theme(strategy: RenderStrategy): Node = Group(Nil)
   }
   object body {
-    def className(strategy: RenderStrategy): String = body_ClassName(strategy)
+    def cssClass(strategy: RenderStrategy): String = body_CssClass(strategy)
   }
   object table {
-    def container(kind: TableKind, schema: Schema, records: Seq[Record]
-, body: => Node): Node = table_Container(kind, schema, records, body)
-    object className {
+    def container(p: Renderer.Table, body: => Node): Node = table_Container(p, body)
+    object css {
       import org.goldenport.Strings.blankopt
-      def caption(kind: TableKind) = table_ClassName_Caption(kind)
-      def table(kind: TableKind) = table_ClassName_Table(kind)
-      def thead(kind: TableKind) = table_ClassName_Thead(kind)
-      def tbody(kind: TableKind) = table_ClassName_Tbody(kind)
-      def tfoot(kind: TableKind) = table_ClassName_Tfoot(kind)
-      def theadTr(kind: TableKind) = table_ClassName_TheadTr(kind)
-      def theadTh(kind: TableKind) = table_ClassName_TheadTh(kind)
-      def tbodyTr(kind: TableKind) = table_ClassName_TbodyTr(kind)
-      def getTbodyTr(kind: TableKind) = blankopt(table_ClassName_TbodyTr(kind))
-      def tbodyTd(kind: TableKind) = table_ClassName_TbodyTd(kind)
-      def tfootTr(kind: TableKind) = table_ClassName_TfootTr(kind)
-      def tfootTd(kind: TableKind) = table_ClassName_TfootTd(kind)
+      def caption(p: Renderer.Table) = table_CssClass_Caption(p)
+      def table(p: Renderer.Table) = table_CssClass_Table(p)
+      def thead(p: Renderer.Table) = table_CssClass_Thead(p)
+      def tbody(p: Renderer.Table) = table_CssClass_Tbody(p)
+      def tfoot(p: Renderer.Table) = table_CssClass_Tfoot(p)
+      def theadTr(p: Renderer.Table) = table_CssClass_TheadTr(p)
+      def theadTh(p: Renderer.TableColumn) = table_CssClass_TheadTh(p)
+      def tbodyTr(p: Renderer.Table) = table_CssClass_TbodyTr(p)
+      def getTbodyTr(p: Renderer.Table) = blankopt(table_CssClass_TbodyTr(p))
+      def tbodyTd(p: Renderer.TableColumn) = table_CssClass_TbodyTd(p)
+      def tfootTr(p: Renderer.Table) = table_CssClass_TfootTr(p)
+      def tfootTd(p: Renderer.TableColumn) = table_CssClass_TfootTd(p)
     }
   }
   object sidebar {
@@ -166,20 +179,19 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
   protected def default_UsageKind: UsageKind = ListUsage
   protected def default_TableKind: TableKind = ListTable
   protected def default_CardKind: CardKind = BootstrapCard
-  protected def body_ClassName(strategy: RenderStrategy): String = ""
-  protected def table_Container(kind: TableKind, schema: Schema, records: Seq[Record]
-, body: => Node): Node = body
-  protected def table_ClassName_Caption(kind: TableKind): String = ""
-  protected def table_ClassName_Table(kind: TableKind): String = ""
-  protected def table_ClassName_Thead(kind: TableKind): String = ""
-  protected def table_ClassName_Tbody(kind: TableKind): String = ""
-  protected def table_ClassName_Tfoot(kind: TableKind): String = ""
-  protected def table_ClassName_TheadTr(kind: TableKind): String = ""
-  protected def table_ClassName_TheadTh(kind: TableKind): String = ""
-  protected def table_ClassName_TbodyTr(kind: TableKind): String = ""
-  protected def table_ClassName_TbodyTd(kind: TableKind): String = ""
-  protected def table_ClassName_TfootTr(kind: TableKind): String = ""
-  protected def table_ClassName_TfootTd(kind: TableKind): String = ""
+  protected def body_CssClass(strategy: RenderStrategy): String = ""
+  protected def table_Container(p: Renderer.Table, body: => Node): Node = body
+  protected def table_CssClass_Caption(p: Renderer.Table): String = ""
+  protected def table_CssClass_Table(p: Renderer.Table): String = ""
+  protected def table_CssClass_Thead(p: Renderer.Table): String = ""
+  protected def table_CssClass_Tbody(p: Renderer.Table): String = ""
+  protected def table_CssClass_Tfoot(p: Renderer.Table): String = ""
+  protected def table_CssClass_TheadTr(p: Renderer.Table): String = ""
+  protected def table_CssClass_TheadTh(p: Renderer.TableColumn): String = ""
+  protected def table_CssClass_TbodyTr(p: Renderer.Table): String = ""
+  protected def table_CssClass_TbodyTd(p: Renderer.TableColumn): String = ""
+  protected def table_CssClass_TfootTr(p: Renderer.Table): String = ""
+  protected def table_CssClass_TfootTd(p: Renderer.TableColumn): String = ""
 
   protected def sidebar_Feature_Item(
     view: ViewModel,
@@ -217,8 +229,7 @@ object RenderTheme extends EnumerationClass[RenderTheme] {
 }
 
 sealed trait BootstrapRenderThemaBase extends RenderTheme {
-  override protected def table_Container(kind: TableKind, schema: Schema, records: Seq[Record]
-, body: => Node): Node = kind match {
+  override protected def table_Container(p: Renderer.Table, body: => Node): Node = p.kind match {
     case StandardTable => _table_container_standard(body)
     case ListTable => _table_container_list(body)
     case GridTable => _table_container_grid(body)
@@ -226,7 +237,7 @@ sealed trait BootstrapRenderThemaBase extends RenderTheme {
     case PropertyTable => _table_container_standard(body) // TODO
     case EntityTable => _table_container_standard(body) // TODO
     case FormTable => _table_container_standard(body) // TODO
-    case DashboardTable => _table_container_card(body)
+    case DashboardTable => _table_container_dashboard(body)
   }
 
   private def _table_container_standard(body: => Node): Node = // TODO
@@ -239,11 +250,16 @@ sealed trait BootstrapRenderThemaBase extends RenderTheme {
   private def _table_container_grid(body: => Node): Node = {body}
 
   private def _table_container_card(body: => Node): Node = 
-    <div class="content table-responsive table-full-width" style="font-size:8px">
+    <div class="content table-responsive table-full-width">
       {body}
     </div>
 
-  override protected def table_ClassName_Table(kind: TableKind): String = "table table-hover" // table, table-striped, table-bordered, table-hover, table-condensed
+  private def _table_container_dashboard(body: => Node): Node = 
+    <div class="content table-responsive table-full-width arcadia-dashboard">
+      {body}
+    </div>
+
+  override protected def table_CssClass_Table(p: Renderer.Table): String = "table table-hover" // table, table-striped, table-bordered, table-hover, table-condensed
 
   // tr/td: active, success, info, warning, danger
 
@@ -268,11 +284,13 @@ case object PlainTheme extends RenderTheme {
 case object PaperDashboardTheme extends Bootstrap3RenderThemaBase {
   override protected def default_TableKind: TableKind = StandardTable
   override protected def default_CardKind: CardKind = PaperDashboardCard
+  override protected def table_CssClass_TheadTh(p: Renderer.TableColumn): String =
+    p.size.cssClass
 }
 case object MatrialKitTheme extends Bootstrap3RenderThemaBase {
 }
 case object NowUiKitTheme extends Bootstrap4RenderThemaBase {
-  override def body_ClassName(strategy: RenderStrategy): String = {
+  override def body_CssClass(strategy: RenderStrategy): String = {
     def default = "landing-page sidebar-collapse"
     strategy.getOperationName.map {
       case "index" => "index-page sidebar-collapse"
@@ -371,7 +389,8 @@ object ScreenEntityUsageSchemarRule {
 }
 
 case class EntityUsageSchemaRule(rules: Map[DomainEntityType, UsageSchemaRule]) {
-  def get(p: Option[DomainEntityType]): Option[UsageSchemaRule] = p.flatMap(rules.get)
+  def get(p: Option[DomainEntityType]): Option[UsageSchemaRule] = p.flatMap(get)
+  def get(p: DomainEntityType): Option[UsageSchemaRule] = rules.get(p)
 }
 object EntityUsageSchemaRule {
   val empty = EntityUsageSchemaRule(Map.empty)
@@ -382,6 +401,9 @@ case class UsageSchemaRule(rules: Map[UsageKind, Schema]) {
 }
 object UsageSchemaRule {
   val empty = UsageSchemaRule(Map.empty)
+
+  def create(p: (UsageKind, Schema), ps: (UsageKind, Schema)*): UsageSchemaRule =
+    UsageSchemaRule((p +: ps).toMap)
 }
 
 case class SchemaRule(
@@ -394,23 +416,27 @@ case class SchemaRule(
   def resolve(p: RenderStrategy, t: Renderer.TableOrder): Schema = {
     val ctx = p.renderContext
     ctx.schema getOrElse {
-      val entitytype = ctx.entityType orElse t.entityType
-      val usagekind = ctx.usageKind getOrElse p.theme.default.usageKind
       val schema = t.schema.getOrElse(RecordUtils.buildSchema(t.records.getOrElse(Nil)))
-      resolve(
-        ctx.operationKind,
-        ctx.screenKind,
-        entitytype,
-        usagekind,
-        schema
-      )
+      (ctx.entityType orElse t.entityType).fold(schema)(resolve(p, _, schema))
     }
+  }
+
+  def resolve(p: RenderStrategy, entitytype: DomainEntityType, schema: Schema): Schema = {
+    val ctx = p.renderContext
+    val usagekind = ctx.usageKind getOrElse p.theme.default.usageKind
+    resolve(
+      ctx.operationKind,
+      ctx.screenKind,
+      entitytype,
+      usagekind,
+      schema
+    )
   }
 
   def resolve(
     op: OperationMode,
     screen: ScreenKind,
-    entitytype: Option[DomainEntityType],
+    entitytype: DomainEntityType,
     usage: UsageKind,
     schema: Schema
   ): Schema = {
@@ -527,6 +553,8 @@ object Components {
 }
 
 case class RenderContext(
+  scope: RenderScope,
+  size: Option[RenderSize],
   operationKind: OperationMode,
   screenKind: ScreenKind,
   usageKind: Option[UsageKind],
@@ -536,15 +564,22 @@ case class RenderContext(
   entityType: Option[DomainEntityType],
   schema: Option[Schema]
 ) {
+  def withScopeHtml = copy(scope = Html)
+  def withScopeSection = copy(scope = Section)
+  def withScopeContent = copy(scope = Content)
+  def withSizeTiny = copy(size = Some(TinySize))
   def sectionDown = {
     val sl: Option[Int] = sectionLevel.map(_ + 1) orElse Some(1)
     copy(sectionLevel = sl)
   }
   def withEntityType(p: Option[DomainEntityType]) = copy(entityType = p)
   def withEntityType(p: DomainEntityType) = copy(entityType = Some(p))
+  def withUsageKind(p: UsageKind) = copy(usageKind = Some(p))
 }
 object RenderContext {
   val empty = RenderContext(
+    Html,
+    None,
     MediaOperationMode,
     WebScreen,
     None,

@@ -6,13 +6,13 @@ import org.goldenport.record.v2.Record
 import arcadia.context._
 import arcadia.domain._
 import arcadia.model.{Model, ErrorModel}
-import arcadia.view.{ViewEngine, RenderStrategy, Partials, View}
+import arcadia.view.{ViewEngine, RenderStrategy, Partials, View, UsageKind}
 
 /*
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
- * @version Oct. 14, 2017
+ * @version Oct. 25, 2017
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -36,6 +36,8 @@ case class Parcel(
     getOrElse(RAISE.noReachDefect)
 
   def withContent(p: Content) = copy(content = Some(p))
+  def withUsageKind(p: UsageKind) = render.
+    fold(RAISE.noReachDefect)(x => withRenderStrategy(x.withUsageKind(p)))
 
   def forComponent(model: Model) = withModel(model).copy(command = None).componentScope
   def forView(engine: ViewEngine) =
@@ -51,6 +53,9 @@ case class Parcel(
       RAISE.noReachDefect
     }
 
+  def toStrategy: RenderStrategy = render getOrElse {
+    RAISE.noReachDefect
+  }
   def getEffectiveModel: Option[Model] = model orElse command.flatMap(_.getModel)
   def toMessage: String = {
     command.map(_.toString) orElse
@@ -60,6 +65,7 @@ case class Parcel(
     RAISE.noReachDefect
   }
   def getOperationName: Option[String] = context.flatMap(_.getOperationName)
+  def getEntityType: Option[DomainEntityType] = render.flatMap(_.getEntityType)
 
   def goOrigin: Parcel = RAISE.notImplementedYetDefect
   def goError(e: Throwable): Parcel = withModel(ErrorModel.create(this, e))
@@ -70,8 +76,8 @@ case class Parcel(
   def controllerUri: URI = context.map(_.controllerUri) getOrElse RAISE.noReachDefect
 //  def eventName: String = context.flatMap(_.getFormParameter("Submit")) getOrElse RAISE.notImplementedYetDefect
   def exception: Throwable = RAISE.notImplementedYetDefect
-  def domainEntityType: DomainEntityType = context.flatMap(_.getFormParameter("web.entity.type")).map(DomainEntityType(_)) getOrElse RAISE.noReachDefect
-  def domainEntityId: DomainObjectId = context.flatMap(_.getFormParameter("web.entity.id").map(StringDomainObjectId(_))) getOrElse RAISE.noReachDefect
+//  def domainEntityType: DomainEntityType = context.flatMap(_.getFormParameter("web.entity.type")).map(DomainEntityType(_)) getOrElse RAISE.noReachDefect
+//  def domainEntityId: DomainObjectId = context.flatMap(_.getFormParameter("web.entity.id").map(StringDomainObjectId(_))) getOrElse RAISE.noReachDefect
 
   def execute[T](pf: ExecutionContext => T): T = executeOption(pf).getOrElse {
     RAISE.noReachDefect

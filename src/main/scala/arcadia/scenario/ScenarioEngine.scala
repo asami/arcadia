@@ -7,7 +7,7 @@ import arcadia.context._
 
 /*
  * @since   Sep. 17, 2017
- * @version Oct.  5, 2017
+ * @version Oct. 25, 2017
  * @author  ASAMI, Tomoharu
  */
 class ScenarioEngine(
@@ -20,7 +20,7 @@ class ScenarioEngine(
 
   private def _apply(parcel: Parcel, command: ScenarioCommand): Parcel =
     command.getScenario.fold {
-      Scenario.get(parcel, command).map(_.start(parcel)).getOrElse {
+      Scenario.launch(parcel, command).map(_.start(parcel)).getOrElse {
         RAISE.notImplementedYetDefect
       }
     } { scenario =>

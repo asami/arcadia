@@ -2,23 +2,26 @@ package arcadia.model
 
 import scala.xml.{NodeSeq, Group, Text}
 import java.net.URI
+import java.util.Locale
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2._
 import org.goldenport.record.v2.util.RecordUtils
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.util.StringUtils
+import com.asamioffice.goldenport.text.UString
 import arcadia._
 import arcadia.context._
 import arcadia.view._
 import arcadia.view.ViewEngine._
 import arcadia.view.tag.Tag
+import arcadia.scenario.Event
 import arcadia.domain._
 
 /*
  * @since   Jul. 29, 2017
  *  version Aug. 30, 2017
  *  version Sep. 27, 2017
- * @version Oct. 18, 2017
+ * @version Oct. 25, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -214,7 +217,9 @@ object ErrorModel {
   private def _back_uri(parcel: Parcel): Option[URI] = None // TODO
 }
 
-sealed trait ValueModel extends Model with IAtomicModel
+sealed trait ValueModel extends Model with IAtomicModel {
+  def datatype: DataType
+}
 case class SingleValueModel(datatype: DataType, v: Option[Any]) extends ValueModel {
   val expiresKind = None
   def toRecord: Record = RAISE.notImplementedYetDefect
@@ -655,6 +660,7 @@ case class TableBodyRecordModel(
 }
 
 case class TableHeadRecordDataModel(
+  column: Column,
   value: ValueModel,
   tableKind: TableKind,
   expiresKind: Option[ExpiresKind] = None
@@ -663,13 +669,14 @@ case class TableHeadRecordDataModel(
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ){
-    protected def render_Content: NodeSeq = table_body_record_data(tableKind, value)
+    protected def render_Content: NodeSeq = table_body_record_data(column, tableKind, value)
   }.apply
   def getEntityType = None
   def record = toRecord
 }
 
 case class TableBodyRecordDataModel(
+  column: Column,
   value: ValueModel,
   tableKind: TableKind,
   expiresKind: Option[ExpiresKind] = None
@@ -678,7 +685,7 @@ case class TableBodyRecordDataModel(
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ){
-    protected def render_Content: NodeSeq = table_body_record_data(tableKind, value)
+    protected def render_Content: NodeSeq = table_body_record_data(column, tableKind, value)
   }.apply
   def getEntityType = None
   def record = toRecord
@@ -756,7 +763,7 @@ object TableCardModel {
     TableCardModel(TableModel(None, Some(schema), records.toList, Some(DashboardTable)), None, Some(TitleLine(title)))
 }
 
-case class PropertyFormModel(
+case class PropertyInputFormModel(
   uri: URI,
   method: Method,
   schema: Schema,
@@ -771,7 +778,27 @@ case class PropertyFormModel(
     strategy, None, None, None, None
   ) {
     protected def render_Content: NodeSeq =
-      property_form(uri, method, schema, record, hidden, submit)
+      property_input_form(uri, method, schema, record, hidden, submit)
+  }.apply
+  protected def view_Bindings(strategy: RenderStrategy): Map[String, AnyRef] = Map.empty
+}
+
+case class PropertyConfirmFormModel(
+  uri: URI,
+  method: Method,
+  schema: Schema,
+  record: Record,
+  hidden: Hidden,
+  submit: Submits,
+  expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
+) extends Model with IFormModel with IComponentModel {
+  val caption = None
+  def toRecord: Record = throw new UnsupportedOperationException()
+  def render(strategy: RenderStrategy): NodeSeq = new Renderer(
+    strategy, None, None, None, None
+  ) {
+    protected def render_Content: NodeSeq =
+      property_confirm_form(uri, method, schema, record, hidden, submit)
   }.apply
   protected def view_Bindings(strategy: RenderStrategy): Map[String, AnyRef] = Map.empty
 }
@@ -820,22 +847,44 @@ object Card {
 }
 
 case class Submits(submits: Vector[Submit])
+object Submits {
+  def apply(p: Submit, ps: Submit*): Submits = Submits(
+    (p +: ps).toVector
+  )
+}
 
-case class Submit(kind: SubmitKind) {
-  def name = kind.name
+case class Submit(kind: SubmitKind, label: I18NString) {
+  def name = ScenarioCommand.PROP_SUBMIT_PREFIX + kind.name
+  def value(locale: Locale) = label(locale)
+}
+object Submit {
+  def apply(kind: SubmitKind): Submit = Submit(kind, kind.label)
 }
 
 sealed trait SubmitKind {
   def name: String
+  def label: I18NString = I18NString(UString.capitalize(name))
 }
 case object OkSubmitKind extends SubmitKind {
-  def name: String = "ok"
+  def name: String = Event.EVENT_OK
 }
 case object CancelSubmitKind extends SubmitKind {
-  def name: String = "cancel"
+  def name: String = Event.EVENT_CANCEL
+}
+case object InputSubmitKind extends SubmitKind {
+  def name: String = Event.EVENT_INPUT
+}
+case object CreateSubmitKind extends SubmitKind {
+  def name: String = Event.EVENT_CREATE
+}
+case object UpdateSubmitKind extends SubmitKind {
+  def name: String = Event.EVENT_UPDATE
+}
+case object DELETESubmitKind extends SubmitKind {
+  def name: String = Event.EVENT_DELETE
 }
 case object BackSubmitKind extends SubmitKind {
-  def name: String = "back"
+  def name: String = Event.EVENT_BACK
 }
 
 case class Hidden(
@@ -843,7 +892,7 @@ case class Hidden(
   scenario: Option[String]
 ) {
   def render: NodeSeq = <div>{
-    scenario.map(x => <input type="hidden" name="web.scenario" value={x}></input>).toList
+    scenario.map(x => <input type="hidden" name={ScenarioCommand.PROP_SCENARIO} value={x}></input>).toList
   }</div>
 }
 

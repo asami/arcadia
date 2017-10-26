@@ -16,7 +16,7 @@ import org.goldenport.util.DateTimeUtils.httpDateTimeString
  * @since   Jul. 16, 2017
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
- * @version Oct. 14, 2017
+ * @version Oct. 24, 2017
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
@@ -149,6 +149,9 @@ case class RedirectContent(
   def etag: Option[ETag] = None
   def lastModified: Option[DateTime] = None
   def withExpiresPeriod(p: FiniteDuration): RedirectContent = this
+}
+object RedirectContent {
+  def apply(p: String): RedirectContent = RedirectContent(new URI(p))
 }
 
 // https://stackoverflow.com/questions/18148884/difference-between-no-cache-and-must-revalidate

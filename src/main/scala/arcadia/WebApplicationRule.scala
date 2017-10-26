@@ -6,11 +6,14 @@ import java.net.URI
 import com.typesafe.config.{Config, ConfigFactory}
 import org.goldenport.i18n.I18NElement
 import org.goldenport.xml.XhtmlUtils
+import org.goldenport.i18n.I18NString
 import org.goldenport.util.HoconUtils.Implicits._
+import arcadia.model.SubmitKind
 
 /*
  * @since   Aug. 12, 2017
- * @version Aug. 30, 2017
+ *  version Aug. 30, 2017
+ * @version Oct. 22, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationRule(
@@ -47,6 +50,8 @@ case class WebApplicationRule(
   }
 
   def complements(xs: Seq[WebApplicationRule]) = xs./:(this)(_ complement _)
+
+  def submitLabel(kind: SubmitKind): I18NString = kind.label
 }
 
 object WebApplicationRule {

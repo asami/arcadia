@@ -19,7 +19,7 @@ import arcadia.domain._
  * @since   Aug.  1, 2017
  *  version Aug. 29, 2017
  *  version Sep. 26, 2017
- * @version Oct. 18, 2017
+ * @version Oct. 25, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -104,20 +104,24 @@ abstract class Renderer(
     tabular(schema, records)
   }
 
-  protected def tabular(schema: Schema, records: Seq[Record]): NodeSeq = <table class={theme_table.className.table(TabularTable)}>{
+  protected def tabular(schema: Schema, records: Seq[Record]): NodeSeq = {
+    val t = TableWithRecords(TabularTable, strategy.size, schema, records)
+    <table class={theme_table.css.table(t.table)}>{
     seq(
-      caption.map(x => <caption class={theme_table.className.tbody(TabularTable)}>{nodeseq(x)}</caption>),
-      Some(table_records(TabularTable, schema, records))
+      caption.map(x => <caption class={theme_table.css.tbody(t.table)}>{nodeseq(x)}</caption>),
+      Some(table_records(t))
     )
-  }</table>
+    }</table>
+  }
 
   protected def table(p: TableOrder): NodeSeq = {
     val records = p.records getOrElse Nil
     val kind = p.kind getOrElse strategy.tableKind
+    val size = p.size getOrElse strategy.size
     val schema = strategy.resolveSchema(p)
 //    val schema = p.schema getOrElse build_schema(records)
     val entitytype = p.entityType
-    val t = Table(kind, schema, entitytype, records)
+    val t = TableWithRecords(kind, size, schema, entitytype, records)
     table(t)
   }
 
@@ -136,9 +140,9 @@ abstract class Renderer(
     table(strategy.tableKind, schema, records)
   
   protected def table(kind: TableKind, schema: Schema, records: Seq[Record]): NodeSeq =
-    table(TableOrder(Some(kind), Some(schema), None, Some(records)))
+    table(TableOrder(Some(kind), None, Some(schema), None, Some(records)))
 
-  protected def table(p: Table): NodeSeq =
+  protected def table(p: TableWithRecords): NodeSeq =
     p.kind match {
       case StandardTable => table_standard(p)
       case ListTable => table_list(p)
@@ -146,52 +150,57 @@ abstract class Renderer(
       case _ => table_standard(p)
     }
 
-  protected def table_list(p: Table): NodeSeq = table_standard(p)
+  protected def table_list(p: TableWithRecords): NodeSeq = table_standard(p)
 
-  protected def table_standard(p: Table): NodeSeq = theme_table.container(p.kind, p.schema, p.records,
-    <table class={theme_table.className.table(p.kind)}>{
+  protected def table_standard(p: TableWithRecords): NodeSeq = theme_table.container(p.table,
+    <table class={theme_table.css.table(p.table)}>{
       seq(
-        caption.map(x => <caption class={theme_table.className.caption(p.kind)}>{nodeseq(x)}</caption>),
-        Some(table_head(p)),
+        caption.map(x => <caption class={theme_table.css.caption(p.table)}>{nodeseq(x)}</caption>),
+        Some(table_head(p.table)),
         Some(table_body(p)),
-        None.map(x => <tfoot class={theme_table.className.tfoot(p.kind)}></tfoot>)
+        None.map(x => <tfoot class={theme_table.css.tfoot(p.table)}></tfoot>)
       )
     }</table>
   )
 
+  protected def table_head(tablekind: TableKind, schema: Schema): Node =
+    table_head(Table(tablekind, strategy.size, schema))
+
   protected def table_head(p: Table): Node = p.kind match {
     case ListTable => Group(Nil)
-    case _ => table_head(p.kind, p.schema)
+    case _ => <thead class={theme_table.css.thead(p)}>{table_head_record(p)}</thead>
   }
 
-  protected def table_head(kind: TableKind, schema: Schema): Elem =
-    <thead class={theme_table.className.thead(kind)}>{table_head_record(kind, schema)}</thead>
+  protected def table_head_record(tablekind: TableKind, schema: Schema): Node =
+    table_head_record(Table(tablekind, strategy.size, schema))
 
-  protected def table_head_record(kind: TableKind, schema: Schema): Elem =
-    <tr classw={theme_table.className.theadTr(kind)}>{
-      for (c <- schema.columns) yield <th class={theme_table.className.theadTh(kind)}>{c.label(locale)}</th>
+  protected def table_head_record(p: Table): Elem =
+    <tr class={theme_table.css.theadTr(p)}>{
+      for (c <- p.schema.columns) yield <th class={theme_table.css.theadTh(p.tableColumn(c))}>{c.label(locale)}</th>
     }</tr>
 
-  protected def table_body(p: Table): Elem =
-    <tbody class={theme_table.className.tbody(p.kind)}>{table_body_records(p)}</tbody>
-
   protected def table_body(kind: TableKind, schema: Schema, records: Seq[Record]): Elem =
-    <tbody class={theme_table.className.tbody(kind)}>{table_body_records(kind, schema, records)}</tbody>
+    table_body(TableWithRecords(kind, strategy.size, schema, records))
+  //   <tbody class={theme_table.css.tbody(kind)}>{table_body_records(kind, schema, records)}</tbody>
 
-  protected def table_body_records(p: Table): Group =
-    Group(p.records.toList.map(table_body_record(p, _)))
+  protected def table_body(p: TableWithRecords): Elem =
+    <tbody class={theme_table.css.tbody(p.table)}>{table_body_records(p)}</tbody>
 
-  protected def table_body_records(kind: TableKind, schema: Schema, records: Seq[Record]): Group =
-    Group(records.toList.map(table_body_record(kind, schema, _)))
+  protected def table_body_records(p: TableWithRecords): Group =
+    Group(p.records.toList.map(table_body_record(p.table, _)))
+
+  // protected def table_body_records(kind: TableKind, schema: Schema, records: Seq[Record]): Group =
+  //   Group(records.toList.map(table_body_record(kind, schema, _)))
+
+  protected def table_body_record(kind: TableKind, schema: Schema, record: Record): Node =
+    table_body_record(Table(kind, strategy.size, schema), record)
+  //   table_record(kind, schema, record)
 
   protected def table_body_record(p: Table, record: Record): Node = 
     table_record(p, record)
 
-  protected def table_body_record(kind: TableKind, schema: Schema, record: Record): Elem = 
-    table_record(kind, schema, record)
-
-  protected def table_body_record_data(kind: TableKind, value: ValueModel): Elem =
-    table_data(value)
+  protected def table_body_record_data(column: Column, kind: TableKind, value: ValueModel): Elem =
+    table_data(TableColumn(kind, strategy.size, column), value)
 
   protected def table_records(schema: Option[Schema], records: Seq[Record]): Group =
     schema.fold(
@@ -204,7 +213,10 @@ abstract class Renderer(
     table_records(strategy.tableKind, schema, records)
 
   protected def table_records(kind: TableKind, schema: Schema, records: Seq[Record]): Group =
-    Group(for (rec <- records) yield table_record(kind, schema, rec))
+    table_records(TableWithRecords(kind, strategy.size, schema, records))
+
+  protected def table_records(p: TableWithRecords): Group =
+    Group(for (rec <- p.records) yield table_record(p.table, rec))
 
   protected def table_record(p: Table, record: Record): Node =
     p.kind match {
@@ -212,30 +224,28 @@ abstract class Renderer(
       case _ => table_record_standard(p, record)
     }
 
-  protected def table_record(schema: Option[Schema], record: Record): Elem =
+  protected def table_record(schema: Option[Schema], record: Record): Node =
     schema.fold(
       table_record(build_schema(record), record)
     )(
       table_record(_, record)
     )
 
-  protected def table_record(schema: Schema, record: Record): Elem =
+  protected def table_record(schema: Schema, record: Record): Node =
     table_record(strategy.tableKind, schema, record)
 
-  protected def table_record(kind: TableKind, schema: Schema, record: Record): Elem =
-    <tr class={theme_table.className.tbodyTr(kind)}>{
-      for (c <- schema.columns) yield table_data(kind, c, record)
-    }</tr>
+  protected def table_record(kind: TableKind, schema: Schema, record: Record): Node =
+    table_record(Table(kind, strategy.size, schema), record)
 
   protected def table_record_standard(p: Table, record: Record): Elem = {
     val attrs = SeqUtils.buildTupleVector(
       Vector(
-        "class" -> theme_table.className.getTbodyTr(p.kind),
+        "class" -> theme_table.css.getTbodyTr(p),
         "data-href" -> table_data_url(p, record)
       )
     )
     val children = for (c <- p.schema.columns) yield {
-      table_data(p.kind, c, record)
+      table_data(p, c, record)
     }
     XmlUtils.element("tr", attrs, children)
   }
@@ -243,7 +253,7 @@ abstract class Renderer(
   protected def table_record_list(p: Table, record: Record): Node = {
     val attrs = SeqUtils.buildTupleVector(
       Vector(
-        "class" -> theme_table.className.getTbodyTr(p.kind),
+        "class" -> theme_table.css.getTbodyTr(p),
         "data-href" -> table_data_url(p, record)
       )
     )
@@ -251,12 +261,14 @@ abstract class Renderer(
     val title = get_title(record).map(nodeseq).getOrElse(Text(""))
     val subtitle = get_subtitle(record).map(nodeseq).getOrElse(Text(""))
     val content: Node = get_content_summary(record) getOrElse Text("")
+    val column = Column("dummy", XString) // TODO
+    val tc = p.tableColumn(column)
     val row1 = List(
-      <td class={theme_table.className.tbodyTd(p.kind)} rowspan="2">{table_value_img_picture{icon}}</td>,
-      <td class={theme_table.className.tbodyTd(p.kind)}>{title}</td>
+      <td class={theme_table.css.tbodyTd(tc)} rowspan="2">{table_value_img_picture{icon}}</td>,
+      <td class={theme_table.css.tbodyTd(tc)}>{title}</td>
     )
     val row2 = List(
-      <td class={theme_table.className.tbodyTd(p.kind)}>{content}</td>
+      <td class={theme_table.css.tbodyTd(tc)}>{content}</td>
     )
     Group(List(
       XmlUtils.element("tr", attrs, row1),
@@ -276,11 +288,14 @@ abstract class Renderer(
   protected def domain_entity_id(entitytype: DomainEntityType, id: Any): DomainEntityId =
     DomainEntityId(entitytype, StringDomainObjectId(id.toString), None) // TODO
 
-  protected def table_data(kind: TableKind, column: Column, record: Record): Elem =
-    <td class={theme_table.className.tbodyTd(kind)}>{table_value(column, record)}</td>
+  protected def table_data(p: Table, column: Column, record: Record): Elem =
+    table_data(p.tableColumn(column), record)
 
-  protected def table_data(v: ValueModel): Elem =
-    <td class={theme_table.className.tbodyTd(strategy.tableKind)}>{table_value(v)}</td>
+  protected def table_data(p: TableColumn, record: Record): Elem =
+    <td class={theme_table.css.tbodyTd(p)}>{table_value(p.column, record)}</td>
+
+  protected def table_data(p: TableColumn, v: ValueModel): Elem =
+    <td class={theme_table.css.tbodyTd(p)}>{table_value(v)}</td>
 
   protected def table_value(column: Column, record: Record): Node =
     get_table_value(column, record).getOrElse(Text(""))
@@ -467,23 +482,26 @@ abstract class Renderer(
     property_sheet(schema, record)
   }
 
-  protected def property_sheet(schema: Schema, record: Record): NodeSeq =
-    <table class={theme_table.className.table(PropertyTable)}>
-  <tbody>{
-    for (c <- schema.columns) yield {
-      <tr class={theme_table.className.tbodyTr(PropertyTable)}>{
-        List(
-          <th class={theme_table.className.theadTh(PropertyTable)}>{c.label(locale)}</th>,
-          table_data(PropertyTable, c, record)
-        )
-      }</tr>
-    }
-  }</tbody>
-  </table>
+  protected def property_sheet(schema: Schema, record: Record): NodeSeq = {
+    val t = Table(PropertyTable, strategy.size, schema)
+    <table class={theme_table.css.table(t)}>
+      <tbody>{
+        for (c <- schema.columns) yield {
+          <tr class={theme_table.css.tbodyTr(t)}>{
+            val tc = t.tableColumn(c)
+            List(
+              <th class={theme_table.css.theadTh(tc)}>{c.label(locale)}</th>,
+              table_data(tc, record)
+            )
+          }</tr>
+        }
+      }</tbody>
+    </table>
+  }
 
   protected def property_sheet_confirm(): NodeSeq = RAISE.notImplementedYetDefect
 
-  protected def property_form(
+  protected def property_input_form(
     action: URI,
     method: Method,
     schema: Schema,
@@ -491,14 +509,16 @@ abstract class Renderer(
     hidden: Hidden,
     submits: Submits
   ): NodeSeq = {
+    val t = Table(FormTable, strategy.size, schema)
     <form action={action.toString} method={method.name}>
-      <table class={theme_table.className.table(FormTable)}>
+      <table class={theme_table.css.table(t)}>
       <tbody>{
         for (c <- schema.columns) yield {
-          <tr class={theme_table.className.tbodyTr(FormTable)}>{
+          val tc = t.tableColumn(c)
+          <tr class={theme_table.css.tbodyTr(t)}>{
             List(
-              <th class={theme_table.className.theadTh(FormTable)}>{c.label(locale)}</th>,
-              input_field(c, record)
+              <th class={theme_table.css.theadTh(tc)}>{c.label(locale)}</th>,
+              input_field(tc, record)
             )
           }</tr>
         }
@@ -507,7 +527,7 @@ abstract class Renderer(
       <table>
         <tr>{
           for (s <- submits.submits) yield {
-            <td><input type="submit" value={s.name}></input></td>
+            <td><input type="submit" name={s.name} value={s.value(strategy.locale)}></input></td>
           }
         }</tr>
       </table>
@@ -515,21 +535,65 @@ abstract class Renderer(
     </form>
   }
 
-  protected def input_field(column: Column, record: Record) = {
+  protected def input_field(tc: TableColumn, record: Record) = {
+    val column = tc.column
     if (column.form.readonly)
-      table_data(FormTable, column, record)
+      table_data(tc, record)
     else
-      <td class={theme_table.className.tbodyTd(FormTable)}>{_input_field(column, record)}</td>
+      <td class={theme_table.css.tbodyTd(tc)}>{_input_field(column, record)}</td>
   }
 
   protected def _input_field(column: Column, record: Record) = {
+    val s = record.getString(column.name) getOrElse ""
     column.datatype match {
-      case XText => <textarea name={column.name} rows="4"></textarea>
-      case _ => <input type="text" name={column.name}></input>
+      case XText => <textarea name={column.name} rows="4" value={s}></textarea>
+      case _ => <input type="text" name={column.name} value={s}></input>
     }
   }
 
-  protected def grid(p: Table): Elem = {
+  protected def get_hidden_data(column: Column, record: Record) =
+    record.getString(column.name).map(s =>
+      <input type="hidden" name={column.name} value={s}></input>
+    )
+
+  protected def property_confirm_form(
+    action: URI,
+    method: Method,
+    schema: Schema,
+    record: Record,
+    hidden: Hidden,
+    submits: Submits
+  ): NodeSeq = {
+    val t = Table(FormTable, strategy.size, schema)
+    <form action={action.toString} method={method.name}>
+      <table class={theme_table.css.table(t)}>
+      <tbody>{
+        for (c <- schema.columns) yield {
+          val tc = t.tableColumn(c)
+          <tr class={theme_table.css.tbodyTr(t)}>{
+            List(
+              <th class={theme_table.css.theadTh(tc)}>{c.label(locale)}</th>,
+              table_data(tc, record)
+            )
+          }</tr>
+        }
+      }</tbody>
+      </table>
+      {
+        schema.columns.flatMap(get_hidden_data(_, record))
+      }
+      <table>
+        <tr>{
+          for (s <- submits.submits) yield {
+            <td><input type="submit" name={s.name} value={s.value(strategy.locale)}></input></td>
+          }
+        }</tr>
+      </table>
+      {hidden.render}
+    </form>
+  }
+
+  protected def grid(p: TableWithRecords): Elem = {
     val ncolumns = 6
     val width = 12 / ncolumns
     <div class="container"> { // container-fluid
@@ -688,6 +752,7 @@ abstract class Renderer(
 object Renderer {
   case class TableOrder(
     kind: Option[TableKind],
+    size: Option[RenderSize],
     schema: Option[Schema],
     entityType: Option[DomainEntityType],
     records: Option[Seq[Record]]
@@ -698,34 +763,97 @@ object Renderer {
       schema: Option[Schema],
       entitytype: DomainEntityType,
       records: Seq[Record]
-    ): TableOrder = TableOrder(Some(kind), schema, Some(entitytype), Some(records))
+    ): TableOrder = TableOrder(Some(kind), None, schema, Some(entitytype), Some(records))
 
     def apply(
       kind: TableKind,
       schema: Option[Schema],
       entitytype: Option[DomainEntityType],
       records: Seq[Record]
-    ): TableOrder = TableOrder(Some(kind), schema, entitytype, Some(records))
+    ): TableOrder = TableOrder(Some(kind), None, schema, entitytype, Some(records))
 
     def apply(
       kind: Option[TableKind],
       schema: Option[Schema],
       entitytype: DomainEntityType,
       records: Seq[Record]
-    ): TableOrder = TableOrder(kind, schema, Some(entitytype), Some(records))
+    ): TableOrder = TableOrder(kind, None, schema, Some(entitytype), Some(records))
 
     def apply(
       kind: Option[TableKind],
       schema: Option[Schema],
       entitytype: Option[DomainEntityType],
       records: Seq[Record]
-    ): TableOrder = TableOrder(kind, schema, entitytype, Some(records))
+    ): TableOrder = TableOrder(kind, None, schema, entitytype, Some(records))
   }
 
   case class Table(
     kind: TableKind,
+    size: RenderSize,
     schema: Schema,
-    entityType: Option[DomainEntityType],
+    entityType: Option[DomainEntityType]
+  ) {
+    def tableColumn(c: Column) = TableColumn(kind, size, c)
+  }
+  object Table {
+    def apply(
+      kind: TableKind,
+      size: RenderSize,
+      schema: Schema
+    ): Table = Table(kind, size, schema, None)
+  }
+
+  case class TableWithRecords(
+    table: Table,
     records: Seq[Record]
+  ) {
+    def kind = table.kind
+    def size = table.size
+    def schema = table.schema
+    def entityType = table.entityType
+  }
+  object TableWithRecords {
+    def apply(
+      kind: TableKind,
+      size: RenderSize,
+      schema: Schema,
+      entitytype: DomainEntityType,
+      records: Seq[Record]
+    ): TableWithRecords = TableWithRecords(
+      Table(kind, size, schema, Some(entitytype)),
+      records
+    )
+
+    def apply(
+      kind: TableKind,
+      size: RenderSize,
+      schema: Schema,
+      entitytype: Option[DomainEntityType],
+      records: Seq[Record]
+    ): TableWithRecords = TableWithRecords(
+      Table(kind, size, schema, entitytype),
+      records
+    )
+
+    def apply(
+      kind: TableKind,
+      size: RenderSize,
+      schema: Schema,
+      records: Seq[Record]
+    ): TableWithRecords = TableWithRecords(
+      Table(kind, size, schema),
+      records
+    )
+  }
+
+  case class TableColumn(
+    kind: TableKind,
+    size: RenderSize,
+    column: Column
+  )
+
+  case class TableColumnWithRecord(
+    tableColumn: TableColumn,
+    record: Record
   )
 }

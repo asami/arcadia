@@ -12,7 +12,7 @@ import arcadia.scenario.Scenario
  * @since   Jul. 16, 2017
  *  version Aug. 29, 2017
  *  version Sep. 25, 2017
- * @version Oct. 14, 2017
+ * @version Oct. 24, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Command {
@@ -113,10 +113,11 @@ case class ScenarioCommand(
 
   def name: String = path.head
   def entityName: String = path(1)
-  def getSubmit: Option[String] = formRecord.getString(PROP_SUBMIT)
+  def entityType: DomainEntityType = DomainEntityType(entityName)
+  def getSubmit: Option[String] = form.keys.find(_.startsWith(PROP_SUBMIT_PREFIX)).map(_.substring(PROP_SUBMIT_PREFIX.length))
   def getScenario: Option[Scenario] = formRecord.getString(PROP_SCENARIO).map(Scenario.unmarshall)
 }
 object ScenarioCommand {
-  val PROP_SUBMIT = "Submit"
+  val PROP_SUBMIT_PREFIX = "$submit_"
   val PROP_SCENARIO = "$scenario"
 }

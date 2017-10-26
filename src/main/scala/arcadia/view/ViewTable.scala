@@ -6,7 +6,7 @@ import arcadia.model._
 
 /*
  * @since   Sep. 24, 2017
- * @version Oct. 18, 2017
+ * @version Oct. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 trait IViewTable {
@@ -36,7 +36,7 @@ object ViewTHead {
   def create(p: IViewTable): ViewTHead = {
     val model = p.model.thead
     val a = for (c <- p.schema.columns) yield {
-      val hm = TableHeadRecordDataModel(ValueModel.create(c.name), p.tableKind)
+      val hm = TableHeadRecordDataModel(c, ValueModel.create(c.name), p.tableKind)
       ViewTh(hm, c.label(p.strategy.locale), p.strategy)
     }
     val rm = TableHeadRecordModel(p.schema, p.tableKind)
@@ -54,7 +54,7 @@ object ViewTBody {
     val model = p.model.tbody
     val a = for (x <- p.model.records) yield {
       val b = for (c <- p.schema.columns) yield {
-        val dm = TableBodyRecordDataModel(ValueModel.create(c, x), p.tableKind)
+        val dm = TableBodyRecordDataModel(c, ValueModel.create(c, x), p.tableKind)
         ViewTd(dm, p.strategy.format(c, x), p.strategy)
       }
       val rm = TableBodyRecordModel(Some(p.schema), x, p.tableKind)

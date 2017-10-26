@@ -7,7 +7,7 @@ import org.goldenport.values.ResourceName
 /*
  * @since   Aug. 30, 2017
  *  version Sep. 20, 2017
- * @version Oct. 13, 2017
+ * @version Oct. 24, 2017
  * @author  ASAMI, Tomoharu
  */
 trait DomainObject {
@@ -29,16 +29,16 @@ case class RecordDomainObject(rec: Record) extends DomainObject {
 }
 
 trait DomainObjectId {
-  def s: String
+  def v: String
 }
 
-case class StringDomainObjectId(s: String) extends AnyRef with DomainObjectId {
-  override def toString() = s
+case class StringDomainObjectId(v: String) extends AnyRef with DomainObjectId {
+  override def toString() = v
 }
 
 object DomainObjectId {
   object undefined extends DomainObjectId {
-    def s = "id undefined*"
+    def v = "id undefined*"
   }
 }
 
@@ -53,5 +53,5 @@ case class DomainEntityId(
   id: DomainObjectId,
   getPresentationId: Option[String]
 ) {
-  def presentationId: String = getPresentationId getOrElse id.s
+  def presentationId: String = getPresentationId getOrElse id.v
 }

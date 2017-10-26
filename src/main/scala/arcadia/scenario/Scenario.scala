@@ -11,36 +11,42 @@ import org.goldenport.record.v2.util.RecordUtils
 import arcadia._
 import arcadia.context._
 import arcadia.model._
+import arcadia.view._
 import arcadia.domain._
 
 /*
  * @since   Sep. 16, 2017
- * @version Oct.  7, 2017
+ * @version Oct. 25, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Scenario {
   def scenarioClass: ScenarioClass
   def scenarioName = scenarioClass.name
   def state: State
-  def method: Method = state.method
+  def stateMachine: StateMachine
+  def method: Method = Post // state.method
   def schema: Schema = getSchema getOrElse RAISE.noReachDefect // ScenarioDefect
   def getSchema: Option[Schema] = None
+  def getCallerUri: Option[URI] = None
   def start(parcel: Parcel): Parcel
   def execute(evt: Event): Parcel = apply(evt)._2.parcel
   def apply(evt: Event): (Scenario, Event) = {
-    val p = StateTransitionParcel(evt, this, state)
-    val r = state.apply(p)
-    r.toScenarioEvent
+    val i = Intent(evt, this, state)
+    val i1 = adjust_Intent(i)
+    val r = stateMachine.apply(i1)
+    r.toEvent
   }
   def withState(p: State): Scenario
   def marshall: String
+
+  protected def adjust_Intent(p: Intent): Intent = p
 }
 object Scenario {
   val scenarios = Vector(CreateEntityScenario)
   val scenarios_stream = scenarios.toStream
 
-  def get(parcel: Parcel, cmd: ScenarioCommand): Option[Scenario] =
-    scenarios_stream.flatMap(_.get(parcel, cmd)).headOption
+  def launch(parcel: Parcel, cmd: ScenarioCommand): Option[Scenario] =
+    scenarios_stream.flatMap(_.launch(parcel, cmd)).headOption
 
   def unmarshall(p: String): Scenario = unmarshallOption(p) getOrElse {
     RAISE.noReachDefect
@@ -50,20 +56,26 @@ object Scenario {
 }
 
 trait ScenarioClass {
-  def name: String = StringUtils.classNameToHypenName("Scenario", this)
-  def get(parcel: Parcel, cmd: ScenarioCommand): Option[Scenario]
+  lazy val _name: String = StringUtils.classNameToHypenName("Scenario", this)
+  def name: String = _name
+  def launch(parcel: Parcel, cmd: ScenarioCommand): Option[Scenario]
   def unmarshallOption(p: String): Option[Scenario]
 }
 
 case class CreateEntityScenario(
   state: State,
+  entityType: DomainEntityType,
   override val schema: Schema,
   data: Record
 ) extends Scenario {
   val scenarioClass = CreateEntityScenario
   override def getSchema = Some(schema)
+  val stateMachine = CreateEntityScenario.stateMachine
   def withState(p: State) = copy(state = p)
-  def start(parcel: Parcel): Parcel = CreateEntityScenario.start(parcel, schema, data)
+  def start(parcel: Parcel): Parcel = CreateEntityScenario.start(parcel, entityType, schema, data)
+
+  override protected def adjust_Intent(p: Intent): Intent =
+    p.withDomainEntityType(entityType)
 
   // def start(parcel: Parcel): Parcel = {
   //   val submit = Submit() // TODO
@@ -74,10 +86,11 @@ case class CreateEntityScenario(
   // }
 
   def marshall = Record.dataApp(
-      "name" -> CreateEntityScenario.name,
-      "state" -> state.marshall,
-      "schema" -> schema.marshallRecord,
-      "data" -> data
+    "name" -> CreateEntityScenario.name,
+    "state" -> state.marshall,
+    "entity" -> entityType.v,
+    "schema" -> schema.toMarshalizable.marshallRecord,
+    "data" -> data
   ).toJsonString
 }
 object CreateEntityScenario extends ScenarioClass {
@@ -164,32 +177,61 @@ object CreateEntityScenario extends ScenarioClass {
   // def apply(schema: Schema, data: Record): CreateEntityScenario =
   //   CreateEntityScenario(schema, data)
 
-  def get(parcel: Parcel, cmd: ScenarioCommand): Option[Scenario] = {
+  val stateMachine = new StateMachine {
+    import StateMachine.Slot
+    val slots = Vector(
+      Slot(InputState, Transitions(
+        Transition(CancelEventGuard, CancelAction),
+        Transition(BackEventGuard, CancelAction),
+        Transition(InputEventGuard, ValidationAction),
+        Transition(OkEventGuard, EntityCreateAction),
+        Transition(CreateEventGuard, EntityCreateAction)
+      )),
+      Slot(ConfirmState, Transitions(
+        Transition(CancelEventGuard, CancelAction),
+        Transition(BackEventGuard, InputAction),
+        Transition(OkEventGuard, ShowAction)
+      )),
+      Slot(ShowState, Transitions(
+        Transition(AllGuard, EndAction)
+      )),
+      Slot(EndState, Transitions(
+        Transition(AllGuard, ReturnAction)
+      ))
+    )
+  }
+
+  def launch(p: Parcel, cmd: ScenarioCommand): Option[Scenario] = {
+    val parcel = p.withUsageKind(CreateUsage)
+    def entitytype = cmd.entityType
+    def resolveschema(p: Schema): Schema =
+      parcel.render.map(_.resolveSchema(entitytype, p)).getOrElse(p)
     if (cmd.name == name) {
       def data = cmd.formRecord
       parcel.context.flatMap(_.
-        getEntitySchema(cmd.entityName).map(init(_, data)))
+        getEntitySchema(cmd.entityName).map(x => _init(entitytype, resolveschema(x), data)))
     } else {
       None
     }
   }
 
-  def init(schema: Schema, data: Record): CreateEntityScenario =
-    CreateEntityScenario(State.input, schema, data)
+  private def _init(entity: DomainEntityType, schema: Schema, data: Record): CreateEntityScenario =
+    CreateEntityScenario(InitState, entity, schema, data)
 
-  def start(parcel: Parcel, schema: Schema, data: Record): Parcel = {
-    val state = State.input
-    val scenario = CreateEntityScenario(state, schema, data)
-    val uri = UriUtils.addPath(parcel.controllerUri, name)
-    val submits = Submits(Vector(
-      Submit(OkSubmitKind),
-      Submit(CancelSubmitKind)
-    ))
-    val hidden = Hidden(
-      Some(scenario.marshall)
-    )
-    val m = InputAction.model(scenario, schema, data, uri, Post)
-    parcel.withModel(m)
+  protected[scenario] def start(p: Parcel, entity: DomainEntityType, schema: Schema, data: Record): Parcel = {
+    val parcel = p.withUsageKind(CreateUsage)
+    val scenario = CreateEntityScenario(InputState, entity, schema, data)
+    InputAction.model(parcel, scenario, schema, data)
+//     val state = InputState
+//     val scenario = CreateEntityScenario(state, entity, schema, data)
+// //    val uri = UriUtils.addPath(parcel.controllerUri, name)
+//     val uri = new URI("")
+//     val submits = Submits(Vector(input, cancel))
+//     val hidden = Hidden(
+//       Some(scenario.marshall)
+//     )
+//     val m = PropertyInputFormModel(uri, Post, schema, data, hidden, submits)
+    // parcel.withModel(m)
   }
 
   def unmarshallOption(p: String): Option[Scenario] =
@@ -202,9 +244,10 @@ object CreateEntityScenario extends ScenarioClass {
     val json = Json.parse(p)
     (json \ "name").asOpt[String].map { name =>
       val state = State.unmarshall((json \ "state").as[String])
-      val schema = Schema.json.unmarshall((json \ "schema").as[String])
-      val data = RecordUtils.js2record((json \ "data").as[JsObject])
-      CreateEntityScenario(state, schema, data)
+      val entity = DomainEntityType((json \ "entity").as[String])
+      val schema = Schema.json.unmarshall(json \ "schema")
+      val data = RecordUtils.js2record(json \ "data")
+      CreateEntityScenario(state, entity, schema, data)
     }
   }
 }
@@ -226,57 +269,81 @@ object CreateEntityScenario extends ScenarioClass {
 // ) extends Scenario {
 // }
 
+trait StateClass {
+  def name: String = StringUtils.classNameToHypenName("State", this)
+  def isAccept(p: State): Boolean = p.name == name
+  def unmarshall(p: String): State
+  def unmarshallOption(p: String): Option[State] =
+    if (p == name)
+      Some(unmarshall(p))
+    else
+      None
+}
+
 trait State {
-  def name: String
-  def method: Method = Post
-  def apply(evt: StateTransitionParcel): StateTransitionParcel
-  def marshall: String
-  def unmarshallOption(p: String): Option[State]
+  def stateClass: StateClass
+  def name: String = stateClass.name
+//  def method: Method = Post
+//  def apply(evt: Intent): Intent
+  def marshall: String = name
 }
 object State {
-  val STATE_INPUT = "input"
-  val STATE_CONFIRM = "confirm"
-  val STATE_SHOW = "show"
-  val STATE_END = "end"
+  // val STATE_INPUT = "input"
+  // val STATE_CONFIRM = "confirm"
+  // val STATE_SHOW = "show"
+  // val STATE_END = "end"
 
-  val input = TransitionState(
-    STATE_INPUT,
-    Transition(
-      Vector(
-        Transition.Slot(CancelEventGuard, Vector(CancelAction)),
-        Transition.Slot(InputEventGuard, Vector(ValidationAction))
-      )
-    )
+  // val input = TransitionState(
+  //   STATE_INPUT,
+  //   Transitions(
+  //     Vector(
+  //       Transition(CancelEventGuard, Vector(CancelAction)),
+  //       Transition(InputEventGuard, Vector(ValidationAction)), // confirm
+  //       Transition(OkEventGuard, Vector(ValidationAction)), // confirm
+  //       Transition(CreateEventGuard, Vector(EntityCreateAction())), // show
+  //       Transition(UpdateEventGuard, Vector(EntityUpdateAction())) // show
+  //     )
+  //   )
+  // )
+
+  // val confirm = TransitionState(
+  //   STATE_CONFIRM,
+  //   Transitions(
+  //     Vector(
+  //       Transition(CancelEventGuard, Vector(CancelAction)),
+  //       Transition(OkEventGuard, Vector(ShowAction)),
+  //       Transition(BackEventGuard, Vector(InputAction)),
+  //       Transition(CreateEventGuard, Vector(EntityCreateAction())), // show
+  //       Transition(UpdateEventGuard, Vector(EntityUpdateAction())) // show
+  //     )
+  //   )
+  // )
+
+  // val show = TransitionState(
+  //   STATE_SHOW,
+  //   Transitions(
+  //     Vector(
+  //     )
+  //   )
+  // )
+
+  // val end = TransitionState(
+  //   STATE_END,
+  //   Transitions(
+  //     Vector(
+  //     )
+  //   )
+  // )
+
+  // val states = Vector(input, confirm, show, end)
+  val states = Vector(
+    InitState,
+    InputState,
+    ConfirmState,
+    ShowState,
+    EndState,
+    FinalState
   )
-
-  val confirm = TransitionState(
-    STATE_CONFIRM,
-    Transition(
-      Vector(
-        Transition.Slot(CancelEventGuard, Vector(CancelAction)),
-        Transition.Slot(OkEventGuard, Vector(ShowAction)),
-        Transition.Slot(BackEventGuard, Vector(InputAction))
-      )
-    )
-  )
-
-  val show = TransitionState(
-    STATE_SHOW,
-    Transition(
-      Vector(
-      )
-    )
-  )
-
-  val end = TransitionState(
-    STATE_END,
-    Transition(
-      Vector(
-      )
-    )
-  )
-
-  val states = Vector(input, confirm, show, end)
 
   def unmarshall(p: String): State = unmarshallOption(p) getOrElse {
     RAISE.notImplementedYetDefect
@@ -284,29 +351,91 @@ object State {
   def unmarshallOption(p: String): Option[State] = states.toStream.flatMap(_.unmarshallOption(p)).headOption
 }
 
-trait TransitionStateBase extends State {
-  def name: String
-  def transition: Transition
+case object InitState extends State with StateClass {
+  override val name = super.name
+  val stateClass = this
+  def unmarshall(p: String): State = this
+}
+case object InputState extends State with StateClass {
+  override val name = super.name
+  val stateClass = this
+  def unmarshall(p: String): State = this
+}
+case object ConfirmState extends State with StateClass {
+  override val name = super.name
+  val stateClass = this
+  def unmarshall(p: String): State = this
+}
+case object ShowState extends State with StateClass {
+  override val name = super.name
+  val stateClass = this
+  def unmarshall(p: String): State = this
+}
+case object EndState extends State with StateClass {
+  override val name = super.name
+  val stateClass = this
+  def unmarshall(p: String): State = this
+}
+case object FinalState extends State with StateClass {
+  override val name = super.name
+  val stateClass = this
+  def unmarshall(p: String): State = this
+}
 
-  def apply(p: StateTransitionParcel): StateTransitionParcel = {
-    p.event match {
-      case m: CancelEvent => p // evt.parcel.goOrigin
-      case m: ExceptionEvent => p // evt.parcel.goError(m.e)
-      case m: InputEvent => transition.applyOption(p) getOrElse
-        p // evt.parcel.goUnknownEvent(evt)
-      case m => p // evt.parcel.goError(m.toString)
+trait StateMachine {
+  def slots: Vector[StateMachine.Slot]
+  private lazy val _slots = slots.toStream
+  def apply(intent: Intent): Intent = {
+    val r = _slots.flatMap(_.applyOption(intent)).headOption orElse {
+      apply_Intent(intent)
+    } getOrElse {
+      intent.goUnknownEvent(intent.event)
+    }
+    r.state match {
+      case EndState => apply(r.withEvent(EndEvent(r.parcel)))
+      case FinalState => r
+      case _ => r
     }
   }
 
-  def marshall: String = name
-  def unmarshallOption(p: String) = if (p == name) Some(this) else None
+  protected def apply_Intent(intent: Intent): Option[Intent] = None
+}
+object StateMachine {
+  case class Slot(
+    stateClass: StateClass,
+    transitions: Transitions
+  ) {
+    def applyOption(intent: Intent): Option[Intent] =
+      if (stateClass.isAccept(intent.state))
+        transitions.applyOption(intent)
+      else
+        None
+  }
 }
 
-case class TransitionState(
-  name: String,
-  transition: Transition
-) extends TransitionStateBase {
-}
+// trait TransitionStateBase extends State {
+//   def name: String
+//   def transitions: Transitions
+
+//   def apply(p: Intent): Intent = {
+//     p.event match {
+//       case m: CancelEvent => p.goOrigin
+//       case m: ExceptionEvent => p.goError(m.e)
+//       case m: InputEvent => transitions.applyOption(p) getOrElse
+//         p.goUnknownEvent(p.event)
+//       case m => p.goError(m.toString)
+//     }
+//   }
+
+//   def marshall: String = name
+//   def unmarshallOption(p: String) = if (p == name) Some(this) else None
+// }
+
+// case class TransitionState(
+//   name: String,
+//   transitions: Transitions
+// ) extends TransitionStateBase {
+// }
 
 // trait GuardState extends State {
 //   def handler: GuardActionHandler
@@ -316,16 +445,25 @@ case class TransitionState(
 //   }
 // }
 
+trait EventClass {
+  def isAccept(p: Event): Boolean
+}
+
 trait Event {
   def parcel: Parcel
-  def withModel(p: Model): Event
+//  def withModel(p: Model): Event
+  def withParcel(p: Parcel): Event
 }
 object Event {
   val EVENT_INPUT = "input"
   val EVENT_OK = "ok"
   val EVENT_CANCEL = "cancel"
+  val EVENT_CREATE = "create"
+  val EVENT_UPDATE = "update"
+  val EVENT_DELETE = "delete"
   val EVENT_BACK = "back"
   val EVENT_EXCEPTION = "exception"
+  val EVENT_END = "end"
 
   def get(parcel: Parcel, cmd: ScenarioCommand): Option[Event] = {
     val name: String = cmd.getSubmit getOrElse {
@@ -339,8 +477,12 @@ object Event {
       case EVENT_INPUT => Some(InputEvent(parcel, data))
       case EVENT_OK => Some(OkEvent(parcel))
       case EVENT_CANCEL => Some(CancelEvent(parcel))
+      case EVENT_CREATE => Some(CreateEvent(parcel))
+      case EVENT_UPDATE => Some(UpdateEvent(parcel))
+      case EVENT_DELETE => Some(DeleteEvent(parcel))
       case EVENT_BACK => Some(BackEvent(parcel))
       case EVENT_EXCEPTION => Some(ExceptionEvent(parcel, e))
+      case EVENT_END => Some(EndEvent(parcel))
       case _ => None
     }
   }
@@ -361,33 +503,89 @@ object Event {
 }
 
 case class InputEvent(parcel: Parcel, data: Record) extends Event {
-  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
+//  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
+  def withParcel(p: Parcel) = copy(parcel = p)
 }
 case class OkEvent(parcel: Parcel) extends Event {
-  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
+//  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
+  def withParcel(p: Parcel) = copy(parcel = p)
 }
 case class CancelEvent(parcel: Parcel) extends Event {
-  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
+//  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
+  def withParcel(p: Parcel) = copy(parcel = p)
+}
+case class CreateEvent(parcel: Parcel) extends Event {
+//  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
+  def withParcel(p: Parcel) = copy(parcel = p)
+}
+case class UpdateEvent(parcel: Parcel) extends Event {
+//  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
+  def withParcel(p: Parcel) = copy(parcel = p)
+}
+case class DeleteEvent(parcel: Parcel) extends Event {
+//  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
+  def withParcel(p: Parcel) = copy(parcel = p)
 }
 case class BackEvent(parcel: Parcel) extends Event {
-  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
+//  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
+  def withParcel(p: Parcel) = copy(parcel = p)
 }
 case class ExceptionEvent(parcel: Parcel, e: Throwable) extends Event {
-  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
+//  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
+  def withParcel(p: Parcel) = copy(parcel = p)
+}
+case class EndEvent(parcel: Parcel) extends Event {
+//  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
+  def withParcel(p: Parcel) = copy(parcel = p)
 }
 
-case class StateTransitionParcel(event: Event, scenario: Scenario, state: State) {
+case class Intent(
+  event: Event,
+  scenario: Scenario,
+  state: State,
+  parcel: Parcel,
+  getDomainEntityType: Option[DomainEntityType],
+  getDomainEntityId: Option[DomainObjectId]
+) {
+  def withEvent(p: Event) = copy(event = p)
   def withState(p: State) = copy(state = p)
-  def withModel(p: Model): StateTransitionParcel = copy(event = event.withModel(p))
-  def toScenarioEvent = (scenario.withState(state), event)
-  def inputFormParameters: Record = event.parcel.inputFormParameters
-  def controllerUri: URI = event.parcel.controllerUri
-  def domainEntityType: DomainEntityType = event.parcel.domainEntityType
-  def domainEntityId: DomainObjectId = event.parcel.domainEntityId
-  def executionContext: ExecutionContext = event.parcel.context getOrElse {
+  def withModel(p: Model): Intent = copy(parcel = parcel.withModel(p))
+  def toEvent = (scenario.withState(state), event.withParcel(parcel))
+  def inputFormParameters: Record = parcel.inputFormParameters
+  def controllerUri: URI = parcel.controllerUri
+  def domainEntityType: DomainEntityType = getDomainEntityType getOrElse {
     RAISE.noReachDefect
   }
+  def domainEntityId: DomainObjectId = getDomainEntityId getOrElse {
+    RAISE.noReachDefect
+  }
+  def executionContext: ExecutionContext = parcel.context getOrElse {
+    RAISE.noReachDefect
+  }
+
+  def toStrategy = parcel.toStrategy
+
+  def goOrigin: Intent = copy(parcel = parcel.goOrigin)
+  def goError(p: Throwable): Intent = copy(parcel = parcel.goError(p))
+  def goError(msg: String): Intent = copy(parcel = parcel.goError(msg))
+  def goUnknownEvent(p: Event): Intent = copy(parcel = parcel.goError("Unknown scenario event: $p"))
+  def withDomainEntityType(p: DomainEntityType) = copy(getDomainEntityType = Some(p))
+  def withDomainEntityId(p: DomainObjectId) = copy(getDomainEntityId = Some(p))
+  def withReturn = scenario.getCallerUri.fold(
+    copy(parcel = parcel.withContent(RedirectContent("../../index.html")))
+  )(x =>
+    copy(parcel = parcel.withContent(RedirectContent(s"../../$x"))))
 }
+object Intent {
+  def apply(
+    event: Event,
+    scenario: Scenario,
+    state: State
+  ): Intent = Intent(
+    event, scenario, state, event.parcel, None, None
+  )
+}
+
 
 // case class ConfirmingEvent(data: Record) extends Event {
 // }
@@ -403,127 +601,185 @@ case class StateTransitionParcel(event: Event, scenario: Scenario, state: State)
 // }
 
 trait Action {
-  def apply(p: StateTransitionParcel): StateTransitionParcel
+  def apply(p: Intent): Intent
+
+  protected def hidden_scenario(scenario: Scenario, state: State): Hidden =
+    Hidden(Some(scenario.withState(state).marshall))
+
+  protected def button_input(strategy: RenderStrategy) = 
+    Submit(InputSubmitKind, strategy.application.submitLabel(InputSubmitKind))
+
+  protected def button_cancel(strategy: RenderStrategy) = 
+    Submit(CancelSubmitKind, strategy.application.submitLabel(CancelSubmitKind))
 }
 
 trait SchemaActionBase extends Action {
-  def apply(p: StateTransitionParcel): StateTransitionParcel = {
-    val scenario = p.scenario
-    val method = scenario.method
-    val schema = scenario.schema
-    val data = p.inputFormParameters
-    // TODO validate
-    val uri = p.controllerUri
-    val m = InputAction.model(scenario, schema, data, uri, method)
-    p.withModel(m).withState(State.confirm)
-  }
+//   def apply(p: Intent): Intent = {
+//     val scenario = p.scenario
+//     val method = scenario.method
+//     val schema = scenario.schema
+//     val data = p.inputFormParameters
+//     // TODO validate
+// //    val uri = p.controllerUri
+//     val uri = new URI("")
+//     val m = InputAction.model(scenario, schema, data, uri, method)
+//     p.withModel(m).withState(ConfirmState)
+//   }
 }
 
 case object CancelAction extends Action {
-  def apply(p: StateTransitionParcel): StateTransitionParcel = p
+  def apply(p: Intent): Intent = p.withReturn
 }
 
-case object ValidationAction extends Action {
-  def apply(p: StateTransitionParcel): StateTransitionParcel = {
+case object ValidationAction extends SchemaActionBase {
+  def apply(p: Intent): Intent = {
     val scenario = p.scenario
     val schema = scenario.schema
     val data = p.inputFormParameters
     // TODO validate
-    val uri = p.controllerUri
-    val m = InputAction.model(scenario, schema, data, uri, Post)
-    p.withModel(m).withState(State.confirm)
+//    val uri = p.controllerUri
+    val uri = new URI("")
+    val state = ConfirmState
+    val m = model(scenario, schema, data, uri, Post, state)
+    p.withModel(m).withState(state)
+  }
+
+  def model(scenario: Scenario, schema: Schema, data: Record, uri: URI, method: Method, state: State): Model = {
+    val submits = Submits(Vector(
+      Submit(OkSubmitKind),
+      Submit(BackSubmitKind),
+      Submit(CancelSubmitKind)
+    ))
+    val hidden = hidden_scenario(scenario, state)
+    PropertyConfirmFormModel(uri, method, schema, data, hidden, submits)
   }
 }
 
-case object InputAction extends Action {
-  def apply(p: StateTransitionParcel): StateTransitionParcel = {
+case object InputAction extends SchemaActionBase {
+  def apply(p: Intent): Intent = {
     val scenario = p.scenario
     val method = scenario.method
     val schema = scenario.schema
     val data = p.inputFormParameters
-    val uri = p.controllerUri
-    val m = model(scenario, schema, data, uri, method)
+//    val uri = p.controllerUri
+    // val uri = new URI("")
+    // val m = model(scenario, schema, data, uri, method)
+    // p.withModel(m)
+    model(p, scenario, schema, data)
+  }
+
+  def model(p: Parcel, scenario: Scenario, schema: Schema, data: Record): Parcel = {
+    val (m, s) = model(p.toStrategy, scenario, schema, data)
     p.withModel(m)
   }
 
-  def model(scenario: Scenario, schema: Schema, data: Record, uri: URI, method: Method): Model = {
-    val state = State.input
-    val submits = Submits(Vector(
-      Submit(OkSubmitKind),
-      Submit(CancelSubmitKind)
-    ))
-    val hidden = Hidden(
-      Some(scenario.marshall)
-    )
-    PropertyFormModel(uri, method, schema, data, hidden, submits)
+  def model(p: Intent, scenario: Scenario, schema: Schema, data: Record): Intent = {
+    val (m, s) = model(p.toStrategy, scenario, schema, data)
+    p.withModel(m).withState(s)
+  }
+
+  def model(strategy: RenderStrategy, scenario: Scenario, schema: Schema, data: Record): (Model, State) = {
+    model(strategy, scenario, schema, data, new URI(""), Post)
+  }
+
+  def model(strategy: RenderStrategy, scenario: Scenario, schema: Schema, data: Record, uri: URI, method: Method): (Model, State) = {
+    val input = button_input(strategy)
+    val cancel = button_cancel(strategy)
+    val state = InputState
+    val submits = Submits(input, cancel)
+    val hidden = hidden_scenario(scenario, state)
+    val m = PropertyInputFormModel(uri, method, schema, data, hidden, submits)
+    (m, state)
   }
 }
 
 case object ShowAction extends Action {
-  def apply(p: StateTransitionParcel): StateTransitionParcel = {
+  def apply(p: Intent): Intent = {
     val scenario = p.scenario
     val method = scenario.method
     val schema = scenario.schema
     val data = p.inputFormParameters
-    val uri = p.controllerUri
+//    val uri = p.controllerUri
+    val uri = new URI("")
     val m = model(scenario, schema, data, uri, method)
     p.withModel(m)
   }
 
   def model(scenario: Scenario, schema: Schema, data: Record, uri: URI, method: Method): Model = {
-    val state = State.input
+    val state = ShowState
     val submits = Submits(Vector(
-      Submit(OkSubmitKind),
-      Submit(CancelSubmitKind)
+      Submit(OkSubmitKind)
     ))
-    val hidden = Hidden(
-      Some(scenario.marshall)
-    )
-    PropertyFormModel(uri, method, schema, data, hidden, submits)
+    val hidden = hidden_scenario(scenario, state)
+    PropertyConfirmFormModel(uri, method, schema, data, hidden, submits)
   }
 }
 
-case class EntityCreateAction() extends Action {
-  def apply(p: StateTransitionParcel): StateTransitionParcel = {
+case object ReturnAction extends Action {
+  def apply(p: Intent): Intent = {
+    p.withReturn.withState(FinalState)
+  }
+}
+
+case object EndAction extends Action {
+  def apply(p: Intent): Intent = {
+    p.withReturn.withState(FinalState)
+  }
+}
+
+case object EntityCreateAction extends Action {
+  def apply(p: Intent): Intent = {
     val scenario = p.scenario
     val rsc = p.domainEntityType
     val data = p.inputFormParameters
     val ctx = p.executionContext
     val id = ctx.createEntity(rsc, data)
-    p.withState(State.end)
+    p.withState(EndState)
   }
 }
 
-case class EntityUpdateAction() extends Action {
-  def apply(p: StateTransitionParcel): StateTransitionParcel = {
+case object EntityUpdateAction extends Action {
+  def apply(p: Intent): Intent = {
     val scenario = p.scenario
     val rsc = p.domainEntityType
     val id = p.domainEntityId
     val data = p.inputFormParameters
     val ctx = p.executionContext
     ctx.updateEntity(rsc, id, data)
-    p.withState(State.end)
+    p.withState(EndState)
   }
 }
 
 trait Guard {
-  def isAccept(evt: StateTransitionParcel): Boolean
+  def isAccept(evt: Intent): Boolean
+}
+
+case object AllGuard extends Guard {
+  def isAccept(p: Intent): Boolean = true
 }
 
 case object OkEventGuard extends Guard {
-  def isAccept(p: StateTransitionParcel): Boolean = p.event.isInstanceOf[OkEvent]
+  def isAccept(p: Intent): Boolean = p.event.isInstanceOf[OkEvent]
 }
 
 case object CancelEventGuard extends Guard {
-  def isAccept(p: StateTransitionParcel): Boolean = p.event.isInstanceOf[CancelEvent]
+  def isAccept(p: Intent): Boolean = p.event.isInstanceOf[CancelEvent]
 }
 
 case object BackEventGuard extends Guard {
-  def isAccept(p: StateTransitionParcel): Boolean = p.event.isInstanceOf[BackEvent]
+  def isAccept(p: Intent): Boolean = p.event.isInstanceOf[BackEvent]
 }
 
 case object InputEventGuard extends Guard {
-  def isAccept(p: StateTransitionParcel): Boolean = p.event.isInstanceOf[InputEvent]
+  def isAccept(p: Intent): Boolean = p.event.isInstanceOf[InputEvent]
+}
+
+case object CreateEventGuard extends Guard {
+  def isAccept(p: Intent): Boolean = p.event.isInstanceOf[CreateEvent]
+}
+
+case object UpdateEventGuard extends Guard {
+  def isAccept(p: Intent): Boolean = p.event.isInstanceOf[UpdateEvent]
 }
 
 // case class GuardActionHandler(
@@ -538,19 +794,28 @@ case object InputEventGuard extends Guard {
 //   }
 // }
 
-case class Transition(
-  slots: Vector[Transition.Slot]
+case class Transitions(
+  transitions: Vector[Transition]
 ) {
-  def applyOption(p: StateTransitionParcel): Option[StateTransitionParcel] =
-    slots.toStream.flatMap(_.applyOption(p)).headOption
+  def applyOption(p: Intent): Option[Intent] =
+    transitions.toStream.flatMap(_.applyOption(p)).headOption
+}
+object Transitions {
+  def apply(): Transitions = Transitions(Vector.empty)
+  def apply(p: Transition, ps: Transition*): Transitions = Transitions(
+    (p +: ps).toVector
+  )
 }
 
+case class Transition(guard: Guard, actions: Seq[Action]) {
+  def applyOption(p: Intent): Option[Intent] =
+    if (guard.isAccept(p))
+      Some(actions./:(p)((z, x) => x.apply(z)))
+    else
+      None
+}
 object Transition {
-  case class Slot(guard: Guard, actions: Seq[Action]) {
-    def applyOption(p: StateTransitionParcel): Option[StateTransitionParcel] =
-      if (guard.isAccept(p))
-        Some(actions./:(p)((z, x) => x.apply(z)))
-      else
-        None
-  }
+  def apply(guard: Guard, p: Action, ps: Action*): Transition = Transition(
+    guard, (p +: ps).toVector
+  )
 }
