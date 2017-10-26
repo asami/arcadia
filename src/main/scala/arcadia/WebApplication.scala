@@ -24,7 +24,7 @@ import arcadia.scenario._
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
  *  version Sep. 30, 2017
- * @version Oct. 14, 2017
+ * @version Oct. 26, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -199,6 +199,8 @@ object WebApplication {
     // protected def is_material(p: T): Boolean =
     //   StringUtils.getSuffix(to_url(p).toString).
     //     fold(false)(x => materialSuffixes.contains(x.toLowerCase))
+    protected def is_web_info(p: T): Boolean = name(p) == "WEB-INF"
+    protected def is_assets(p: T): Boolean = name(p) == "assets"
     protected def name(p: T): String
     protected def namebody(p: T): String = StringUtils.pathLastComponentBody(name(p))
     protected def getNameSuffix(p: T): Option[String] = StringUtils.getSuffix(name(p))
@@ -254,9 +256,38 @@ object WebApplication {
             case m => PageView(m, src).gv
           }
         }
-        protected def directory_view(p: T): Vector[(Guard, View)] = {
-          Vector.empty // TODO
+        protected def directory_view(p: T): Vector[(Guard, View)] =
+          if (is_web_info(p) || is_assets(p))
+            Vector.empty
+          else
+            to_children(p)./:(Z2(name(p)))(_+_).views
+      }
+      case class Z2(
+        base: String,
+        views: Vector[(Guard, View)] = Vector.empty
+      ) {
+        def r: Seq[Slot] = views.map(Slot(_))
+        def +(rhs: T) = {
+          if (is_html(rhs))
+            copy(views = views :+ html_view(rhs))
+          else if (is_template(rhs))
+            copy(views = views :+ template_view(rhs))
+          else if (is_directory(rhs))
+            copy(views = views ++ directory_view(rhs))
+          else
+            this
         }
+        protected def html_view(p: T): (Guard, View) =
+          HtmlView(to_url(p)).gv
+        protected def template_view(p: T): (Guard, View) = {
+          val src = to_template_source(p)
+          PageView(pathname(p), src).gv
+        }
+        protected def directory_view(p: T): Vector[(Guard, View)] =
+          to_children(p)./:(Z2(pathname(p)))(_+_).views
+
+        protected def pathname(p: T): String = 
+          s"$base/${StringUtils.pathLastComponentBody(to_url(p).toString)}"
       }
       val config = build_config
       val view = {

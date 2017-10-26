@@ -19,7 +19,7 @@ import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL}
  * @since   Jul. 15, 2017
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
- * @version Oct. 21, 2017
+ * @version Oct. 27, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -141,9 +141,32 @@ case class MaterialView(baseUrl: URL) extends View() {
       } yield mime
       a.getOrElse(MimeType.application_octet_stream)
     }
-    val url = new URL(baseUrl, c.pathname)
-    BinaryContent(mime, new UrlBag(url), StaticPageExpires)
+    _get_control_content(c.pathname) getOrElse {
+      val url = new URL(baseUrl, c.pathname)
+      BinaryContent(mime, new UrlBag(url), AssetsExpires)
+    }
   }
+
+  def getControlContent(parcel: Parcel): Option[Content] = {
+    val c = parcel.takeCommand[MaterialCommand]
+    _get_control_content(c.pathname)
+  }
+
+  private def _get_control_content(pathname: String): Option[Content] = {
+    val url = new URL(baseUrl, pathname)
+    if (UrlUtils.isExist(url)) {
+      if (StringUtils.getSuffix(pathname).isEmpty)
+        Some(RedirectContent(StringUtils.concatPath(pathname, "index.html")))
+      else
+        None
+    } else {
+      Some(NotFoundContent)
+    }
+  }
+
+  private def _is_redirect(pathname: String): Boolean =
+    StringUtils.getSuffix(pathname).isEmpty
+
 }
 // case class MaterialView(url: URL, pathname: Option[String] = None) extends View() {
 //   private val _pathname = pathname getOrElse UrlUtils.takeLeafName(url)

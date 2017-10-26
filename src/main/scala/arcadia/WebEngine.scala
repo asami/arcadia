@@ -13,7 +13,7 @@ import arcadia.scenario._
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
  *  version Sep.  2, 2017
- * @version Oct. 14, 2017
+ * @version Oct. 27, 2017
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -55,6 +55,7 @@ class WebEngine(
       case m: BinaryContent => RAISE.noReachDefect
       case m: XmlContent => m.xml.toString
       case m: RedirectContent => RAISE.noReachDefect
+      case NotFoundContent => RAISE.noReachDefect
     }
   }
 
