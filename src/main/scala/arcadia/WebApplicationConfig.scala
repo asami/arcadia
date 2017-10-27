@@ -13,7 +13,7 @@ import org.goldenport.util.HoconUtils.Implicits._
 /*
  * @since   Aug. 12, 2017
  *  version Sep.  2, 2017
- * @version Oct. 14, 2017
+ * @version Oct. 27, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationConfig(
@@ -29,6 +29,8 @@ case class WebApplicationConfig(
   usecase_list: Option[WebApplicationConfig.UsecaseList], // navigator
   admin_list: Option[WebApplicationConfig.AdminList], // navigator
   info_list: Option[WebApplicationConfig.InfoList], // footer
+  //
+  singlePageApplication: Option[WebApplicationConfig.SinglePageApplication],
   //
   lifecycle: Option[WebApplicationConfig.LifecycleConfig],
   extend: Option[List[String]] // related feature: mixin
@@ -52,6 +54,7 @@ case class WebApplicationConfig(
       usecase_list orElse rhs.usecase_list,
       admin_list orElse rhs.admin_list,
       info_list orElse rhs.info_list,
+      singlePageApplication orElse rhs.singlePageApplication,
       lifecycle orElse lifecycle,
       extend |+| rhs.extend
     )
@@ -69,7 +72,8 @@ case class WebApplicationConfig(
     feature_list.map(_.toRule),
     usecase_list.map(_.toRule),
     admin_list.map(_.toRule),
-    info_list.map(_.toRule)
+    info_list.map(_.toRule),
+    singlePageApplication.map(_.toRule)
   )
 
   def getAssets: Option[String] = lifecycle.
@@ -94,6 +98,7 @@ object WebApplicationConfig {
     None,
     None,
     None,
+    None,
     None
   )
 
@@ -106,14 +111,14 @@ object WebApplicationConfig {
       XhtmlUtils.title(name)
     }
 
-    def toRule = WebApplicationRule.Page(name, title, icon)
+    lazy val toRule = WebApplicationRule.Page(name, title, icon)
   }
 
   case class FeatureList(
     page: List[Page],
     feature_list: Option[FeatureList]
   ) {
-    def toRule: WebApplicationRule.FeatureList = WebApplicationRule.FeatureList(
+    lazy val toRule: WebApplicationRule.FeatureList = WebApplicationRule.FeatureList(
       page.map(_.toRule),
       feature_list.map(_.toRule)
     )
@@ -123,7 +128,7 @@ object WebApplicationConfig {
     page: List[Page],
     usecase_list: Option[UsecaseList]
   ) {
-    def toRule: WebApplicationRule.UsecaseList = WebApplicationRule.UsecaseList(
+    lazy val toRule: WebApplicationRule.UsecaseList = WebApplicationRule.UsecaseList(
       page.map(_.toRule),
       usecase_list.map(_.toRule)
     )
@@ -133,7 +138,7 @@ object WebApplicationConfig {
     page: List[Page],
     admin_list: Option[AdminList]
   ) {
-    def toRule: WebApplicationRule.AdminList = WebApplicationRule.AdminList(
+    lazy val toRule: WebApplicationRule.AdminList = WebApplicationRule.AdminList(
       page.map(_.toRule),
       admin_list.map(_.toRule)
     )
@@ -143,9 +148,18 @@ object WebApplicationConfig {
     page: List[Page],
     info_list: Option[InfoList]
   ) {
-    def toRule: WebApplicationRule.InfoList = WebApplicationRule.InfoList(
+    lazy val toRule: WebApplicationRule.InfoList = WebApplicationRule.InfoList(
       page.map(_.toRule),
       info_list.map(_.toRule)
+    )
+  }
+
+  case class SinglePageApplication(
+    base_uri: Option[List[URI]]
+  ) {
+    lazy val toOption = base_uri.map(x => Some(this)) getOrElse None
+    lazy val toRule: WebApplicationRule.SinglePageApplication = WebApplicationRule.SinglePageApplication(
+      base_uri getOrElse Nil
     )
   }
 
@@ -208,6 +222,7 @@ object WebApplicationConfig {
     None,
     None,
     None,
+    None,
     None
   )
 
@@ -230,6 +245,7 @@ object WebApplicationConfig {
   implicit val UsecaseListFormat = Json.format[UsecaseList]
   implicit val AdminListFormat = Json.format[AdminList]
   implicit val InfoListFormat = Json.format[InfoList]
+  implicit val SinglePageApplicationFormat = Json.format[SinglePageApplication]
   implicit val ExpiresConfigFormat = Json.format[ExpiresConfig]
   implicit val CdnConfigFormat = Json.format[CdnConfig]
   implicit val LifecycleConfigFormat = Json.format[LifecycleConfig]
@@ -256,6 +272,9 @@ object WebApplicationConfig {
       c.getUriOption("cdn.static_page"),
       c.getUriOption("cdn.common_page")
     )
+    val spa = SinglePageApplication(
+      c.getUriListOption("singlePageApplication.base_uri")
+    )
     val lifecycle = LifecycleConfig(expires.toOption, cdn.toOption)
     WebApplicationConfig(
       c.getStringOption("theme"),
@@ -269,6 +288,7 @@ object WebApplicationConfig {
       None,
       None,
       None,
+      spa.toOption,
       lifecycle.toOption,
       c.getEagerStringListOption("extend")
     )

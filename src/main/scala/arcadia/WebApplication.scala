@@ -24,7 +24,7 @@ import arcadia.scenario._
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
  *  version Sep. 30, 2017
- * @version Oct. 26, 2017
+ * @version Oct. 27, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -299,7 +299,8 @@ object WebApplication {
         val theme = config.theme.flatMap(RenderTheme.get)
         val slots = applicationslots ++ compslots
         val tags = Tags.empty // TODO
-        ViewEngine.Rule.create(theme, slots, layouts, partials, comps, tags)
+        val spa = config.singlePageApplication.map(_.toRule)
+        ViewEngine.Rule.create(theme, slots, layouts, partials, comps, tags, spa)
       }
       val controller = {
         val controllers = build_controllers

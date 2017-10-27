@@ -10,7 +10,7 @@ import org.goldenport.util.MapUtils
 import arcadia._
 import arcadia.context._
 import arcadia.view.tag._
-import arcadia.model.ErrorModel
+import arcadia.model.{Model, ErrorModel}
 
 /*
  * @since   Jul.  8, 2017
@@ -50,12 +50,23 @@ class ViewEngine(
     components.find(_.isAccept(parcel)).map(_.view)
 
   def getLayout(parcel: Parcel): Option[LayoutView] = {
-    val uselayout = parcel.command.flatMap(_.getUseLayout).getOrElse(true)
+    val uselayout = is_spa(parcel) || parcel.command.map(_.getUseLayout.getOrElse(true)).getOrElse(true)
     if (uselayout)
       layouts.get(DefaultLayout)
     else
       None
   }
+
+  protected def is_spa(parcel: Parcel): Boolean = parcel.command.map {
+    case m: MaterialCommand => rule.isSinglePageApplication(m.pathname)
+    case m => false
+  }.getOrElse(false)
+
+  protected def is_spa_redirect(parcel: Parcel): Boolean = 
+    is_spa(parcel) && parcel.command.map {
+      case m: MaterialCommand => !rule.isSinglePageApplicationRoot(m.pathname)
+      case m => false
+    }.getOrElse(false)
 
   private val _template_engine = {
     val a = new TemplateEngine()
@@ -93,14 +104,27 @@ class ViewEngine(
       (p.render getOrElse PlainHtml).withThemePartials(t, partials)
     }
     val parcel = p.withRenderStrategy(render)
-    findView(p).fold {
-      extend.toStream.flatMap(_.applyOption(p)).headOption orElse {
-        val model = p.getEffectiveModel orElse Some(ErrorModel.notFound(parcel, "View and Model is not found."))
-        model map { m =>
-          getLayout(parcel).map(_.apply(this, parcel)) getOrElse {
-            m.apply(render)
-          }
-        }
+    findView(parcel).fold {
+      extend.toStream.flatMap(_.applyOption(parcel)).headOption orElse {
+        // val model = p.getEffectiveModel orElse Some(ErrorModel.notFound(parcel, "View and Model is not found."))
+        // model map { m =>
+        //   getLayout(parcel).map(_.apply(this, parcel)) getOrElse {
+        //     m.apply(render)
+        //   }
+        // }
+        def f(m: Model): Content = getLayout(parcel).
+          map(_.apply(this, parcel)).
+          getOrElse(m.apply(render))
+        parcel.getEffectiveModel.map(f).
+          orElse(
+            if (is_spa_redirect(parcel))
+              rule.
+              getRedirectCommandForSinglePageApplication.
+              flatMap(x => applyOption(parcel.withCommand(x)))
+            else
+              // Some(f(ErrorModel.notFound(parcel, "View and Model is not found.")))
+              None
+          )
       }
     } { content =>
       val a: Option[Content] = content match {
@@ -221,8 +245,17 @@ object ViewEngine {
     layouts: Map[LayoutKind, LayoutView],
     partials: Partials,
     components: Components,
-    tags: Tags
+    tags: Tags,
+    singlePageApplication: Option[WebApplicationRule.SinglePageApplication]
   ) {
+    def isSinglePageApplication(pathname: String): Boolean =
+      singlePageApplication.map(_.isActive(pathname)).getOrElse(false)
+
+    def getRedirectCommandForSinglePageApplication: Option[MaterialCommand] =
+      singlePageApplication.map(_.redirectCommand)
+
+    def isSinglePageApplicationRoot(p: String): Boolean =
+      singlePageApplication.map(_.isRootPagePathname(p)).getOrElse(false)
     // def findView(parcel: Parcel): Option[View] =
     //   slots.find(_.isAccept(parcel)).map(_.view)
 
@@ -241,8 +274,9 @@ object ViewEngine {
       layouts: Map[LayoutKind, LayoutView],
       partials: Partials,
       components: Components,
-      tags: Tags
-    ): Rule = Rule(theme, slots.toVector, layouts, partials, components, tags)
+      tags: Tags,
+      spa: Option[WebApplicationRule.SinglePageApplication]
+    ): Rule = Rule(theme, slots.toVector, layouts, partials, components, tags, spa)
 
     def create(head: (Guard, View), tail: (Guard, View)*): Rule = Rule(
       None,
@@ -250,7 +284,8 @@ object ViewEngine {
       Map.empty,
       Partials.empty,
       Components.empty,
-      Tags.empty
+      Tags.empty,
+      None
     )
   }
 

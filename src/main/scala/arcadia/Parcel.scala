@@ -3,6 +3,7 @@ package arcadia
 import java.net.URI
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2.Record
+import org.goldenport.util.StringUtils
 import arcadia.context._
 import arcadia.domain._
 import arcadia.model.{Model, ErrorModel}
@@ -12,7 +13,7 @@ import arcadia.view.{ViewEngine, RenderStrategy, Partials, View, UsageKind}
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
- * @version Oct. 25, 2017
+ * @version Oct. 27, 2017
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -24,8 +25,10 @@ case class Parcel(
   platformContext: Option[PlatformExecutionContext],
   context: Option[ExecutionContext]
 ) {
+  def withCommand(p: Command) = copy(command = Some(p))
   def withModel(model: Model) = copy(model = Some(model))
   def withView(view: View) = copy(view = Some(view))
+  def withContent(p: Content) = copy(content = Some(p))
   def withRenderStrategy(render: RenderStrategy) = copy(render = Some(render))
 
   // def withPartials(p: Partials) = render.fold(this)(r => copy(render = Some(r.copy(partials = p))))
@@ -35,7 +38,6 @@ case class Parcel(
     map(x => copy(context = Some(ExecutionContext(x, p)))).
     getOrElse(RAISE.noReachDefect)
 
-  def withContent(p: Content) = copy(content = Some(p))
   def withUsageKind(p: UsageKind) = render.
     fold(RAISE.noReachDefect)(x => withRenderStrategy(x.withUsageKind(p)))
 
@@ -64,7 +66,11 @@ case class Parcel(
   def takeCommand[T <: Command]: T = command.map(_.asInstanceOf[T]) getOrElse {
     RAISE.noReachDefect
   }
-  def getOperationName: Option[String] = context.flatMap(_.getOperationName)
+  def getOperationName: Option[String] =
+    command flatMap {
+      case MaterialCommand(pathname) => Some(StringUtils.toPathnameBody(pathname))
+      case _ => context.flatMap(_.getOperationName)
+    }
   def getEntityType: Option[DomainEntityType] = render.flatMap(_.getEntityType)
 
   def goOrigin: Parcel = RAISE.notImplementedYetDefect

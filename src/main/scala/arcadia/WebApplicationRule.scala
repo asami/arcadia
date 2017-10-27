@@ -5,15 +5,15 @@ import java.util.Locale
 import java.net.URI
 import com.typesafe.config.{Config, ConfigFactory}
 import org.goldenport.i18n.I18NElement
-import org.goldenport.xml.XhtmlUtils
 import org.goldenport.i18n.I18NString
+import org.goldenport.xml.XhtmlUtils
+import org.goldenport.util.StringUtils
 import org.goldenport.util.HoconUtils.Implicits._
 import arcadia.model.SubmitKind
 
 /*
  * @since   Aug. 12, 2017
- *  version Aug. 30, 2017
- * @version Oct. 22, 2017
+ * @version Oct. 27, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationRule(
@@ -26,7 +26,8 @@ case class WebApplicationRule(
   feature_list: Option[WebApplicationRule.FeatureList], // TopMenu, SideBar
   usecase_list: Option[WebApplicationRule.UsecaseList], // navigator
   admin_list: Option[WebApplicationRule.AdminList], // navigator
-  info_list: Option[WebApplicationRule.InfoList] // footer
+  info_list: Option[WebApplicationRule.InfoList], // footer
+  singlePageApplication: Option[WebApplicationRule.SinglePageApplication]
 ) {
   def applicationTitle(locale: Locale): NodeSeq = application_title.flatMap(_.get(locale)) getOrElse Group(Nil)
 
@@ -45,7 +46,8 @@ case class WebApplicationRule(
       feature_list orElse rhs.feature_list,
       usecase_list orElse rhs.usecase_list,
       admin_list orElse rhs.admin_list,
-      info_list orElse rhs.info_list
+      info_list orElse rhs.info_list,
+      singlePageApplication orElse rhs.singlePageApplication
     )
   }
 
@@ -56,6 +58,7 @@ case class WebApplicationRule(
 
 object WebApplicationRule {
   val empty = WebApplicationRule(
+    None,
     None,
     None,
     None,
@@ -97,4 +100,17 @@ object WebApplicationRule {
     page: List[Page],
     info_list: Option[InfoList]
   )
+
+  case class SinglePageApplication(
+    base_uri: List[URI],
+    rootPage: String = "index.html"
+  ) {
+    //    val pathname = base_uri.toString
+    private val _pathnames = base_uri.map(_.toString)
+    val rootPathname = _pathnames.head
+    val rootPagePathname = StringUtils.concatPath(rootPathname, rootPage)
+    def isActive(p: String): Boolean = _pathnames.exists(p.startsWith)
+    def isRootPagePathname(p: String): Boolean = p == rootPagePathname
+    def redirectCommand: MaterialCommand = MaterialCommand(rootPagePathname)
+  }
 }
