@@ -8,11 +8,11 @@ import org.goldenport.xml.XmlUtils
 import arcadia._
 import arcadia.context._
 import arcadia.view._
-import arcadia.model.Model
+import arcadia.model.{Model, ErrorModel, EmptyModel}
 
 /*
  * @since   Sep. 30, 2017
- * @version Oct. 16, 2017
+ * @version Oct. 31, 2017
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -72,6 +72,11 @@ object Tags {
   val embeded = Tags(Vector(
     TableTag,
     GridTag,
+    ContentTag,
+    NoticeTag,
+    BannerTag,
+    CarouselTag,
+    BadgeTag,
     ModelTag
   ))
 }
@@ -101,6 +106,28 @@ case class Expression(
   }
   lazy val engine: ViewEngine = strategy.viewContext.map(_.engine) getOrElse {
     RAISE.noReachDefect
+  }
+
+  // def model(key: Option[String]): Model = getModel(key) getOrElse {
+  //   ErrorModel.create(parcel, s"No model for key '$key'.")
+  // }
+
+  // def getModel(key: Option[String]): Option[Model] =
+  //   key.flatMap(parcel.getModel)
+
+  def getModel(key: String): Option[Model] = parcel.getModel(key)
+
+  def effectiveModel: Model = getEffectiveModel getOrElse {
+    EmptyModel
+  }
+
+  def effectiveModelOrError: Model = getEffectiveModel getOrElse {
+    ErrorModel.create(parcel, s"No model.")
+  }
+
+  def getEffectiveModel: Option[Model] = get("source") match {
+    case Some(s) => getModel(s)
+    case None => getModel
   }
 
   def applyModel: XmlContent = {

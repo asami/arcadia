@@ -8,12 +8,13 @@ import org.goldenport.record.v2.{Record, Schema}
 import arcadia._
 import arcadia.model._
 import arcadia.view._
+import arcadia.controller.UrnSource
 import arcadia.domain._
 
 /*
  * @since   Aug. 29, 2017
  *  version Sep. 27, 2017
- * @version Oct. 14, 2017
+ * @version Oct. 30, 2017
  * @author  ASAMI, Tomoharu
  */
 trait PlatformExecutionContext {
@@ -31,6 +32,8 @@ trait PlatformExecutionContext {
   def createEntity(klass: DomainEntityType, data: Record): DomainObjectId
   def updateEntity(klass: DomainEntityType, id: DomainObjectId, data: Record): Unit 
   def deleteEntity(klass: DomainEntityType, id: DomainObjectId): Unit
+  def fetchString(urn: UrnSource): Option[String]
+  def fetchBadge(urn: UrnSource): Option[Badge]
   def controllerUri: URI
   def inputFormParameters: Record
   def getFormParameter(key: String): Option[String]

@@ -17,7 +17,7 @@ import arcadia.view.ViewEngine._
  * @since   Jul. 31, 2017
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
- * @version Oct. 25, 2017
+ * @version Oct. 30, 2017
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -37,6 +37,7 @@ case class RenderStrategy(
   def cardKind = renderContext.cardKind getOrElse theme.default.cardKind
   def isLogined = executeOption(_.isLogined) getOrElse false
   def getOperationName: Option[String] = executeOption(_.getOperationName).flatten
+  def gridContext: GridContext = renderContext.gridContext getOrElse theme.default.gridContext
 
   def withScopeHtml = if (scope == Html) this else copy(renderContext = renderContext.withScopeHtml)
   def withScopeSection = if (scope == Section) this else copy(renderContext = renderContext.withScopeSection)
@@ -109,6 +110,11 @@ case object TinySize extends RenderSize { // 8pt
   val cssClass = "arcadia-tiny-size"
 }
 
+case class GridContext(width: Int, ncolumns: Int) // TODO xs, sm, md, lg
+object GridContext {
+  val default = GridContext(12, 6)
+}
+
 sealed trait RenderTheme extends ClassNamedValueInstance {
   protected def name_Suffix = "Theme"
   object default {
@@ -117,6 +123,7 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
     def usageKind: UsageKind = default_UsageKind
     def tableKind: TableKind = default_TableKind
     def cardKind: CardKind = default_CardKind
+    def gridContext: GridContext = default_GridContext
   }
   object head {
     def charset(strategy: RenderStrategy): Node = <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
@@ -179,6 +186,7 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
   protected def default_UsageKind: UsageKind = ListUsage
   protected def default_TableKind: TableKind = ListTable
   protected def default_CardKind: CardKind = BootstrapCard
+  protected def default_GridContext: GridContext = GridContext.default
   protected def body_CssClass(strategy: RenderStrategy): String = ""
   protected def table_Container(p: Renderer.Table, body: => Node): Node = body
   protected def table_CssClass_Caption(p: Renderer.Table): String = ""
@@ -555,6 +563,7 @@ object Components {
 case class RenderContext(
   scope: RenderScope,
   size: Option[RenderSize],
+  gridContext: Option[GridContext],
   operationKind: OperationMode,
   screenKind: ScreenKind,
   usageKind: Option[UsageKind],
@@ -579,6 +588,7 @@ case class RenderContext(
 object RenderContext {
   val empty = RenderContext(
     Html,
+    None,
     None,
     MediaOperationMode,
     WebScreen,

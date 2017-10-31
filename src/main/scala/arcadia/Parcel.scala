@@ -6,19 +6,21 @@ import org.goldenport.record.v2.Record
 import org.goldenport.util.StringUtils
 import arcadia.context._
 import arcadia.domain._
-import arcadia.model.{Model, ErrorModel}
+import arcadia.model.{Model, ErrorModel, Badge}
 import arcadia.view.{ViewEngine, RenderStrategy, Partials, View, UsageKind}
+import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
 
 /*
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
- * @version Oct. 27, 2017
+ * @version Oct. 31, 2017
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
   command: Option[Command],
   model: Option[Model],
+  modelHanger: Map[String, Model],
   view: Option[View],
   content: Option[Content],
   render: Option[RenderStrategy],
@@ -59,6 +61,7 @@ case class Parcel(
     RAISE.noReachDefect
   }
   def getEffectiveModel: Option[Model] = model orElse command.flatMap(_.getModel)
+  def getModel(key: String): Option[Model] = modelHanger.get(key)
   def toMessage: String = {
     command.map(_.toString) orElse
     getOperationName getOrElse ("Empty parcel")
@@ -72,6 +75,8 @@ case class Parcel(
       case _ => context.flatMap(_.getOperationName)
     }
   def getEntityType: Option[DomainEntityType] = render.flatMap(_.getEntityType)
+  def fetchString(p: UrnSource): Option[String] = context.flatMap(_.fetchString(p))
+  def fetchBadge(p: UrnSource): Option[Badge] = context.flatMap(_.fetchBadge(p))
 
   def goOrigin: Parcel = RAISE.notImplementedYetDefect
   def goError(e: Throwable): Parcel = withModel(ErrorModel.create(this, e))
@@ -94,11 +99,15 @@ case class Parcel(
   def applyOnContext(pf: ExecutionContext => Parcel): Parcel = context.map(pf).getOrElse {
     RAISE.noReachDefect
   }
+
+  def sink(s: Sink, m: Model): Parcel = s match {
+    case ModelHangerSink(key) => copy(modelHanger = modelHanger ++ Map(key -> m))
+  }
 }
 
 object Parcel {
   def apply(model: Model, strategy: RenderStrategy): Parcel = Parcel(
-    None, Some(model), None, None, Some(strategy), None, None
+    None, Some(model), Map.empty, None, None, Some(strategy), None, None
   )
 
   // def apply(command: Command, req: ServiceRequest): Parcel = Parcel(

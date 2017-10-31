@@ -9,12 +9,13 @@ import org.goldenport.record.v2.util.SchemaBuilder
 import arcadia._
 import arcadia.model._
 import arcadia.view._
+import arcadia.controller.UrnSource
 import arcadia.domain._
 
 /*
  * @since   Aug. 29, 2017
  *  version Sep. 27, 2017
- * @version Oct. 14, 2017
+ * @version Oct. 30, 2017
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -42,6 +43,8 @@ case class ExecutionContext(
   def createEntity(klass: DomainEntityType, data: Record): DomainObjectId = platformExecutionContext.createEntity(klass, data)
   def updateEntity(klass: DomainEntityType, id: DomainObjectId, data: Record): Unit = platformExecutionContext.updateEntity(klass, id, data)
   def deleteEntity(klass: DomainEntityType, id: DomainObjectId): Unit = platformExecutionContext.deleteEntity(klass, id)
+  def fetchString(urn: UrnSource): Option[String] = platformExecutionContext.fetchString(urn)
+  def fetchBadge(urn: UrnSource): Option[Badge] = platformExecutionContext.fetchBadge(urn)
   def controllerUri: URI = platformExecutionContext.controllerUri
   def inputFormParameters: Record = platformExecutionContext.inputFormParameters
   def getFormParameter(key: String): Option[String] = platformExecutionContext.getFormParameter(key)

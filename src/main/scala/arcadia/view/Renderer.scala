@@ -19,7 +19,7 @@ import arcadia.domain._
  * @since   Aug.  1, 2017
  *  version Aug. 29, 2017
  *  version Sep. 26, 2017
- * @version Oct. 25, 2017
+ * @version Oct. 31, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -47,6 +47,8 @@ abstract class Renderer(
     case Section => render_section
     case Content => render_content
   }
+
+  protected def generate_id = java.util.UUID.randomUUID().toString
 
   protected def render_html = <html>{render_head}{render_body}</html>
   protected def render_head = <head>
@@ -90,6 +92,8 @@ abstract class Renderer(
   ): NodeSeq = <div>ERROR: {code}</div> // TODO
 
   protected def text(p: String): Text = Text(p)
+
+  protected def empty_block: Elem = <div></div> // TODO
 
   protected def seq(head: Option[NodeSeq], tail: Option[NodeSeq]*): Seq[NodeSeq] =
     (head :: tail.toList).flatten
@@ -594,6 +598,7 @@ abstract class Renderer(
   }
 
   protected def grid(p: TableWithRecords): Elem = {
+    val grid = strategy.gridContext
     val ncolumns = 6
     val width = 12 / ncolumns
     <div class="container"> { // container-fluid
@@ -609,13 +614,34 @@ abstract class Renderer(
     } </div>
   }
 
+  protected def grid(ps: List[Card]): Elem = {
+    val grid = strategy.gridContext
+    val ncolumns = Math.min(grid.ncolumns, ps.length)
+    if (ncolumns == 0) {
+      empty_block
+    } else {
+      val width = grid.width / ncolumns
+      <div class="container"> { // container-fluid
+        for (row <- ps.grouped(ncolumns)) yield {
+          <div class="row"> {
+            for (x <- row) yield {
+              <div class={s"col-sm-${width}"}> {
+                card(x)
+              } </div>
+            }
+          } </div>
+        }
+      } </div>
+    }
+  }
+
   protected def card(rec: Record): Elem = {
     val icon = picture_icon(rec)
     val title = get_title(rec)
     val subtitle = get_subtitle(rec)
     val header = TitleLine(title, subtitle).toOption
     val content = get_content(rec) getOrElse (Text("-"))
-    val c = Card(icon, header, content)
+    val c = Card.create(icon, header, content)
     card(c)
   }
 
@@ -624,7 +650,7 @@ abstract class Renderer(
     header: Option[TitleLine],
     footer: Option[TitleLine],
     content: NodeSeq
-  ): Elem = card(Card(imagetop, header, footer, content))
+  ): Elem = card(Card(imagetop, header, footer, Some(I18NElement(content))))
 
   protected def card(card: Card): Elem =
     strategy.cardKind match {
@@ -701,43 +727,111 @@ abstract class Renderer(
             h.subTitle.map(d => <p class="category">{d(locale)}</p>)
           ).flatten
         }</div>
-      ) ++ <div class="content">{
-        card.content ++ List(
-          card.footer.map(f =>
-            <div class="footer">{
-              List(
-                f.title.map(t => <h4 class="title">{t(locale)}</h4>),
-                f.subTitle.map(d => <p class="category">{d(locale)}</p>)
-              ).flatten
-            }</div>
-          )
-        ).flatten
-      }</div>
+      ) ++ card.content.map(c =>
+        <div class="content">{
+          c(locale) ++ List(
+            card.footer.map(f =>
+              <div class="footer">{
+                List(
+                  f.title.map(t => <h4 class="title">{t(locale)}</h4>),
+                  f.subTitle.map(d => <p class="category">{d(locale)}</p>)
+                ).flatten
+              }</div>
+            )
+          ).flatten
+        }</div>
+      )
     }</div>
   }
 
-  def get_title(rec: Record): Option[I18NElement] =
+  protected def get_title(rec: Record): Option[I18NElement] =
     rec.getString(KEY_DOMAIN_OBJECT_TITLE).map(I18NElement.parse)
 
-  def get_subtitle(rec: Record): Option[I18NElement] =
+  protected def get_subtitle(rec: Record): Option[I18NElement] =
     rec.getString(KEY_DOMAIN_OBJECT_SUBTITLE).map(I18NElement.parse)
 
-  def get_content(rec: Record): Option[Node] =
+  protected def get_content(rec: Record): Option[Node] =
     rec.getString(KEY_DOMAIN_OBJECT_CONTENT).map(table_value_html)
 
-  def get_content_summary(rec: Record): Option[Node] =
+  protected def get_content_summary(rec: Record): Option[Node] =
     rec.getString(KEY_DOMAIN_OBJECT_CONTENT).map(table_value_html_summary)
 
-  def picture_icon(rec: Record): Picture =
+  protected def picture_icon(rec: Record): Picture =
     rec.getOne(KEY_DOMAIN_OBJECT_IMAGE_ICON).fold {
-      Picture(theme.default.noImageIcon)
+      Picture.create(theme.default.noImageIcon)
     } {
-      case m: URL => Picture(m.toURI)
-      case m: URI => Picture(m)
-      case m: String => Picture(new URI(m))
+      case m: URL => Picture.create(m.toURI)
+      case m: URI => Picture.create(m)
+      case m: String => Picture.create(new URI(m))
       case m: Picture => m
       case m => RAISE.noReachDefect
     }
+
+  protected def carousel(
+    ps: List[Picture],
+    isControl: Boolean = true,
+    isIndicator: Boolean = true,
+    isCaption: Boolean = true
+  ): Elem = {
+    val id = generate_id
+    <div id={s"$id"} class="carousel slide" data-ride="carousel">
+      {
+        if (isIndicator)
+          <ol class="carousel-indicators"> {
+            for ((x, i) <- ps.zipWithIndex) yield {
+              if (i == 0)
+                <li data-target={s"#${id}"} data-slide-to="0" class="active"></li>
+              else
+                <li data-target={s"#${id}"} data-slide-to={s"i"}></li>
+            }
+          } </ol>
+        else
+          Group(Nil)
+      }
+      <div class="carousel-inner"> {
+        ps.map(x =>
+          <div class="carousel-item active">
+  	    <img class="d-block w-100" src={x.srcString} alt={x.altString(locale)}></img>
+            {
+              if (!isCaption || (x.caption.isEmpty && x.description.isEmpty))
+                Group(Nil)
+              else
+                <div class="carousel-caption d-none d-md-block"> {
+                  List(
+                    x.caption.map(c => <h3>{c(locale)}</h3>),
+                    x.description.map(d => <p>{d(locale)}</p>)
+                  ).flatten
+                } </div>
+            }
+          </div>
+        )
+      } </div>
+      {
+        if (isControl) {
+          <a class="carousel-control-prev" href={s"#${id}"} role="button" data-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="sr-only">Previous</span>
+	  </a>
+	  <a class="carousel-control-next" href={s"#${id}"} role="button" data-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="sr-only">Next</span>
+	  </a>
+        } else {
+          Group(Nil)
+        }
+      }
+    </div>
+  }
+
+  protected def banner(ps: List[Picture]): Elem = {
+    val cards = ps.map(Card.create)
+    grid(cards)
+  }
+
+  protected def badge(p: Badge): Elem = {
+    val c = s"badge badge-${p.asIndicatorName}"
+    <span class={c}>{p.asLabel}</span>
+  }
 
   /*
    * Utilities

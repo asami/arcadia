@@ -16,7 +16,7 @@ import arcadia.model.{Model, ErrorModel}
  * @since   Jul.  8, 2017
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
- * @version Oct. 27, 2017
+ * @version Oct. 31, 2017
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -95,7 +95,7 @@ class ViewEngine(
   // }
 
   def apply(p: Parcel): Content = applyOption(p) getOrElse {
-    throw new IllegalStateException(p.toMessage) // TODO WebViewNotFoundFault(p.toMessage).RAISE
+    throw new NoSuchElementException(p.toMessage) // TODO WebViewNotFoundFault(p.toMessage).RAISE
   }
 
   def applyOption(p: Parcel): Option[Content] = {

@@ -8,7 +8,6 @@ import org.goldenport.record.v2._
 import org.goldenport.record.v2.util.RecordUtils
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.util.StringUtils
-import com.asamioffice.goldenport.text.UString
 import arcadia._
 import arcadia.context._
 import arcadia.view._
@@ -21,7 +20,7 @@ import arcadia.domain._
  * @since   Jul. 29, 2017
  *  version Aug. 30, 2017
  *  version Sep. 27, 2017
- * @version Oct. 25, 2017
+ * @version Oct. 31, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -36,7 +35,7 @@ trait Model {
     PROP_VIEW_MODEL -> ViewModel(this, strategy)
   ) ++ view_Bindings(strategy) // for Template
 
-  protected def view_Bindings(strategy: RenderStrategy): Map[String, AnyRef]
+  protected def view_Bindings(strategy: RenderStrategy): Map[String, AnyRef] = Map.empty
   def isActiveFeature(p: String): Boolean = p == featureName || featureNameAliases.contains(p)
 
   //
@@ -97,11 +96,10 @@ trait ISectionModel { self: Model =>
 }
 
 trait IComponentModel { self: Model =>
-  def caption: Option[I18NElement]
+  def caption: Option[I18NElement] = None
 }
 
 trait IAtomicModel { self: Model =>
-  protected def view_Bindings(strategy: RenderStrategy): Map[String, AnyRef] = Map.empty
 }
 
 trait IOrganismModel extends IAtomicModel { self: Model =>
@@ -173,8 +171,12 @@ trait IFormModel { self: Model =>
 case object EmptyModel extends Model {
   val expiresKind = None
   def toRecord: Record = RAISE.notImplementedYetDefect
-  def render(strategy: RenderStrategy) = RAISE.notImplementedYetDefect
-  protected def view_Bindings(strategy: RenderStrategy): Map[String, AnyRef] = Map.empty
+  def render(strategy: RenderStrategy) = new Renderer(
+    strategy, None, None, None, None
+  ) {
+    protected def render_Content: NodeSeq = empty_block
+  }.apply
+
 }
 
 case class ErrorModel(
@@ -191,7 +193,6 @@ case class ErrorModel(
   ) {
     protected def render_Content: NodeSeq = error(code, message, exception, topUri, backUri)
   }.apply
-  protected def view_Bindings(strategy: RenderStrategy): Map[String, AnyRef] = Map.empty
 }
 object ErrorModel {
   def create(parcel: Parcel, e: Throwable): ErrorModel = {
@@ -260,14 +261,70 @@ case class IndexModel(
 ) extends Model with IPageModel {
   def toRecord: Record = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy) = RAISE.notImplementedYetDefect
-  protected def view_Bindings(strategy: RenderStrategy): Map[String, AnyRef] = Map.empty
 
   def getEntityList(name: String): Option[EntityListModel] = entities.find(_._1 == name).map(_._2)
 }
 
-case class CarouselModel()
+case class CarouselModel(
+  pictures: List[Picture],
+  expiresKind: Option[ExpiresKind] = None
+) extends Model with IComponentModel {
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy) = new Renderer(
+    strategy, None, None, None, None
+  ) {
+    protected def render_Content: NodeSeq = carousel(pictures)
+  }.apply
+}
 object CarouselModel {
+}
 
+case class BannerModel(
+  pictures: List[Picture],
+  expiresKind: Option[ExpiresKind] = None
+) extends Model with IComponentModel {
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy) = new Renderer(
+    strategy, None, None, None, None
+  ) {
+    protected def render_Content: NodeSeq = banner(pictures)
+  }.apply
+}
+
+case class BadgeModel(
+  badge: Badge,
+  expiresKind: Option[ExpiresKind] = Some(PrivatePageExpires)
+) extends Model with IComponentModel {
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy) = new Renderer(
+    strategy, None, None, None, None
+  ) {
+    protected def render_Content: NodeSeq = this.badge(BadgeModel.this.badge)
+  }.apply
+}
+
+case class NoticeModel(
+  getXml: Option[Xml],
+  expiresKind: Option[ExpiresKind] = None // TODO
+) extends Model with IComponentModel {
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy) = new Renderer(
+    strategy, None, None, None, None
+  ) {
+    protected def render_Content: NodeSeq = getXml.map(_.apply(locale)).getOrElse(Group(Nil)) // TODO background
+  }.apply
+}
+
+case class XmlModel(
+  xml: Xml,
+  expiresKind: Option[ExpiresKind] = None
+) extends Model with IComponentModel {
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy) = new Renderer(
+    strategy, None, None, None, None
+  ) {
+    protected def render_Content: NodeSeq = xml(locale)
+  }.apply
 }
 
 case class QueueDashboardModel(
@@ -278,7 +335,6 @@ case class QueueDashboardModel(
   done: TableCardModel,
   expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
 ) extends Model with IQueueDashboardModel with ISectionModel with IComponentModel {
-  val caption = None
   def toRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, title, caption
@@ -290,7 +346,6 @@ case class QueueDashboardModel(
     <div>{done.render(strategy.withScopeSection)}</div>
     </div>
   }.apply
-  protected def view_Bindings(strategy: RenderStrategy) = Map.empty // TODO
 }
 
 case class QueueDashboardSetModel(
@@ -299,7 +354,6 @@ case class QueueDashboardSetModel(
   queues: List[QueueDashboardModel],
   expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
 ) extends Model with IQueueDashboardSetModel with ISectionModel with IComponentModel {
-  val caption = None
   def toRecord = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy) =
     <div class="container-fluid">
@@ -310,21 +364,20 @@ case class QueueDashboardSetModel(
     </div>
     </div>
     </div>
-  protected def view_Bindings(strategy: RenderStrategy) = Map.empty // TODO
 }
 
 trait DashboardModelBase extends Model with IDashboardModel with IPageModel with ISectionModel with IComponentModel {
 }
 
 case class EntityDetailModel(
-  caption: Option[I18NElement],
+  override val caption: Option[I18NElement],
   entityType: DomainEntityType,
   getSchema: Option[Schema],
   record: Record,
   expiresKind: Option[ExpiresKind] = Some(AgilePageExpires)
 ) extends Model with IEntityDetailModel with IComponentModel {
   def getEntityType = Some(entityType)
-  protected def view_Bindings(strategy: RenderStrategy) = Map(
+  override protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_OBJECT -> ViewObject.create(record),
     PROP_VIEW_RECORD -> ViewRecord.create(record)
   )
@@ -349,7 +402,7 @@ object EntityDetailModel extends ModelClass {
 }
 
 case class EntityListModel(
-  caption: Option[I18NElement],
+  override val caption: Option[I18NElement],
   entityType: DomainEntityType,
   getSchema: Option[Schema],
   records: List[Record],
@@ -358,7 +411,7 @@ case class EntityListModel(
   expiresKind: Option[ExpiresKind] = Some(AgilePageExpires)
 ) extends Model with IEntityListModel with IComponentModel {
   override def getEntityType: Option[DomainEntityType] = Some(entityType)
-  protected def view_Bindings(strategy: RenderStrategy) = Map(
+  override protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_LIST -> records.map(ViewObject.create),
     PROP_VIEW_RECORD -> records.map(ViewRecord.create)
   )
@@ -429,13 +482,13 @@ object EntityListModel extends ModelClass {
 }
 
 case class PropertySheetModel(
-  caption: Option[I18NElement],
+  override val caption: Option[I18NElement],
   getSchema: Option[Schema],
   record: Record,
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IRecordModel with IComponentModel {
   def getEntityType = None
-  protected def view_Bindings(strategy: RenderStrategy) = Map(
+  override protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORD -> ViewRecord.create(record)
   )
   def toRecord: Record = throw new UnsupportedOperationException()
@@ -463,14 +516,14 @@ object PropertySheetModel extends ModelClass {
 }
 
 case class PropertyTableModel(
-  caption: Option[I18NElement],
+  override val caption: Option[I18NElement],
   getSchema: Option[Schema],
   records: List[Record],
   tableKind: Option[TableKind] = None,
   expiresKind: Option[ExpiresKind] = None
 ) extends ITableModel with IComponentModel {
   def getEntityType = None
-  protected def view_Bindings(strategy: RenderStrategy) = Map(
+  override protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORDS -> records.map(ViewRecord.create)
   )
 
@@ -523,14 +576,14 @@ object PropertyTableModel extends ModelClass {
 }
 
 case class TableModel(
-  caption: Option[I18NElement],
+  override val caption: Option[I18NElement],
   getSchema: Option[Schema],
   records: List[Record],
   tableKind: Option[TableKind],
   expiresKind: Option[ExpiresKind] = None
 ) extends ITableModel with IComponentModel {
   def getEntityType = None
-  protected def view_Bindings(strategy: RenderStrategy) = Map(
+  override protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORDS -> records.map(ViewRecord.create)
   )
   def withSchemaKind(
@@ -692,13 +745,13 @@ case class TableBodyRecordDataModel(
 }
 
 case class RecordModel(
-  caption: Option[I18NElement],
+  override val caption: Option[I18NElement],
   getSchema: Option[Schema],
   record: Record,
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IRecordModel with IComponentModel {
   def getEntityType = None
-  protected def view_Bindings(strategy: RenderStrategy) = Map(
+  override protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORD -> ViewRecord.create(record)
   )
   def toRecord: Record = throw new UnsupportedOperationException()
@@ -715,13 +768,13 @@ object RecordModel {
 }
 
 case class RecordsModel(
-  caption: Option[I18NElement],
+  override val caption: Option[I18NElement],
   getSchema: Option[Schema],
   records: List[Record],
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IRecordsModel with IComponentModel {
   def getEntityType = None
-  protected def view_Bindings(strategy: RenderStrategy) = Map(
+  override protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORDS -> records.map(ViewRecord.create)
   )
   def toRecord: Record = throw new UnsupportedOperationException()
@@ -746,8 +799,7 @@ case class TableCardModel(
   footer: Option[TitleLine] = None,
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IComponentModel {
-  val caption = None
-  protected def view_Bindings(strategy: RenderStrategy) = Map(
+  override protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORDS -> records.records.map(ViewRecord.create)
   )
   def toRecord: Record = throw new UnsupportedOperationException()
@@ -760,7 +812,7 @@ case class TableCardModel(
 }
 object TableCardModel {
   def apply(title: I18NElement, schema: Schema, records: Seq[Record]): TableCardModel =
-    TableCardModel(TableModel(None, Some(schema), records.toList, Some(DashboardTable)), None, Some(TitleLine(title)))
+    TableCardModel(TableModel(None, Some(schema), records.toList, Some(DashboardTable)), None, Some(TitleLine.create(title)))
 }
 
 case class PropertyInputFormModel(
@@ -772,7 +824,6 @@ case class PropertyInputFormModel(
   submit: Submits,
   expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
 ) extends Model with IFormModel with IComponentModel {
-  val caption = None
   def toRecord: Record = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
@@ -780,7 +831,6 @@ case class PropertyInputFormModel(
     protected def render_Content: NodeSeq =
       property_input_form(uri, method, schema, record, hidden, submit)
   }.apply
-  protected def view_Bindings(strategy: RenderStrategy): Map[String, AnyRef] = Map.empty
 }
 
 case class PropertyConfirmFormModel(
@@ -792,7 +842,6 @@ case class PropertyConfirmFormModel(
   submit: Submits,
   expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
 ) extends Model with IFormModel with IComponentModel {
-  val caption = None
   def toRecord: Record = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
@@ -800,114 +849,4 @@ case class PropertyConfirmFormModel(
     protected def render_Content: NodeSeq =
       property_confirm_form(uri, method, schema, record, hidden, submit)
   }.apply
-  protected def view_Bindings(strategy: RenderStrategy): Map[String, AnyRef] = Map.empty
-}
-
-/*
- *
- */
-case class TitleLine(
-  title: Option[I18NElement],
-  subTitle: Option[I18NElement]
-) {
-  def toOption: Option[TitleLine] =
-    if (title.isEmpty)
-      None
-    else
-      Some(this)
-}
-object TitleLine {
-  def apply(title: I18NElement): TitleLine = TitleLine(Some(title), None)
-}
-
-case class Picture( // HTML5 picture
-  // TODO source
-  // TODO map/area
-  src: URI,
-  alt: Option[I18NString],
-  href: Option[URI],
-  size: Option[Int],
-  height: Option[Int],
-  width: Option[Int]
-)
-object Picture {
-  def apply(src: URI): Picture = Picture(src, None, None, None, None, None)
-}
-
-case class Card(
-  imagetop: Option[Picture],
-  header: Option[TitleLine],
-  footer: Option[TitleLine],
-  content: NodeSeq
-)
-object Card {
-  def apply(pic: Picture, header: TitleLine, content: NodeSeq): Card = Card(Some(pic), Some(header), None, content)
-
-  def apply(pic: Picture, header: Option[TitleLine], content: NodeSeq): Card = Card(Some(pic), header, None, content)
-}
-
-case class Submits(submits: Vector[Submit])
-object Submits {
-  def apply(p: Submit, ps: Submit*): Submits = Submits(
-    (p +: ps).toVector
-  )
-}
-
-case class Submit(kind: SubmitKind, label: I18NString) {
-  def name = ScenarioCommand.PROP_SUBMIT_PREFIX + kind.name
-  def value(locale: Locale) = label(locale)
-}
-object Submit {
-  def apply(kind: SubmitKind): Submit = Submit(kind, kind.label)
-}
-
-sealed trait SubmitKind {
-  def name: String
-  def label: I18NString = I18NString(UString.capitalize(name))
-}
-case object OkSubmitKind extends SubmitKind {
-  def name: String = Event.EVENT_OK
-}
-case object CancelSubmitKind extends SubmitKind {
-  def name: String = Event.EVENT_CANCEL
-}
-case object InputSubmitKind extends SubmitKind {
-  def name: String = Event.EVENT_INPUT
-}
-case object CreateSubmitKind extends SubmitKind {
-  def name: String = Event.EVENT_CREATE
-}
-case object UpdateSubmitKind extends SubmitKind {
-  def name: String = Event.EVENT_UPDATE
-}
-case object DELETESubmitKind extends SubmitKind {
-  def name: String = Event.EVENT_DELETE
-}
-case object BackSubmitKind extends SubmitKind {
-  def name: String = Event.EVENT_BACK
-}
-
-case class Hidden(
-//  event: Option[String],
-  scenario: Option[String]
-) {
-  def render: NodeSeq = <div>{
-    scenario.map(x => <input type="hidden" name={ScenarioCommand.PROP_SCENARIO} value={x}></input>).toList
-  }</div>
-}
-
-sealed trait Method {
-  def name: String
-}
-case object Get extends Method {
-  def name = "GET"
-}
-case object Post extends Method {
-  def name = "POST"
-}
-case object Put extends Method {
-  def name = "PUT"
-}
-case object Delete extends Method {
-  def name = "DELETE"
 }
