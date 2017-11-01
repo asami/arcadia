@@ -17,7 +17,8 @@ import arcadia.scenario.ScenarioEngine
  * @since   Jul. 16, 2017
  *  version Aug. 29, 2017
  *  version Sep. 21, 2017
- * @version Oct. 31, 2017
+ *  version Oct. 31, 2017
+ * @version Nov.  1, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -60,6 +61,9 @@ trait Action {
     fetch_source_via_string_option(x =>
       if (Strings.notblankp(x)) None else Some(Xml.parse(x))
     )(parcel, s)
+
+  protected final def fetch_request_parameter(parcel: Parcel, s: Source): Option[RequestParameter] =
+    fetch_source_via_string(RequestParameter.parse)(parcel, s)
 }
 object Action {
   import org.goldenport.json.JsonUtils.Implicits._
@@ -257,7 +261,13 @@ case class ReadEntityListAction(
   sink: Option[Sink]
 ) extends SourceSinkAction {
   def apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
-    val q = Query(DomainEntityType(entity), parameters = query.getOrElse(Map.empty))
+    val params = source.flatMap(src =>
+      fetch_request_parameter(parcel, src).flatMap(_.query)
+    )
+    val q = Query(
+      DomainEntityType(entity),
+      parameters = query.getOrElse(Map.empty)
+    ).withParameter(params)
     val r = context.readEntityList(q)
     set_sink(parcel)(r)
   }

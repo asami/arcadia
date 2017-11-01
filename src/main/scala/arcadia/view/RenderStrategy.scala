@@ -17,7 +17,8 @@ import arcadia.view.ViewEngine._
  * @since   Jul. 31, 2017
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
- * @version Oct. 30, 2017
+ *  version Oct. 30, 2017
+ * @version Nov.  1, 2017
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -51,15 +52,20 @@ case class RenderStrategy(
 
   def withSizeTiny = if (size == TinySize) this else copy(renderContext = renderContext.withSizeTiny)
 
+  def withGridContext(p: GridContext) = copy(renderContext = renderContext.withGridContext(p))
+
+  def withEntityType(p: Option[DomainEntityType]) = copy(renderContext = renderContext.withEntityType(p))
+  def withEntityType(p: DomainEntityType) = copy(renderContext = renderContext.withEntityType(p))
+  def withUsageKind(p: UsageKind) = copy(renderContext = renderContext.withUsageKind(p))
+  def withTableKind(p: TableKind) = copy(renderContext = renderContext.withTableKind(p))
+  def withCardKind(p: CardKind) = copy(renderContext = renderContext.withCardKind(p))
+
   def withViewContext(engine: ViewEngine, parcel: Parcel) = copy(viewContext = Some(ViewContext(engine, parcel)))
   def withThemePartials(t: RenderTheme, p: Partials) = copy(
     theme = t,
     partials = p
   )
   def withApplicationRule(p: WebApplicationRule) = copy(application = p)
-  def withEntityType(p: Option[DomainEntityType]) = copy(renderContext = renderContext.withEntityType(p))
-  def withEntityType(p: DomainEntityType) = copy(renderContext = renderContext.withEntityType(p))
-  def withUsageKind(p: UsageKind) = copy(renderContext = renderContext.withUsageKind(p))
 
   def forComponent(engine: ViewEngine, parcel: Parcel) = forView(engine, parcel)
   def forView(engine: ViewEngine, parcel: Parcel) =
@@ -110,9 +116,37 @@ case object TinySize extends RenderSize { // 8pt
   val cssClass = "arcadia-tiny-size"
 }
 
-case class GridContext(width: Int, ncolumns: Int) // TODO xs, sm, md, lg
+case class GridContext(
+  width: Int,
+  ncolumns: Map[ScreenKind, Int], // xs, sm, md, lg
+  isNoGutters: Boolean = false
+) {
+  def withTabletColumns(p: Int): GridContext = copy(ncolumns = ncolumns + (TabletScreen -> p))
+}
 object GridContext {
-  val default = GridContext(12, 6)
+  val image = GridContext(
+    12,
+    Map(
+      LargeScreen -> 12,
+      DesktopScreen -> 6,
+      TabletScreen -> 4,
+      PhoneScreen -> 3
+    )
+  )
+  val card = GridContext(
+    12,
+    Map(
+      TabletScreen -> 4,
+      PhoneScreen -> 3
+    )
+  )
+  val banner = GridContext(
+    12,
+    Map(
+      TabletScreen -> 4
+    ),
+    true
+  )
 }
 
 sealed trait RenderTheme extends ClassNamedValueInstance {
@@ -185,8 +219,8 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
 
   protected def default_UsageKind: UsageKind = ListUsage
   protected def default_TableKind: TableKind = ListTable
-  protected def default_CardKind: CardKind = BootstrapCard
-  protected def default_GridContext: GridContext = GridContext.default
+  protected def default_CardKind: CardKind = ImageTitleCard
+  protected def default_GridContext: GridContext = GridContext.card
   protected def body_CssClass(strategy: RenderStrategy): String = ""
   protected def table_Container(p: Renderer.Table, body: => Node): Node = body
   protected def table_CssClass_Caption(p: Renderer.Table): String = ""
@@ -291,7 +325,6 @@ case object PlainTheme extends RenderTheme {
 }
 case object PaperDashboardTheme extends Bootstrap3RenderThemaBase {
   override protected def default_TableKind: TableKind = StandardTable
-  override protected def default_CardKind: CardKind = PaperDashboardCard
   override protected def table_CssClass_TheadTh(p: Renderer.TableColumn): String =
     p.size.cssClass
 }
@@ -349,19 +382,67 @@ case object DashboardTable extends TableKind {
 }
 
 sealed trait CardKind extends NamedValueInstance {
+  def isImageTop: Boolean
+  def isHeader: Boolean
+  def isFooter: Boolean
+  def isContent: Boolean
 }
 object CardKind extends EnumerationClass[CardKind] {
   val elements = Vector(
-    BootstrapCard, // Bootstrap4
-    PaperDashboardCard // Creative-Tim PaperDashboard
+    ImageCard,
+    ImageTitleCard,
+    ImageTitleSummaryCard,
+    ImageTitleContentCard
   )
+  def take(p: String) = get(p) getOrElse BrokenCard(p)
 }
-case object BootstrapCard extends CardKind {
-  val name = "bootstrap"
+case object ImageCard extends CardKind {
+  val name = "image"
+  def isImageTop: Boolean = true
+  def isHeader: Boolean = false
+  def isFooter: Boolean = false
+  def isContent: Boolean = false
 }
-case object PaperDashboardCard extends CardKind {
-  val name = "paper-dashboard"
+case object ImageTitleCard extends CardKind {
+  val name = "image_title"
+  def isImageTop: Boolean = true
+  def isHeader: Boolean = true
+  def isFooter: Boolean = false
+  def isContent: Boolean = false
 }
+case object ImageTitleSummaryCard extends CardKind {
+  val name = "image_title_summary"
+  def isImageTop: Boolean = true
+  def isHeader: Boolean = true
+  def isFooter: Boolean = false
+  def isContent: Boolean = true
+}
+case object ImageTitleContentCard extends CardKind {
+  val name = "image_title_content"
+  def isImageTop: Boolean = true
+  def isHeader: Boolean = true
+  def isFooter: Boolean = false
+  def isContent: Boolean = true
+}
+case class BrokenCard(m: String) extends CardKind {
+  val name = "broken"
+  def isImageTop: Boolean = false
+  def isHeader: Boolean = false
+  def isFooter: Boolean = false
+  def isContent: Boolean = false
+}
+// object CardKind extends EnumerationClass[CardKind] {
+//   val elements = Vector(
+//     BootstrapCard, // Bootstrap4
+//     PaperDashboardCard // Creative-Tim PaperDashboard
+//   )
+// }
+// case object BootstrapCard extends CardKind {
+//   val name = "bootstrap"
+// }
+// case object PaperDashboardCard extends CardKind {
+//   val name = "paper-dashboard"
+// }
 
 sealed trait OperationMode {
 }
@@ -370,9 +451,10 @@ case object ConsoleOperationMode extends OperationMode
 
 sealed trait ScreenKind {
 }
-case object WebScreen extends ScreenKind
-case object TabletScreen extends ScreenKind
-case object PhoneScreen extends ScreenKind
+case object LargeScreen extends ScreenKind // lg
+case object DesktopScreen extends ScreenKind // md
+case object TabletScreen extends ScreenKind // sm
+case object PhoneScreen extends ScreenKind // xs
 
 sealed trait UsageKind {
 }
@@ -417,7 +499,7 @@ object UsageSchemaRule {
 case class SchemaRule(
   byOperationMode: OperationScreenEntityUsageSchemaRule,
   byScreen: ScreenEntityUsageSchemarRule, // MediaOperationMode
-  byEntity: EntityUsageSchemaRule, // WebScreen
+  byEntity: EntityUsageSchemaRule, // DesktopScreen
   byUsage: UsageSchemaRule, // common
   default: Schema // AtomFeed
 ) {
@@ -581,9 +663,12 @@ case class RenderContext(
     val sl: Option[Int] = sectionLevel.map(_ + 1) orElse Some(1)
     copy(sectionLevel = sl)
   }
+  def withGridContext(p: GridContext) = copy(gridContext = Some(p))
   def withEntityType(p: Option[DomainEntityType]) = copy(entityType = p)
   def withEntityType(p: DomainEntityType) = copy(entityType = Some(p))
   def withUsageKind(p: UsageKind) = copy(usageKind = Some(p))
+  def withTableKind(p: TableKind) = copy(tableKind = Some(p))
+  def withCardKind(p: CardKind) = copy(cardKind = Some(p))
 }
 object RenderContext {
   val empty = RenderContext(
@@ -591,7 +676,7 @@ object RenderContext {
     None,
     None,
     MediaOperationMode,
-    WebScreen,
+    DesktopScreen,
     None,
     None,
     None,

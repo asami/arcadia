@@ -17,9 +17,9 @@ import arcadia.domain._
 
 /*
  * @since   Aug.  1, 2017
- *  version Aug. 29, 2017
  *  version Sep. 26, 2017
- * @version Oct. 31, 2017
+ *  version Oct. 31, 2017
+ * @version Nov.  1, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -598,15 +598,53 @@ abstract class Renderer(
   }
 
   protected def grid(p: TableWithRecords): Elem = {
-    val grid = strategy.gridContext
-    val ncolumns = 6
-    val width = 12 / ncolumns
+    val cards = p.records.map(to_card).toList
+    grid(cards)
+    // val grid = strategy.gridContext
+    // val ncolumns = 6
+    // val width = 12 / ncolumns
+    // <div class="container"> { // container-fluid
+    //   for (row <- p.records.grouped(ncolumns)) yield {
+    //     <div class="row"> {
+    //       for (x <- row) yield {
+    //         <div class={s"col-sm-${width}"}> {
+    //           card(x)
+    //         } </div>
+    //       }
+    //     } </div>
+    //   }
+    // } </div>
+  }
+
+  protected def grid(ps: List[Card]): Elem =
+    if (ps.length == 0)
+      empty_block
+    else
+      grid(strategy, ps)(card(_))
+
+  protected def grid[T](s: RenderStrategy, ps: List[T])(f: T => NodeSeq): Elem = {
+    val g = s.gridContext
+    val w = g.width
+    val sxcolumns = g.ncolumns.get(PhoneScreen)
+    val smcolumns = g.ncolumns.get(TabletScreen)
+    val mdcolumns = g.ncolumns.get(DesktopScreen)
+    val lgcolumns = g.ncolumns.get(LargeScreen)
+    val colclass = Vector(
+      sxcolumns.map(x => s"col-sx-${w / x}"),
+      smcolumns.map(x => s"col-sm-${w / x}"),
+      mdcolumns.map(x => s"col-md-${w / x}"),
+      lgcolumns.map(x => s"col-lg-${w / x}")
+    ).flatten.mkString(" ")
     <div class="container"> { // container-fluid
-      for (row <- p.records.grouped(ncolumns)) yield {
-        <div class="row"> {
+      for (row <- ps.grouped(w)) yield {
+        val rowclass = if (g.isNoGutters)
+          "row no-gutters"
+        else
+          "row"
+        <div class={rowclass}> {
           for (x <- row) yield {
-            <div class={s"col-sm-${width}"}> {
-              card(x)
+            <div class={colclass}> {
+              f(x)
             } </div>
           }
         } </div>
@@ -614,49 +652,54 @@ abstract class Renderer(
     } </div>
   }
 
-  protected def grid(ps: List[Card]): Elem = {
-    val grid = strategy.gridContext
-    val ncolumns = Math.min(grid.ncolumns, ps.length)
-    if (ncolumns == 0) {
-      empty_block
-    } else {
-      val width = grid.width / ncolumns
-      <div class="container"> { // container-fluid
-        for (row <- ps.grouped(ncolumns)) yield {
-          <div class="row"> {
-            for (x <- row) yield {
-              <div class={s"col-sm-${width}"}> {
-                card(x)
-              } </div>
-            }
-          } </div>
-        }
-      } </div>
-    }
-  }
-
-  protected def card(rec: Record): Elem = {
+  protected def to_card(rec: Record): Card = {
     val icon = picture_icon(rec)
     val title = get_title(rec)
     val subtitle = get_subtitle(rec)
     val header = TitleLine(title, subtitle).toOption
-    val content = get_content(rec) getOrElse (Text("-"))
-    val c = Card.create(icon, header, content)
-    card(c)
+    val content = get_content(rec)
+    Card.create(icon, header, content)
   }
 
-  def card(
+  protected def card(rec: Record): Elem = card(to_card(rec))
+
+  protected def card(
     imagetop: Option[Picture],
     header: Option[TitleLine],
     footer: Option[TitleLine],
     content: NodeSeq
   ): Elem = card(Card(imagetop, header, footer, Some(I18NElement(content))))
 
-  protected def card(card: Card): Elem =
-    strategy.cardKind match {
-      case BootstrapCard => card_bootstrap(card)
-      case PaperDashboardCard => card_paperdashboard(card)
+  protected def card(p: Card): Elem = {
+    val card = {
+      val imagetop: Option[Picture] =
+        if (strategy.cardKind.isImageTop)
+          p.imagetop // TODO default
+        else
+          None
+      val header: Option[TitleLine] =
+        if (strategy.cardKind.isHeader)
+          p.header orElse Some(TitleLine.blank)
+        else
+          None
+      val footer: Option[TitleLine] =
+        if (strategy.cardKind.isFooter)
+          p.footer orElse Some(TitleLine.blank)
+        else
+          None
+      val content: Option[I18NElement] =
+        if (strategy.cardKind.isContent)
+          p.content orElse Some(I18NElement(""))
+        else
+          None
+      Card(imagetop, header, footer, content)
     }
+    strategy.theme match {
+      case m: Bootstrap4RenderThemaBase => card_bootstrap(card)
+      case m: Bootstrap3RenderThemaBase => card_paperdashboard(card)
+      case m => card_table(card)
+    }
+  }
 
   // Bootstrap 4
   protected def card_bootstrap(card: Card): Elem = {
@@ -683,9 +726,9 @@ abstract class Renderer(
         <div class="card-header">{
           card_title_bootstrap(h)
         }</div>
-      ) ++ <div class="card-block">{
-        <div class="card-text">{card.content}</div>
-      }</div> ++ card.footer.map(f =>
+      ) ++ card.content.map(c => <div class="card-block">{
+        <div class="card-text">{c}</div>
+      }</div>) ++ card.footer.map(f =>
         <div class="card-footer">{
           card_title_bootstrap(f)
         }</div>
@@ -701,26 +744,8 @@ abstract class Renderer(
   }
 
   protected def card_paperdashboard(card: Card): Elem = {
-    def img(p: Picture): Elem = XmlUtils.element("img",
-      SeqUtils.buildTupleVector(
-        Vector(
-          "class" -> "card-img-top",
-          "src" -> p.src.toString
-        ),
-        Vector(
-          "alt" -> p.alt.map(node)
-        )
-      ),
-      Nil
-    )
     <div class="card">{
-      card.imagetop.map(i =>
-        i.href.fold {
-          img(i)
-        } { href =>
-          <a href={href.toString} target="_blank">{img(i)}</a>
-        }
-      ) ++ card.header.map(h =>
+      card.imagetop.map(picture(_)) ++ card.header.map(h =>
         <div class="header">{
           List(
             h.title.map(t => <h4 class="title">{t(locale)}</h4>),
@@ -743,6 +768,8 @@ abstract class Renderer(
       )
     }</div>
   }
+
+  protected def card_table(card: Card): Elem = RAISE.notImplementedYetDefect
 
   protected def get_title(rec: Record): Option[I18NElement] =
     rec.getString(KEY_DOMAIN_OBJECT_TITLE).map(I18NElement.parse)
@@ -774,23 +801,24 @@ abstract class Renderer(
     isCaption: Boolean = true
   ): Elem = {
     val id = generate_id
-    <div id={s"$id"} class="carousel slide" data-ride="carousel">
+    <div id={s"$id"} class="carousel slide w-50 ml-auto mr-auto" data-ride="carousel">
       {
         if (isIndicator)
-          <ol class="carousel-indicators"> {
+          <ol class="carousel-indicators" role="listbox"> {
             for ((x, i) <- ps.zipWithIndex) yield {
               if (i == 0)
                 <li data-target={s"#${id}"} data-slide-to="0" class="active"></li>
               else
-                <li data-target={s"#${id}"} data-slide-to={s"i"}></li>
+                <li data-target={s"#${id}"} data-slide-to={s"$i"}></li>
             }
           } </ol>
         else
           Group(Nil)
       }
       <div class="carousel-inner"> {
-        ps.map(x =>
-          <div class="carousel-item active">
+        for ((x, i) <- ps.zipWithIndex) yield {
+          val c = if (i == 0) "carousel-item active" else "carousel-item"
+          <div class={c}>
   	    <img class="d-block w-100" src={x.srcString} alt={x.altString(locale)}></img>
             {
               if (!isCaption || (x.caption.isEmpty && x.description.isEmpty))
@@ -804,7 +832,7 @@ abstract class Renderer(
                 } </div>
             }
           </div>
-        )
+        }
       } </div>
       {
         if (isControl) {
@@ -823,10 +851,45 @@ abstract class Renderer(
     </div>
   }
 
-  protected def banner(ps: List[Picture]): Elem = {
-    val cards = ps.map(Card.create)
-    grid(cards)
+  protected def banner(ps: List[Picture]): Elem =
+    if (ps.length == 0)
+      empty_block
+    else
+      _banner(ps)
+
+  private def _banner(ps: List[Picture]): Elem = {
+    val width = ps.length match {
+      case 0 => 1
+      case 1 => 12
+      case 2 => 6
+      case 3 => 4
+      case 4 => 3
+      case _ => 3
+    }
+    val g = GridContext.banner.withTabletColumns(width)
+    val s: RenderStrategy = strategy.withCardKind(ImageCard).withGridContext(g)
+    grid(s, ps)(picture(_))
   }
+
+  protected def picture(p: Picture): Elem = 
+    p.href.fold {
+      img(p)
+    } { href =>
+      <a href={href.toString} target="_blank">{img(p)}</a>
+    }
+
+  def img(p: Picture): Elem = XmlUtils.element("img",
+    SeqUtils.buildTupleVector(
+      Vector(
+        "class" -> "card-img-top",
+        "src" -> p.src.toString
+      ),
+      Vector(
+        "alt" -> p.alt.map(node)
+      )
+    ),
+    Nil
+  )
 
   protected def badge(p: Badge): Elem = {
     val c = s"badge badge-${p.asIndicatorName}"

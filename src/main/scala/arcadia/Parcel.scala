@@ -7,14 +7,17 @@ import org.goldenport.util.StringUtils
 import arcadia.context._
 import arcadia.domain._
 import arcadia.model.{Model, ErrorModel, Badge}
-import arcadia.view.{ViewEngine, RenderStrategy, Partials, View, UsageKind}
+import arcadia.view.{ViewEngine, RenderStrategy, Partials, View,
+  UsageKind, TableKind, CardKind
+}
 import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
 
 /*
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
- * @version Oct. 31, 2017
+ *  version Oct. 31, 2017
+ * @version Nov.  1, 2017
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -42,6 +45,10 @@ case class Parcel(
 
   def withUsageKind(p: UsageKind) = render.
     fold(RAISE.noReachDefect)(x => withRenderStrategy(x.withUsageKind(p)))
+  def withTableKind(p: TableKind) = render.
+    fold(RAISE.noReachDefect)(x => withRenderStrategy(x.withTableKind(p)))
+  def withCardKind(p: CardKind) = render.
+    fold(RAISE.noReachDefect)(x => withRenderStrategy(x.withCardKind(p)))
 
   def forComponent(model: Model) = withModel(model).copy(command = None).componentScope
   def forView(engine: ViewEngine) =

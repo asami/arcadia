@@ -12,7 +12,8 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
 
 /*
  * @since   Sep. 30, 2017
- * @version Oct. 31, 2017
+ *  version Oct. 31, 2017
+ * @version Nov.  1, 2017
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -95,6 +96,12 @@ case class Expression(
     RAISE.notImplementedYetDefect // TODO
   }
   def take(key: String, d: String): String = get(key) | d
+
+  def withTable(p: TableKind): Expression = copy(parcel = parcel.withTableKind(p))
+  def withCard(p: Option[String]): Expression = p.fold(this) { x =>
+    val card = CardKind.take(x)
+    copy(parcel = parcel.withCardKind(card))
+  }
 
   lazy val element = elem.copy(child = XmlUtils.seqOfNodeSeqToSeqOfNode(children.map(_.xml)))
   lazy val getModel: Option[Model] = parcel.model

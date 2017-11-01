@@ -8,13 +8,17 @@ import org.goldenport.exception.RAISE
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.xml.XhtmlUtils
 import org.goldenport.value._
+import org.goldenport.record.v2.Record
+import org.goldenport.json.JsonUtils
 import com.asamioffice.goldenport.text.UString
 import arcadia._
+import arcadia.context.Query
 import arcadia.scenario.Event
+import arcadia.domain.DomainEntityType
 
 /*
  * @since   Oct. 29, 2017
- * @version Oct. 31, 2017
+ * @version Nov.  1, 2017
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -31,6 +35,7 @@ case class TitleLine(
       Some(this)
 }
 object TitleLine {
+  val blank = TitleLine(Some(I18NElement("")), None)
   def create(title: I18NElement): TitleLine = TitleLine(Some(title), None)
 }
 
@@ -73,6 +78,8 @@ object Card {
   def create(pic: Picture, header: TitleLine, content: NodeSeq): Card = Card(Some(pic), Some(header), None, Some(I18NElement(content)))
 
   def create(pic: Picture, header: Option[TitleLine], content: NodeSeq): Card = Card(Some(pic), header, None, Some(I18NElement(content)))
+
+  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq]): Card = Card(Some(pic), header, None, content.map(I18NElement(_)))
 
   def parseList(p: String): List[Card] = Particle.parseParticleList(p) match {
     case JsSuccess(xs, _) => xs.collect {
@@ -236,12 +243,35 @@ case object Delete extends Method {
   def name = "DELETE"
 }
 
+case class RequestParameter(
+  query: Option[Record],
+  form: Option[Record]
+) extends Particle {
+}
+object RequestParameter {
+  def parse(p: String): RequestParameter = {
+    val r = Particle.RequestParameterFormat.reads(Json.parse(p))
+    r match {
+      case JsSuccess(s, _) => s
+      case m: JsError => RAISE.syntaxErrorFault(m.toString)
+    }
+  }
+}
+
 case class BrokenParticle(error: JsError) extends Particle {
 }
 
 object Particle {
   import org.goldenport.json.JsonUtils.Implicits._
 
+  implicit object RecordFormat extends Format[Record] { // TODO migrate to record.
+    def reads(json: JsValue): JsResult[Record] = json match {
+      case m: JsObject => JsSuccess(Record.create(JsonUtils.toMapS(m)))
+      case _ => JsError(s"Not json object: $json")
+    }
+    def writes(p: Record): JsValue = RAISE.notImplementedYetDefect
+  }
+  implicit val RequestParameterFormat = Json.format[RequestParameter]
   implicit object LabelIndicatorFormat extends Format[LabelIndicator] {
     def reads(json: JsValue): JsResult[LabelIndicator] = LabelIndicator.parseJsValue(json)
     def writes(p: LabelIndicator): JsValue = RAISE.notImplementedYetDefect
@@ -251,6 +281,13 @@ object Particle {
   implicit val PictureFormat = Json.format[Picture]
   implicit val CardFormat = Json.format[Card]
   implicit val XmlFormat = Json.format[Xml]
+  // implicit object QueryFormat extends Format[Query] {
+  //   def reads(json: JsValue): JsResult[Query] = json match {
+  //     case m: JsObject => JsSuccess(Query(Record.create(JsonUtils.toMapS(m))))
+  //     case m => JsError(s"Unknown query: $json")
+  //   }
+  //   def writes(p: Query): JsValue = RAISE.notImplementedYetDefect
+  // }
   implicit object ParticleFormat extends Format[Particle] {
     def reads(json: JsValue): JsResult[Particle] = parseJsValue(json)
     def writes(p: Particle): JsValue = RAISE.notImplementedYetDefect
@@ -276,6 +313,7 @@ object Particle {
       case "picture" => Json.fromJson[Picture](o)
       case "card" => Json.fromJson[Card](o)
       case "xml" => Json.fromJson[Xml](o)
+      case "parameter" => Json.fromJson[RequestParameter](o)
       case m => JsError(s"Unknown particle: $o")
     }
     a.getOrElse {
