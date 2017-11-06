@@ -19,7 +19,8 @@ import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL}
  * @since   Jul. 15, 2017
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
- * @version Oct. 27, 2017
+ *  version Oct. 27, 2017
+ * @version Nov.  6, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -125,7 +126,7 @@ case class MaterialView(baseUrl: URL) extends View() {
   val guard = new Guard {
     def isAccept(p: Parcel): Boolean = p.command.fold(false) {
       case MaterialCommand(pathname) =>
-        val url = new URL(baseUrl, pathname)
+        val url = new URL(baseUrl, pathname.v)
         UrlUtils.isExist(url)
       case _ => false
     }
@@ -135,21 +136,21 @@ case class MaterialView(baseUrl: URL) extends View() {
     val c = parcel.takeCommand[MaterialCommand]
     val mime = {
       val a = for {
-        suffix <- StringUtils.getSuffix(c.pathname)
+        suffix <- c.pathname.getSuffix
         context <- parcel.context
         mime <- context.getMimetypeBySuffix(suffix)
       } yield mime
       a.getOrElse(MimeType.application_octet_stream)
     }
-    _get_control_content(c.pathname) getOrElse {
-      val url = new URL(baseUrl, c.pathname)
+    _get_control_content(c.pathname.v) getOrElse {
+      val url = new URL(baseUrl, c.pathname.v)
       BinaryContent(mime, new UrlBag(url), AssetsExpires)
     }
   }
 
   def getControlContent(parcel: Parcel): Option[Content] = {
     val c = parcel.takeCommand[MaterialCommand]
-    _get_control_content(c.pathname)
+    _get_control_content(c.pathname.v)
   }
 
   private def _get_control_content(pathname: String): Option[Content] = {
@@ -160,7 +161,7 @@ case class MaterialView(baseUrl: URL) extends View() {
       else
         None
     } else {
-      Some(NotFoundContent)
+      Some(NotFoundContent(pathname))
     }
   }
 

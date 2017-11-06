@@ -15,13 +15,15 @@ import arcadia.domain._
 /*
  * @since   Aug. 29, 2017
  *  version Sep. 27, 2017
- * @version Oct. 30, 2017
+ *  version Oct. 30, 2017
+ * @version Nov.  5, 2017
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
   platformExecutionContext: PlatformExecutionContext,
-  config: WebApplicationConfig
+  webapp: WebApplication
 ) {
+  def config = webapp.config
   def isLogined: Boolean = platformExecutionContext.isLogined
   def getOperationName: Option[String] = platformExecutionContext.getOperationName
   def getMimetypeBySuffix(p: Option[String]): Option[MimeType] = platformExecutionContext.getMimetypeBySuffix(p)
@@ -46,6 +48,7 @@ case class ExecutionContext(
   def fetchString(urn: UrnSource): Option[String] = platformExecutionContext.fetchString(urn)
   def fetchBadge(urn: UrnSource): Option[Badge] = platformExecutionContext.fetchBadge(urn)
   def controllerUri: URI = platformExecutionContext.controllerUri
+  def getIdInRequest: Option[DomainObjectId] = platformExecutionContext.getIdInRequest
   def inputFormParameters: Record = platformExecutionContext.inputFormParameters
   def getFormParameter(key: String): Option[String] = platformExecutionContext.getFormParameter(key)
   def assets: String = config.getAssets getOrElse platformExecutionContext.assets

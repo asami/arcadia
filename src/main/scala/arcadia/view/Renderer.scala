@@ -19,7 +19,7 @@ import arcadia.domain._
  * @since   Aug.  1, 2017
  *  version Sep. 26, 2017
  *  version Oct. 31, 2017
- * @version Nov.  1, 2017
+ * @version Nov.  6, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -40,12 +40,22 @@ abstract class Renderer(
   def theme = strategy.theme
   protected lazy val theme_head = theme.head
   protected lazy val theme_table = theme.table
+  protected lazy val theme_grid = theme.grid
+  protected lazy val theme_card = theme.card
+  protected lazy val render_context = strategy.renderContext
 
   def apply: NodeSeq = strategy.scope match {
     case Html => render_html
     case Body => render_body
     case Section => render_section
     case Content => render_content
+  }
+
+  def execute[T](s: RenderStrategy)(body: Renderer => T): T = {
+    def go = render_Content
+    body(new Renderer(s, pageName, headline, title, caption) {
+      protected def render_Content: NodeSeq = go
+    })
   }
 
   protected def generate_id = java.util.UUID.randomUUID().toString
@@ -100,6 +110,43 @@ abstract class Renderer(
 
   protected def h2(p: Option[I18NString]): Node = p.map(x => <h2>string(x)</h2>).getOrElse(Group(Nil))
 
+  private def _get_href_base(p: Record): Option[URI] =
+    (
+      p.getConcreteString(KEY_DOMAIN_OBJECT_HREF_BASE) orElse
+      p.getConcreteString(KEY_DOMAIN_OBJECT_ENTITYTYPE)
+    ).map(new URI(_))
+
+
+  protected def get_link(table: Table, rec: Record): Option[DomainEntityLink] = {
+    val id = DomainEntityId.get(rec, table.entityType)
+    (
+      id,
+      table.dataHref orElse _get_href_base(rec)
+    ) match {
+      case (None, _) => None
+      case (Some(id), href) => Some(DomainEntityLink(id, href))
+    }
+  }
+
+  protected def get_link(rec: Record): Option[DomainEntityLink] = {
+    val id = DomainEntityId.get(rec)
+    (
+      id,
+      _get_href_base(rec)
+    ) match {
+      case (None, _) => None
+      case (Some(id), href) => Some(DomainEntityLink(id, href))
+    }
+  }
+
+  protected def table_data_url(p: Table, record: Record): Option[DomainEntityLink] = {
+    def base = (p.dataHref.map(x => StringUtils.toPathnameBody(x.toString)) orElse p.entityType.map(_.v)).map(x => new URI(x)) orElse {
+      _get_href_base(record)
+    }
+    DomainEntityId.get(record, p.entityType).map(id =>
+      DomainEntityLink(id, base))
+  }
+
   protected def tabular(schema: Option[Schema], records: Seq[Record]): NodeSeq =
     schema.fold(tabular(records))(tabular(_, records))
 
@@ -125,7 +172,8 @@ abstract class Renderer(
     val schema = strategy.resolveSchema(p)
 //    val schema = p.schema getOrElse build_schema(records)
     val entitytype = p.entityType
-    val t = TableWithRecords(kind, size, schema, entitytype, records)
+    val datahref = p.dataHref
+    val t = TableWithRecords(kind, size, schema, entitytype, datahref, records)
     table(t)
   }
 
@@ -144,7 +192,7 @@ abstract class Renderer(
     table(strategy.tableKind, schema, records)
   
   protected def table(kind: TableKind, schema: Schema, records: Seq[Record]): NodeSeq =
-    table(TableOrder(Some(kind), None, Some(schema), None, Some(records)))
+    table(TableOrder(Some(kind), None, Some(schema), None, None, Some(records)))
 
   protected def table(p: TableWithRecords): NodeSeq =
     p.kind match {
@@ -279,18 +327,6 @@ abstract class Renderer(
       XmlUtils.element("tr", attrs, row2)
     ))
   }
-
-  protected def table_data_url(p: Table, record: Record): Option[URI] =
-    for {
-      entitytype <- p.entityType
-      id <- record.getOne(PROP_DOMAIN_OBJECT_ID)
-    } yield {
-      val domainid = domain_entity_id(entitytype, id)
-      new URI(s"${entitytype.v}/${domainid.presentationId}.html")
-    }
-
-  protected def domain_entity_id(entitytype: DomainEntityType, id: Any): DomainEntityId =
-    DomainEntityId(entitytype, StringDomainObjectId(id.toString), None) // TODO
 
   protected def table_data(p: Table, column: Column, record: Record): Elem =
     table_data(p.tableColumn(column), record)
@@ -478,6 +514,19 @@ abstract class Renderer(
   protected def property_table(schema: Schema, records: Seq[Record]): NodeSeq =
     table(PropertyTable, schema, records)
 
+  protected def entity_property_sheet(
+    entitytype: DomainEntityType,
+    schema: Option[Schema],
+    record: Record
+  ): NodeSeq = schema.fold(
+    property_sheet(schema, record)
+  )(s =>
+    property_sheet(
+      strategy.withUsageKind(DetailUsage).resolveSchema(entitytype, s),
+      record
+    )
+  )
+
   protected def property_sheet(schema: Option[Schema], record: Record): NodeSeq =
     schema.fold(property_sheet(record))(property_sheet(_, record))
 
@@ -598,7 +647,7 @@ abstract class Renderer(
   }
 
   protected def grid(p: TableWithRecords): Elem = {
-    val cards = p.records.map(to_card).toList
+    val cards = p.records.map(to_card(p.table, _)).toList
     grid(cards)
     // val grid = strategy.gridContext
     // val ncolumns = 6
@@ -620,10 +669,18 @@ abstract class Renderer(
     if (ps.length == 0)
       empty_block
     else
-      grid(strategy, ps)(card(_))
+      grid_with_content(ps)(card(_))
 
-  protected def grid[T](s: RenderStrategy, ps: List[T])(f: T => NodeSeq): Elem = {
-    val g = s.gridContext
+  protected def grid_with_content[T](ps: List[T])(f: T => NodeSeq): Elem =
+    strategy.theme match {
+      case m: Bootstrap4RenderThemaBase => grid_bootstrap(ps)(f)
+      case m: Bootstrap3RenderThemaBase => grid_bootstrap(ps)(f)
+      case m => grid_table(ps)(f)
+    }
+
+  // bootstrap 3/4
+  protected def grid_bootstrap[T](ps: List[T])(f: T => NodeSeq): Elem = {
+    val g = strategy.gridContext
     val w = g.width
     val sxcolumns = g.ncolumns.get(PhoneScreen)
     val smcolumns = g.ncolumns.get(TabletScreen)
@@ -652,13 +709,42 @@ abstract class Renderer(
     } </div>
   }
 
+  protected def grid_table[T](ps: List[T])(f: T => NodeSeq): Elem = {
+    val g = strategy.gridContext
+    val ncolumns = g.ncolumns.get(strategy.renderContext.screenKind) getOrElse {
+      g.defaultNColumns
+    }
+    <div class={theme_grid.css.table.container}>{
+      <table class={theme_grid.css.table.table}>
+        <tbody class={theme_grid.css.table.tbody}>{
+          for (row <- ps.grouped(ncolumns)) yield {
+            <tr class={theme_grid.css.table.tbodyTr}>{
+              for (x <- row) yield f(x)
+            }</tr>
+          }
+        }</tbody>
+      </table>
+    }</div>
+  }
+
   protected def to_card(rec: Record): Card = {
     val icon = picture_icon(rec)
     val title = get_title(rec)
     val subtitle = get_subtitle(rec)
     val header = TitleLine(title, subtitle).toOption
     val content = get_content(rec)
-    Card.create(icon, header, content)
+    val link = get_link(rec)
+    Card.create(icon, header, content, link)
+  }
+
+  protected def to_card(table: Table, rec: Record): Card = {
+    val icon = picture_icon(rec)
+    val title = get_title(rec)
+    val subtitle = get_subtitle(rec)
+    val header = TitleLine(title, subtitle).toOption
+    val content = get_content(rec)
+    val link = get_link(table, rec)
+    Card.create(icon, header, content, link)
   }
 
   protected def card(rec: Record): Elem = card(to_card(rec))
@@ -668,7 +754,7 @@ abstract class Renderer(
     header: Option[TitleLine],
     footer: Option[TitleLine],
     content: NodeSeq
-  ): Elem = card(Card(imagetop, header, footer, Some(I18NElement(content))))
+  ): Elem = card(Card(imagetop, header, footer, Some(I18NElement(content)), None))
 
   protected def card(p: Card): Elem = {
     val card = {
@@ -692,7 +778,7 @@ abstract class Renderer(
           p.content orElse Some(I18NElement(""))
         else
           None
-      Card(imagetop, header, footer, content)
+      Card(imagetop, header, footer, content, p.link)
     }
     strategy.theme match {
       case m: Bootstrap4RenderThemaBase => card_bootstrap(card)
@@ -715,31 +801,40 @@ abstract class Renderer(
       ),
       Nil
     )
-    <div class="card"> {
+    def body: NodeSeq = Group(
       card.imagetop.map(i =>
         i.href.fold {
           img(i)
         } { href =>
           <a href={href.toString} target="_blank">{img(i)}</a>
         }
-      ) ++ card.header.map(h =>
+      ).toVector ++ card.header.map(h =>
         <div class="card-header">{
           card_title_bootstrap(h)
         }</div>
-      ) ++ card.content.map(c => <div class="card-block">{
+      ).toVector ++ card.content.map(c => <div class="card-block">{
         <div class="card-text">{c}</div>
-      }</div>) ++ card.footer.map(f =>
+      }</div>).toVector ++ card.footer.map(f =>
         <div class="card-footer">{
           card_title_bootstrap(f)
         }</div>
-      )
+      ).toVector
+    )
+    def bodywithlink: NodeSeq =
+      card.link.fold(body) { link =>
+        link.getDataHref(render_context).fold(body) { href =>
+          <a class={theme_card.css.table.anchor} href={href.toString}>{body}</a>
+        }
+      }
+    <div class="card"> {
+      bodywithlink
     } </div>
   }
 
   def card_title_bootstrap(p: TitleLine): List[Node] = {
     List(
       p.title.map(t => <h4 class="card-title">{t(locale)}</h4>),
-      p.subTitle.map(d => <p class="card-subtitle">{d(locale)}</p>)
+      p.subtitle.map(d => <p class="card-subtitle">{d(locale)}</p>)
     ).flatten
   }
 
@@ -749,7 +844,7 @@ abstract class Renderer(
         <div class="header">{
           List(
             h.title.map(t => <h4 class="title">{t(locale)}</h4>),
-            h.subTitle.map(d => <p class="category">{d(locale)}</p>)
+            h.subtitle.map(d => <p class="category">{d(locale)}</p>)
           ).flatten
         }</div>
       ) ++ card.content.map(c =>
@@ -759,7 +854,7 @@ abstract class Renderer(
               <div class="footer">{
                 List(
                   f.title.map(t => <h4 class="title">{t(locale)}</h4>),
-                  f.subTitle.map(d => <p class="category">{d(locale)}</p>)
+                  f.subtitle.map(d => <p class="category">{d(locale)}</p>)
                 ).flatten
               }</div>
             )
@@ -769,7 +864,34 @@ abstract class Renderer(
     }</div>
   }
 
-  protected def card_table(card: Card): Elem = RAISE.notImplementedYetDefect
+  protected def card_table(card: Card): Elem = {
+    def render = {
+      def tl(p: TitleLine): Vector[Node] = Vector(
+        p.title.map(x => <h3>{x(locale)}</h3>),
+        p.subtitle.map(x => <p>{x(locale)}</p>)
+      ).flatten
+      <table> {
+        Vector(
+          card.imagetop.toVector.flatMap(picture).map(x => <tr><td>{x}</td></tr>), // XXX css
+          card.header.toVector.flatMap(tl).map(x => <tr><td>{x}</td></tr>), // XXX css
+          card.content.toVector.flatMap(_(locale)).map(x => <tr><td>{x}</td></tr>), // XXX css
+          card.footer.toVector.flatMap(tl).map(x => <tr><td>{x}</td></tr>)
+        ).flatten // XXX css
+      }</table>
+    }
+    def data: NodeSeq = card.imagetop.fold(render)(it =>
+      if (card.isImageTopOnly)
+        picture(it)
+      else
+        render
+    )
+    def datawithlink: NodeSeq = card.link.fold(data) { link =>
+      link.getDataHref(render_context).fold(data) { href =>
+        <a class={theme_card.css.table.anchor} href={href.toString}>{data}</a>
+      }
+    }
+    <td class={theme_card.css.table.td}>{datawithlink}</td>
+  }
 
   protected def get_title(rec: Record): Option[I18NElement] =
     rec.getString(KEY_DOMAIN_OBJECT_TITLE).map(I18NElement.parse)
@@ -868,7 +990,7 @@ abstract class Renderer(
     }
     val g = GridContext.banner.withTabletColumns(width)
     val s: RenderStrategy = strategy.withCardKind(ImageCard).withGridContext(g)
-    grid(s, ps)(picture(_))
+    execute(s)(_.grid_with_content(ps)(picture(_)))
   }
 
   protected def picture(p: Picture): Elem = 
@@ -912,6 +1034,7 @@ object Renderer {
     size: Option[RenderSize],
     schema: Option[Schema],
     entityType: Option[DomainEntityType],
+    dataHref: Option[URI],
     records: Option[Seq[Record]]
   )
   object TableOrder {
@@ -920,35 +1043,37 @@ object Renderer {
       schema: Option[Schema],
       entitytype: DomainEntityType,
       records: Seq[Record]
-    ): TableOrder = TableOrder(Some(kind), None, schema, Some(entitytype), Some(records))
+    ): TableOrder = TableOrder(Some(kind), None, schema, Some(entitytype), None, Some(records))
 
     def apply(
       kind: TableKind,
       schema: Option[Schema],
       entitytype: Option[DomainEntityType],
       records: Seq[Record]
-    ): TableOrder = TableOrder(Some(kind), None, schema, entitytype, Some(records))
+    ): TableOrder = TableOrder(Some(kind), None, schema, entitytype, None, Some(records))
 
     def apply(
       kind: Option[TableKind],
       schema: Option[Schema],
       entitytype: DomainEntityType,
       records: Seq[Record]
-    ): TableOrder = TableOrder(kind, None, schema, Some(entitytype), Some(records))
+    ): TableOrder = TableOrder(kind, None, schema, Some(entitytype), None, Some(records))
 
     def apply(
       kind: Option[TableKind],
       schema: Option[Schema],
       entitytype: Option[DomainEntityType],
+      datahref: Option[URI],
       records: Seq[Record]
-    ): TableOrder = TableOrder(kind, None, schema, entitytype, Some(records))
+    ): TableOrder = TableOrder(kind, None, schema, entitytype, datahref, Some(records))
   }
 
   case class Table(
     kind: TableKind,
     size: RenderSize,
     schema: Schema,
-    entityType: Option[DomainEntityType]
+    entityType: Option[DomainEntityType],
+    dataHref: Option[URI]
   ) {
     def tableColumn(c: Column) = TableColumn(kind, size, c)
   }
@@ -957,7 +1082,7 @@ object Renderer {
       kind: TableKind,
       size: RenderSize,
       schema: Schema
-    ): Table = Table(kind, size, schema, None)
+    ): Table = Table(kind, size, schema, None, None)
   }
 
   case class TableWithRecords(
@@ -977,7 +1102,7 @@ object Renderer {
       entitytype: DomainEntityType,
       records: Seq[Record]
     ): TableWithRecords = TableWithRecords(
-      Table(kind, size, schema, Some(entitytype)),
+      Table(kind, size, schema, Some(entitytype), None),
       records
     )
 
@@ -986,9 +1111,10 @@ object Renderer {
       size: RenderSize,
       schema: Schema,
       entitytype: Option[DomainEntityType],
+      datahref: Option[URI],
       records: Seq[Record]
     ): TableWithRecords = TableWithRecords(
-      Table(kind, size, schema, entitytype),
+      Table(kind, size, schema, entitytype, datahref),
       records
     )
 

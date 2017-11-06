@@ -8,7 +8,7 @@ import arcadia.domain._
 
 /*
  * @since   Oct.  8, 2017
- * @version Nov.  1, 2017
+ * @version Nov.  3, 2017
  * @author  ASAMI, Tomoharu
  */
 case class Query(
@@ -16,8 +16,7 @@ case class Query(
   start: Int = 0,
   limit: Int = 20,
   maxlimit: Int = 40,
-  tags: List[String] = Nil,
-  parameters: Map[String, Any] = Map.empty
+  parameters: Record = Record.empty
 ) {
   def withParameter(params: Option[Record]): Query = params.fold(this)(withParameter)
 
@@ -29,7 +28,7 @@ case class Query(
       val s = params.getInt('start) getOrElse start
       val l = params.getInt('limit) getOrElse limit
       val ml = params.getInt('maxlimit) getOrElse maxlimit
-      val ts = params.getEagerStringList('tags) getOrElse tags
-      Query(et, s, l, ml, ts, parameters ++ params.toMap)
+//      val ts = params.getEagerStringList('tags) getOrElse tags
+      Query(et, s, l, ml, parameters + params)
     }
 }

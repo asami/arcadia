@@ -12,7 +12,7 @@ import arcadia.model._
 /*
  * @since   Oct. 11, 2017
  *  version Oct. 31, 2017
- * @version Nov.  1, 2017
+ * @version Nov.  5, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -64,6 +64,21 @@ case object GridTag extends Tag with SelectByName {
       case m => m
     }
     p.withTable(GridTable).withCard(card).applyModel(model)
+  }
+}
+
+case object DetailTag extends Tag with SelectByName {
+  val name = "detail"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    // val column = p.getStringList("column")
+    // val card = p.get("card")
+    val model = p.effectiveModel match {
+      case m: EntityDetailModel => m // .withSchemaKind(column, GridTable)
+      case m => m
+    }
+//    p.withTable(GridTable).withCard(card).applyModel(model)
+    p.applyModel(model)
   }
 }
 

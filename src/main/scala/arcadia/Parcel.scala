@@ -3,7 +3,6 @@ package arcadia
 import java.net.URI
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2.Record
-import org.goldenport.util.StringUtils
 import arcadia.context._
 import arcadia.domain._
 import arcadia.model.{Model, ErrorModel, Badge}
@@ -17,7 +16,7 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
- * @version Nov.  1, 2017
+ * @version Nov.  5, 2017
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -39,7 +38,7 @@ case class Parcel(
   // def withPartials(p: Partials) = render.fold(this)(r => copy(render = Some(r.copy(partials = p))))
 
   def withApplicationRule(p: WebApplicationRule) = copy(render = render.map(_.withApplicationRule(p)))
-  def withApplicationConfig(p: WebApplicationConfig) = platformContext.
+  def withApplication(p: WebApplication) = platformContext.
     map(x => copy(context = Some(ExecutionContext(x, p)))).
     getOrElse(RAISE.noReachDefect)
 
@@ -78,9 +77,15 @@ case class Parcel(
   }
   def getOperationName: Option[String] =
     command flatMap {
-      case MaterialCommand(pathname) => Some(StringUtils.toPathnameBody(pathname))
+      case MaterialCommand(pathname) => Some(pathname.body)
       case _ => context.flatMap(_.getOperationName)
     }
+  def isOperationPathName(p: String): Boolean = 
+    command.fold(false) {
+      case MaterialCommand(pathname) => p == pathname.body || pathname.getParent.fold(false)(_.body == p)
+      case _ => context.flatMap(_.getOperationName).map(_ == p).getOrElse(false)
+    }
+
   def getEntityType: Option[DomainEntityType] = render.flatMap(_.getEntityType)
   def fetchString(p: UrnSource): Option[String] = context.flatMap(_.fetchString(p))
   def fetchBadge(p: UrnSource): Option[Badge] = context.flatMap(_.fetchBadge(p))

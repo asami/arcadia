@@ -24,7 +24,8 @@ import arcadia.scenario._
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
  *  version Sep. 30, 2017
- * @version Oct. 27, 2017
+ *  version Oct. 27, 2017
+ * @version Nov.  6, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -34,8 +35,6 @@ case class WebApplication(
   controller: ControllerEngine.Rule,
   view: ViewEngine.Rule
 ) {
-  // def applicationTitle(locale: Locale): NodeSeq = config.applicationTitle(locale)
-  // def applicationLogo(locale: Locale): NodeSeq = config.applicationLogo(locale)
   def extend: List[String] = config.extend getOrElse Nil
 }
 
@@ -61,25 +60,7 @@ object WebApplication {
       new URLTemplateSource(url)
     }
     val entitydetailview = EntityDetailView(source("plain/detail.jade")).gv
-      // val source = {
-      //   if (true) {
-      //     val filename = "/Users/asami/src/Project2017/EverforthFramework/src/main/resources/com/everforth/everforth/view/plain/detail.jade"
-      //     TemplateSource.fromFile(filename)
-      //   } else {
-      //     val url = getClass.getResource("plain/detail.jade")
-      //     new URLTemplateSource(url)
-      //   }
-      // }
     val entitylistview = EntityListView(source("plain/list.jade")).gv
-      // val source = {
-      //   if (true) {
-      //     val filename = "/Users/asami/src/Project2017/EverforthFramework/src/main/resources/com/everforth/everforth/view/plain/list.jade"
-      //     TemplateSource.fromFile(filename)
-      //   } else {
-      //     val url = getClass.getResource("plain/list.jade")
-      //     new URLTemplateSource(url)
-      //   }
-      // }
     val dashboardview = DashboardView(source("plain/dashboard.jade")).gv
     val modelview = ModelView(source("plain/model.jade")).gv
     val view = ViewEngine.Rule.create(
@@ -92,98 +73,6 @@ object WebApplication {
     val config = WebApplicationConfig.create("Plain")
     WebApplication("plain", None, config, ControllerEngine.Rule.empty, view)
   }
-
-  // val bootstrap = {
-  //   val resourcedetailview = {
-  //     val source = {
-  //       if (true) {
-  //         val filename = "/Users/asami/src/Project2017/EverforthFramework/src/main/resources/com/everforth/everforth/view/bootstrap/detail.jade"
-  //         TemplateSource.fromFile(filename)
-  //       } else {
-  //         val url = getClass.getResource("bootstrap/detail.jade")
-  //         new URLTemplateSource(url)
-  //       }
-  //     }
-  //     ResourceDetailView(source).gv
-  //   }
-  //   val resourcelistview = {
-  //     val source = {
-  //       if (true) {
-  //         val filename = "/Users/asami/src/Project2017/EverforthFramework/src/main/resources/com/everforth/everforth/view/bootstrap/list.jade"
-  //         TemplateSource.fromFile(filename)
-  //       } else {
-  //         val url = getClass.getResource("bootstrap/list.jade")
-  //         new URLTemplateSource(url)
-  //       }
-  //     }
-  //     ResourceListView(source).gv
-  //   }
-  //   val view = ViewEngine.Rule.create(
-  //     resourcedetailview,
-  //     resourcelistview
-  //   )
-  //   WebApplication("bootstrap", controller, view)
-  // }
-
-  // val foundation = {
-  //   val resourcedetailview = {
-  //     val source = {
-  //       if (true) {
-  //         val filename = "/Users/asami/src/Project2017/EverforthFramework/src/main/resources/com/everforth/everforth/view/foundation/detail.jade"
-  //         TemplateSource.fromFile(filename)
-  //       } else {
-  //         val url = getClass.getResource("foundation/detail.jade")
-  //         new URLTemplateSource(url)
-  //       }
-  //     }
-  //     ResourceDetailView(source).gv
-  //   }
-  //   val resourcelistview = {
-  //     val source = {
-  //       if (true) {
-  //         val filename = "/Users/asami/src/Project2017/EverforthFramework/src/main/resources/com/everforth/everforth/view/foundation/list.jade"
-  //         TemplateSource.fromFile(filename)
-  //       } else {
-  //         val url = getClass.getResource("foundation/list.jade")
-  //         new URLTemplateSource(url)
-  //       }
-  //     }
-  //     ResourceListView(source).gv
-  //   }
-  //   val view = ViewEngine.Rule.create(
-  //     resourcedetailview,
-  //     resourcelistview
-  //   )
-  //   WebApplication("foundation", controller, view)
-  // }
-
-  // val dashboard = {
-  //   val filename = "/tmp/bootstrap.d/paper-dashboard-free-v1.1.2/dashboard.html.ssp"
-  //   val index = {
-  //     val source = {
-  //       TemplateSource.fromFile(new java.io.File(filename))
-  //     }
-  //     IndexView(source).gv
-  //   }
-  //   val view = ViewEngine.Rule.create(
-  //     index,
-  //     AssetView.fromHtmlFilenameOrUri(filename).gv
-  //   )
-  //   WebApplication("dashboard", controller, view)
-  // }
-
-  // val systemWebApplications = Vector(plain, bootstrap, foundation, dashboard)
-  // lazy val dashboard = {
-  //   val dirname = "/Users/asami/src/Project2017/admin/paper-dashboard-free-v1.1.2/"
-  //   val module = DirectoryWebModule.fromPathname(dirname)
-  //   module.toWebApplication
-  // }
-
-  // lazy val dashboardwar = {
-  //   val filename = "/Users/asami/src/Project2017/admin/dashboard-1.0.war"
-  //   val module = WarWebModule(filename)
-  //   module.toWebApplication
-  // }
 
 //  lazy val systemWebApplications = Vector(plain, dashboard, dashboardwar)
   def systemWebApplications(platform: PlatformContext) = Vector(plain(platform))
@@ -260,9 +149,9 @@ object WebApplication {
           if (is_web_info(p) || is_assets(p))
             Vector.empty
           else
-            to_children(p)./:(Z2(name(p)))(_+_).views
+            to_children(p)./:(ZZ(name(p)))(_+_).views
       }
-      case class Z2(
+      case class ZZ(
         base: String,
         views: Vector[(Guard, View)] = Vector.empty
       ) {
@@ -284,7 +173,7 @@ object WebApplication {
           PageView(pathname(p), src).gv
         }
         protected def directory_view(p: T): Vector[(Guard, View)] =
-          to_children(p)./:(Z2(pathname(p)))(_+_).views
+          to_children(p)./:(ZZ(pathname(p)))(_+_).views
 
         protected def pathname(p: T): String = 
           s"$base/${StringUtils.pathLastComponentBody(to_url(p).toString)}"
@@ -294,13 +183,14 @@ object WebApplication {
         val applicationslots = root_children./:(Z())(_+_).r
         val layouts = build_layouts
         val partials = build_partials
+        val pages = build_pages
         val comps = build_components
         val compslots = comps.toSlots
         val theme = config.theme.flatMap(RenderTheme.get)
         val slots = applicationslots ++ compslots
         val tags = Tags.empty // TODO
         val spa = config.singlePageApplication.map(_.toRule)
-        ViewEngine.Rule.create(theme, slots, layouts, partials, comps, tags, spa)
+        ViewEngine.Rule.create(theme, slots, layouts, partials, pages, comps, tags, spa)
       }
       val controller = {
         val controllers = build_controllers
@@ -358,6 +248,66 @@ object WebApplication {
       }
       get_pathnode(PathName("WEB-INF/partials")).
         map(x => to_children(x)./:(Z())(_+_).r).getOrElse(Partials.empty)
+    }
+
+    protected def build_pages: Pages = {
+      case class Z(views: Vector[(PathName, View)] = Vector.empty) {
+        val r = Pages(views.toMap)
+        def +(rhs: T) = {
+          if (is_html(rhs))
+            copy(views = views :+ (PathName.home -> HtmlView(to_url(rhs))))
+          else if (is_template(rhs))
+            copy(views = views :+ (PathName.home -> templateview(rhs)))
+          else if (is_directory(rhs))
+            copy(views = views ++ directoryview(rhs))
+          else
+            this
+        }
+
+        private def templateview(p: T): View = {
+          val src = to_template_source(p)
+          val name = StringUtils.pathLastComponentBody(to_url(p).toString)
+          PageView(name, src)
+        }
+
+        private def directoryview(p: T): Vector[(PathName, View)] = {
+          val name = StringUtils.pathLastComponentBody(to_url(p).toString) // TODO
+          to_children(p)./:(ZZ(PathName(name), name))(_+_).r
+        }
+      }
+      case class ZZ(
+        pathname: PathName,
+        base: String,
+        views: Vector[(PathName, View)] = Vector.empty
+      ) {
+        def r = views
+        def +(rhs: T) = {
+          val n = StringUtils.pathLastComponentBody(to_url(rhs).toString)
+          def pn: PathName = pathname + n
+          if (is_html(rhs))
+            copy(views = views :+ (pn -> htmlview(rhs)))
+          else if (is_template(rhs))
+            copy(views = views :+ (pn -> templateview(rhs)))
+          else if (is_directory(rhs))
+            copy(views = views ++ directoryview(pn, rhs))
+          else
+            this
+        }
+
+        protected def htmlview(p: T): View =
+          HtmlView(to_url(p))
+        protected def templateview(p: T): View = {
+          val src = to_template_source(p)
+          PageView(toname(p), src)
+        }
+        protected def directoryview(pn: PathName, p: T): Vector[(PathName, View)] =
+          to_children(p)./:(ZZ(pn, toname(p)))(_+_).r
+
+        protected def toname(p: T): String = 
+          s"base/${StringUtils.pathLastComponentBody(to_url(p).toString)}"
+      }
+      get_pathnode(PathName("WEB-INF/pages")).
+        map(x => to_children(x)./:(Z())(_+_).r).getOrElse(Pages.empty)
     }
 
     protected def build_components: Components = {

@@ -1,5 +1,6 @@
 package arcadia
 
+import scala.util.control.NonFatal
 import org.goldenport.exception.RAISE
 import org.goldenport.values.ResourceName
 import org.goldenport.record.v2.Record
@@ -13,7 +14,8 @@ import arcadia.scenario._
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
  *  version Sep.  2, 2017
- * @version Oct. 27, 2017
+ *  version Oct. 27, 2017
+ * @version Nov.  6, 2017
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -34,19 +36,24 @@ class WebEngine(
     systemcontroller
   )
 
-  def apply(p: Parcel): Content = {
-    val parcel = p.withApplicationRule(rule).
-      withApplicationConfig(application.config)
+  def apply(p: Parcel): Content = try {
+    val parcel =
+      p.withApplicationRule(rule).withApplication(application)
     val a = controller.apply(parcel)
     a.content getOrElse {
-      val r = view.apply(a)
-      if (r.expiresPeriod.isDefined)
-        r
-      else
-        r.expiresKind.fold(r) { x =>
-          application.config.getExpiresPeriod(x).fold(r)(r.withExpiresPeriod)
-        }
+      view.apply(a) match {
+        case m: NotFoundContent => view.error(p, 404)
+        case r =>
+          if (r.expiresPeriod.isDefined)
+            r
+          else
+            r.expiresKind.fold(r) { x =>
+              application.config.getExpiresPeriod(x).fold(r)(r.withExpiresPeriod)
+            }
+      }
     }
+  } catch {
+    case NonFatal(e) => view.error(p, e)
   }
 
   def render(p: Parcel): String = {
@@ -55,48 +62,9 @@ class WebEngine(
       case m: BinaryContent => RAISE.noReachDefect
       case m: XmlContent => m.xml.toString
       case m: RedirectContent => RAISE.noReachDefect
-      case NotFoundContent => RAISE.noReachDefect
+      case m: NotFoundContent => RAISE.noReachDefect // TODO
     }
   }
-
-  // def apply(command: Command)(implicit context: ExecutionContext): Content = {
-  //   val parcel = Parcel(command, context)
-  //   apply(parcel)
-  // }
-
-  // def render(command: Command)(implicit context: ExecutionContext): String = {
-  //   val parcel = Parcel(command, context)
-  //   apply(parcel) match {
-  //     case m: StringContent => m.string
-  //     case m: BinaryContent => NoReachDefect().RAISE
-  //   }
-  // }
-
-  // def grid(records: Seq[Record], transfer: TransferDoc)(implicit context: ExecutionContext): String = {
-  //   val resource = context.resourceName.map(ResourceName(_)) getOrElse {
-  //     NoReachDefect().RAISE
-  //   }
-  //   val command = ResourceListCommand(resource, records, transfer)
-  //   render(command)
-  // }
-
-  // def detail(record: Record)(implicit context: ExecutionContext): String = {
-  //   val resource = context.resourceName.map(ResourceName(_)) getOrElse {
-  //     NoReachDefect().RAISE
-  //   }
-  //   val command = ResourceDetailCommand(resource, record)
-  //   render(command)
-  // }
-
-  // def record(record: Record)(implicit context: ExecutionContext): String = {
-  //   val command = RecordCommand(record)
-  //   render(command)
-  // }
-
-  // def records(records: Seq[Record])(implicit context: ExecutionContext): String = {
-  //   val command = RecordsCommand(records)
-  //   render(command)
-  // }
 
   def shutdown(): Unit = view.shutdown()
 }

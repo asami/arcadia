@@ -10,7 +10,8 @@ import arcadia.scenario.ScenarioEngine
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
  *  version Sep. 17, 2017
- * @version Oct. 14, 2017
+ *  version Oct. 14, 2017
+ * @version Nov.  5, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Controller(rule: Controller.Rule) {
@@ -34,9 +35,11 @@ object Controller {
 }
 
 case object ResourceDetailController extends Controller(
-  Controller.Rule(Nil)
+  Controller.Rule(List(ResourceDetailAction()))
 ) {
-  override val guard = NotImplementedYetGuard
+  override val guard = new Guard {
+    def isAccept(p: Parcel): Boolean = is_pathname_command(p)
+  }
 }
 
 case object ResourceListController extends Controller(

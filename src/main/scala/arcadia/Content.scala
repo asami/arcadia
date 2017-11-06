@@ -8,7 +8,7 @@ import org.joda.time.DateTime
 import org.goldenport.exception.RAISE
 import org.goldenport.bag.ChunkBag
 import org.goldenport.record.v2.Record
-import org.goldenport.xml.XmlUtils
+import org.goldenport.xml.{XmlUtils, XmlPrinter}
 import org.goldenport.util.SeqUtils.mkStringOption
 import org.goldenport.util.DateTimeUtils.httpDateTimeString
 
@@ -16,7 +16,8 @@ import org.goldenport.util.DateTimeUtils.httpDateTimeString
  * @since   Jul. 16, 2017
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
- * @version Oct. 27, 2017
+ *  version Oct. 27, 2017
+ * @version Nov.  6, 2017
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
@@ -89,6 +90,8 @@ case class XmlContent(
   override def asXml: NodeSeq = xml
   override def asXmlContent: XmlContent = this
 
+  lazy val toHtmlString: String = XmlPrinter.html(xml)
+
   def withXml(xml: NodeSeq) = copy(xml = xml)
   def withExpiresPeriod(p: FiniteDuration): XmlContent = copy(expiresPeriod = Some(p))
 
@@ -154,7 +157,7 @@ object RedirectContent {
   def apply(p: String): RedirectContent = RedirectContent(new URI(p))
 }
 
-case object NotFoundContent extends Content {
+case class NotFoundContent(pathname: String) extends Content {
   def mimetype: MimeType = MimeType.text_html
   lazy val xml: NodeSeq = Group(Nil)
   def expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)

@@ -20,7 +20,8 @@ import arcadia.domain._
  * @since   Jul. 29, 2017
  *  version Aug. 30, 2017
  *  version Sep. 27, 2017
- * @version Oct. 31, 2017
+ *  version Oct. 31, 2017
+ * @version Nov.  6, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -195,6 +196,14 @@ case class ErrorModel(
   }.apply
 }
 object ErrorModel {
+  def create(parcel: Parcel, code: Int): ErrorModel = {
+    val backuri = _back_uri(parcel)
+    ErrorModel(code, None, None, None, backuri)
+  }
+  def create(parcel: Parcel, code: Int, e: Throwable): ErrorModel = {
+    val backuri = _back_uri(parcel)
+    ErrorModel(code, None, Some(e), None, backuri)
+  }
   def create(parcel: Parcel, e: Throwable): ErrorModel = {
     val code = parcel.context.fold {
       ExecutionContext.toCode(e)
@@ -208,12 +217,12 @@ object ErrorModel {
     val backuri = _back_uri(parcel)
     ErrorModel(500, Some(I18NElement(m)), None, None, backuri)
   }
+  def create(parcel: Parcel, evt: scenario.Event): ErrorModel = RAISE.notImplementedYetDefect
   def notFound(parcel: Parcel, m: String): ErrorModel = {
     val backuri = _back_uri(parcel)
     val msg = I18NElement(m)
     ErrorModel(404, Some(msg), None, None, backuri)
   }
-  def create(parcel: Parcel, evt: scenario.Event): ErrorModel = RAISE.notImplementedYetDefect
 
   private def _back_uri(parcel: Parcel): Option[URI] = None // TODO
 }
@@ -382,7 +391,11 @@ case class EntityDetailModel(
     PROP_VIEW_RECORD -> ViewRecord.create(record)
   )
   def toRecord: Record = throw new UnsupportedOperationException()
-  def render(strategy: RenderStrategy) = throw new UnsupportedOperationException()
+  def render(strategy: RenderStrategy) = new Renderer(
+    strategy, None, None, None, None
+  ) {
+    protected def render_Content: NodeSeq = entity_property_sheet(entityType, getSchema, record)
+  }.apply
 }
 object EntityDetailModel extends ModelClass {
   def apply(
@@ -408,7 +421,8 @@ case class EntityListModel(
   records: List[Record],
   transfer: Transfer,
   tableKind: Option[TableKind] = None,
-  expiresKind: Option[ExpiresKind] = Some(AgilePageExpires)
+  expiresKind: Option[ExpiresKind] = Some(AgilePageExpires),
+  dataHref: Option[URI] = None
 ) extends Model with IEntityListModel with IComponentModel {
   override def getEntityType: Option[DomainEntityType] = Some(entityType)
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
@@ -445,10 +459,12 @@ case class EntityListModel(
     tableKind = get_table_kind(tableKind, kind)
   )
 
+  def withDataHref(p: Option[URI]): EntityListModel = copy(dataHref = p)
+
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, caption
   ){
-    protected def render_Content: NodeSeq = table(Renderer.TableOrder(tableKind, getSchema, getEntityType, records))
+    protected def render_Content: NodeSeq = table(Renderer.TableOrder(tableKind, getSchema, getEntityType, dataHref, records))
   }.apply
   lazy val effectiveSchema = getSchema.getOrElse(RecordUtils.buildSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)

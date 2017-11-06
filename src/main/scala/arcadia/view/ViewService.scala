@@ -1,6 +1,7 @@
 package arcadia.view
 
 import play.api.libs.json.JsValue
+import org.goldenport.record.v2.Record
 import arcadia._
 import arcadia.context.{Query => CQuery, _}
 import arcadia.domain._
@@ -8,7 +9,8 @@ import arcadia.model._
 
 /*
  * @since   Sep. 25, 2017
- * @version Oct. 10, 2017
+ *  version Oct. 10, 2017
+ * @version Nov.  3, 2017
  * @author  ASAMI, Tomoharu
  */
 case class ViewService(context: ExecutionContext, strategy: RenderStrategy) {
@@ -29,25 +31,18 @@ case class ViewService(context: ExecutionContext, strategy: RenderStrategy) {
     name: String,
     start: Int = 0,
     limit: Int = 20,
-    tags: List[String] = Nil,
     parameters: Map[String, Any] = Map.empty
   ): ViewEntityList = strategy.execute { ctx =>
     val q = CQuery(
       DomainEntityType(name),
       start, limit,
-      tags = tags,
-      parameters = parameters
+      parameters = Record.create(parameters)
     )
     ViewEntityList(ctx.readEntityList(q), strategy)
   }
 
   def readEntityList(query: Query): ViewEntityList = strategy.execute { ctx =>
-    val q = CQuery(
-      DomainEntityType(query.name),
-      query.start, query.limit,
-      tags = query.tags,
-      parameters = query.parameters
-    )
+    val q = query.toQueryForExecutionContext
     ViewEntityList(ctx.readEntityList(q), strategy)
   }
 }
@@ -58,13 +53,11 @@ case class Query(
   start: Int = 0,
   limit: Int = 20,
   maxlimit: Int = 20,
-  tags: List[String] = Nil,
   parameters: Map[String, Any] = Map.empty
 ) {
   def toQueryForExecutionContext: CQuery = CQuery(
     DomainEntityType(name),
     start, limit, maxlimit,
-    tags,
-    parameters
+    Record.create(parameters)
   )
 }

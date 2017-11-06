@@ -16,7 +16,8 @@ import arcadia.model.{Model, ErrorModel}
  * @since   Jul.  8, 2017
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
- * @version Oct. 31, 2017
+ *  version Oct. 31, 2017
+ * @version Nov.  6, 2017
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -41,6 +42,8 @@ class ViewEngine(
 
   lazy val partials: Partials = rule.partials.complements(extend.map(_.partials))
 
+  lazy val pages: Pages = rule.pages.complements(extend.map(_.pages))
+
   lazy val tags: Tags = rule.tags.complements(extend.map(_.tags)).complements(Tags.embeded)
 
   def findView(parcel: Parcel): Option[View] =
@@ -58,13 +61,13 @@ class ViewEngine(
   }
 
   protected def is_spa(parcel: Parcel): Boolean = parcel.command.map {
-    case m: MaterialCommand => rule.isSinglePageApplication(m.pathname)
+    case m: MaterialCommand => rule.isSinglePageApplication(m.pathname.v)
     case m => false
   }.getOrElse(false)
 
   protected def is_spa_redirect(parcel: Parcel): Boolean = 
     is_spa(parcel) && parcel.command.map {
-      case m: MaterialCommand => !rule.isSinglePageApplicationRoot(m.pathname)
+      case m: MaterialCommand => !rule.isSinglePageApplicationRoot(m.pathname.v)
       case m => false
     }.getOrElse(false)
 
@@ -95,7 +98,7 @@ class ViewEngine(
   // }
 
   def apply(p: Parcel): Content = applyOption(p) getOrElse {
-    throw new NoSuchElementException(p.toMessage) // TODO WebViewNotFoundFault(p.toMessage).RAISE
+    error(p, 404)
   }
 
   def applyOption(p: Parcel): Option[Content] = {
@@ -163,6 +166,20 @@ class ViewEngine(
     _apply_option(parcel)
   }
 
+  def error(p: Parcel, code: Int): Content = error(p, ErrorModel.create(p, code))
+  def error(p: Parcel, e: Throwable): Content = error(p, ErrorModel.create(p, 503, e))
+  def error(p: Parcel, m: ErrorModel): Content = { // TODO layout
+    def name(code: Int) = s"error/${code}"
+    def default = "error/default"
+    (pages.get(name(m.code)) orElse pages.get(default)).map { x =>
+      // val page = getLayout(parcel).getOrElse(content)
+      val page = x
+      page.apply(this, p.withModel(m).withView(x))
+    }.getOrElse {
+      p.render.fold(RAISE.noReachDefect)(m.apply)
+    }
+  }
+
   def renderSectionOption(p: Parcel): Option[NodeSeq] = applySectionOption(p).map(_.asXml)
   def renderComponentOption(p: Parcel): Option[NodeSeq] = applyComponentOption(p).map(_.asXml)
   def renderAtomicOption(p: Parcel): Option[NodeSeq] = applyAtomicOption(p).map(_.asXml)
@@ -176,60 +193,8 @@ class ViewEngine(
     _template_engine.layoutAsNodes(template.uri, bindings)
   }
 
-  // def render(r: Record): String = {
-  //   val source = {
-  //     if (true) {
-  //       val filename = "/Users/asami/src/Project2017/EverforthFramework/src/main/resources/com/everforth/everforth/view/plain/detail.jade"
-  //       TemplateSource.fromFile(filename)
-  //     } else {
-  //       val url = getClass.getResource("plain/detail.jade")
-  //       new URLTemplateSource(url)
-  //     }
-  //   }
-  //   val bindings = Map(PROP_VIEW_OBJECT -> ViewObject.create(r))
-  //   _template_engine.layout(source, bindings)
-  // }
-  // def render(rs: RecordSet)(implicit context: ExecutionContext): String = render(rs.records)
-  // def render(rs: Seq[Record])(implicit context: ExecutionContext): String = {
-  //   val source = {
-  //     if (true) {
-  //       val filename = "/Users/asami/src/Project2017/EverforthFramework/src/main/resources/com/everforth/everforth/view/plain/list.jade"
-  //       TemplateSource.fromFile(filename)
-  //     } else {
-  //       val url = getClass.getResource("plain/list.jade")
-  //       new URLTemplateSource(url)
-  //     }
-  //   }
-  //   val bindings = Map(PROP_VIEW_LIST -> rs.map(ViewObject.create).toList)
-  //   _template_engine.layout(source, bindings)
-  // }
-
   def eval(parcel: Parcel, p: Content): Content = _tag_engine.call(parcel).apply(p)
 
-  // def eval(p: NodeSeq): NodeSeq = p match {
-  //   case m: Text => m
-  //   case m: Elem =>
-  //     val xs = m.child.flatMap(_eval)
-  //     _eval_element(m, xs) getOrElse Group(Nil)
-  //   case m if m.length > 0 => Group(m.toList.flatMap(_eval))
-  //   case m => m
-  // }
-
-  // private def _eval(p: Node): Option[Node] = p match {
-  //   case m: Text => Some(m)
-  //   case m: Elem =>
-  //     val xs = m.child.flatMap(_eval)
-  //     _eval_element(m, xs)
-  //   case m if m.length > 0 => Some(Group(m.toList.flatMap(_eval)))
-  //   case m => Some(m)
-  // }
-
-  // private def _eval_element(p: Elem, children: Seq[Node]): Option[Node] = {
-  //   if (p.label == "model")
-  //     Some(Text("MODEL Component"))
-  //   else
-  //     Some(p.copy(child = children))
-  // }
 }
 object ViewEngine {
   final val PROP_VIEW_MODEL = "model"
@@ -244,6 +209,7 @@ object ViewEngine {
     slots: Vector[ViewEngine.Slot], // pages, components
     layouts: Map[LayoutKind, LayoutView],
     partials: Partials,
+    pages: Pages,
     components: Components,
     tags: Tags,
     singlePageApplication: Option[WebApplicationRule.SinglePageApplication]
@@ -273,16 +239,18 @@ object ViewEngine {
       slots: Seq[Slot],
       layouts: Map[LayoutKind, LayoutView],
       partials: Partials,
+      pages: Pages,
       components: Components,
       tags: Tags,
       spa: Option[WebApplicationRule.SinglePageApplication]
-    ): Rule = Rule(theme, slots.toVector, layouts, partials, components, tags, spa)
+    ): Rule = Rule(theme, slots.toVector, layouts, partials, pages, components, tags, spa)
 
     def create(head: (Guard, View), tail: (Guard, View)*): Rule = Rule(
       None,
       (head +: tail.toVector).map(Slot(_)),
       Map.empty,
       Partials.empty,
+      Pages.empty,
       Components.empty,
       Tags.empty,
       None

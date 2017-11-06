@@ -3,11 +3,13 @@ package arcadia.view
 import scala.xml.{NodeSeq, Group, Elem, Node, Text}
 import java.util.Locale
 import java.net.URI
+import org.goldenport.Strings.blankopt
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2._
 import org.goldenport.record.v2.util.{SchemaBuilder, RecordUtils}
 import org.goldenport.value._
-import org.goldenport.util.MapUtils
+import org.goldenport.values.PathName
+import org.goldenport.util.{MapUtils, StringUtils}
 import arcadia._
 import arcadia.context._
 import arcadia.domain._
@@ -18,7 +20,7 @@ import arcadia.view.ViewEngine._
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
- * @version Nov.  1, 2017
+ * @version Nov.  6, 2017
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -122,6 +124,7 @@ case class GridContext(
   isNoGutters: Boolean = false
 ) {
   def withTabletColumns(p: Int): GridContext = copy(ncolumns = ncolumns + (TabletScreen -> p))
+  def defaultNColumns: Int = 4 // TODO
 }
 object GridContext {
   val image = GridContext(
@@ -173,7 +176,6 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
   object table {
     def container(p: Renderer.Table, body: => Node): Node = table_Container(p, body)
     object css {
-      import org.goldenport.Strings.blankopt
       def caption(p: Renderer.Table) = table_CssClass_Caption(p)
       def table(p: Renderer.Table) = table_CssClass_Table(p)
       def thead(p: Renderer.Table) = table_CssClass_Thead(p)
@@ -186,6 +188,24 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
       def tbodyTd(p: Renderer.TableColumn) = table_CssClass_TbodyTd(p)
       def tfootTr(p: Renderer.Table) = table_CssClass_TfootTr(p)
       def tfootTd(p: Renderer.TableColumn) = table_CssClass_TfootTd(p)
+    }
+  }
+  object grid {
+    object css {
+      object table {
+        def container = grid_CssClass_Table_Container
+        def table = grid_CssClass_Table_Table
+        def tbody = grid_CssClass_Table_Tbody
+        def tbodyTr = grid_CssClass_Table_TbodyTr
+      }
+    }
+  }
+  object card {
+    object css {
+      object table {
+        def td = card_CssClass_Table_Td
+        def anchor = card_CssClass_Table_Anchor
+      }
     }
   }
   object sidebar {
@@ -234,6 +254,14 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
   protected def table_CssClass_TbodyTd(p: Renderer.TableColumn): String = ""
   protected def table_CssClass_TfootTr(p: Renderer.Table): String = ""
   protected def table_CssClass_TfootTd(p: Renderer.TableColumn): String = ""
+
+  protected def grid_CssClass_Table_Container: String = ""
+  protected def grid_CssClass_Table_Table: String = ""
+  protected def grid_CssClass_Table_Tbody: String = ""
+  protected def grid_CssClass_Table_TbodyTr: String = ""
+
+  protected def card_CssClass_Table_Td: String = ""
+  protected def card_CssClass_Table_Anchor: String = ""
 
   protected def sidebar_Feature_Item(
     view: ViewModel,
@@ -464,44 +492,82 @@ case object CreateUsage extends UsageKind
 case object UpdateUsage extends UsageKind
 case object DeleteUsage extends UsageKind
 
-case class OperationScreenEntityUsageSchemaRule(rules: Map[OperationMode, ScreenEntityUsageSchemarRule]) {
-  def get(p: OperationMode) = rules.get(p)
+case class OperationScreenEntityUsageSchemaRule(
+  rules: Map[OperationMode, ScreenEntityUsageSchemaRule],
+  defaultRule: ScreenEntityUsageSchemaRule
+) {
+  // def get(p: OperationMode) = rules.get(p)
+  def apply(p: OperationMode) = rules.get(p) getOrElse defaultRule
 }
 object OperationScreenEntityUsageSchemaRule {
-  val empty = OperationScreenEntityUsageSchemaRule(Map.empty)
+  val empty = OperationScreenEntityUsageSchemaRule(Map.empty, ScreenEntityUsageSchemaRule.empty)
+
+  def create(p: (OperationMode, ScreenEntityUsageSchemaRule), ps: (OperationMode, ScreenEntityUsageSchemaRule)*): OperationScreenEntityUsageSchemaRule =
+    OperationScreenEntityUsageSchemaRule((p +: ps).toMap, p._2)
+
+  def create(p: ScreenEntityUsageSchemaRule, ps: (OperationMode, ScreenEntityUsageSchemaRule)*): OperationScreenEntityUsageSchemaRule =
+    OperationScreenEntityUsageSchemaRule(ps.toMap, p)
 }
 
-case class ScreenEntityUsageSchemarRule(rules: Map[ScreenKind, EntityUsageSchemaRule]) {
-  def get(p: ScreenKind) = rules.get(p)
+case class ScreenEntityUsageSchemaRule(
+  rules: Map[ScreenKind, EntityUsageSchemaRule],
+  defaultRule: EntityUsageSchemaRule
+) {
+  // def get(p: ScreenKind) = rules.get(p)
+  def apply(p: ScreenKind) = rules.get(p) getOrElse defaultRule
 }
-object ScreenEntityUsageSchemarRule {
-  val empty = ScreenEntityUsageSchemarRule(Map.empty)
+object ScreenEntityUsageSchemaRule {
+  val empty = ScreenEntityUsageSchemaRule(Map.empty, EntityUsageSchemaRule.empty)
+
+  def create(p: (ScreenKind, EntityUsageSchemaRule), ps: (ScreenKind, EntityUsageSchemaRule)*): ScreenEntityUsageSchemaRule =
+    ScreenEntityUsageSchemaRule((p +: ps).toMap, p._2)
+
+  def create(p: EntityUsageSchemaRule, ps: (ScreenKind, EntityUsageSchemaRule)*): ScreenEntityUsageSchemaRule =
+    ScreenEntityUsageSchemaRule(ps.toMap, p)
 }
 
-case class EntityUsageSchemaRule(rules: Map[DomainEntityType, UsageSchemaRule]) {
-  def get(p: Option[DomainEntityType]): Option[UsageSchemaRule] = p.flatMap(get)
-  def get(p: DomainEntityType): Option[UsageSchemaRule] = rules.get(p)
+case class EntityUsageSchemaRule(
+  rules: Map[DomainEntityType, UsageSchemaRule],
+  defaultRule: UsageSchemaRule
+) {
+  // def get(p: Option[DomainEntityType]): Option[UsageSchemaRule] = p.flatMap(get)
+  // def get(p: DomainEntityType): Option[UsageSchemaRule] = rules.get(p)
+  def apply(p: DomainEntityType) = rules.get(p) getOrElse defaultRule
 }
 object EntityUsageSchemaRule {
-  val empty = EntityUsageSchemaRule(Map.empty)
+  val empty = EntityUsageSchemaRule(Map.empty, UsageSchemaRule.empty)
+
+  def create(p: (DomainEntityType, UsageSchemaRule), ps: (DomainEntityType, UsageSchemaRule)*): EntityUsageSchemaRule =
+    EntityUsageSchemaRule((p +: ps).toMap, p._2)
+
+  def create(p: UsageSchemaRule, ps: (DomainEntityType, UsageSchemaRule)*): EntityUsageSchemaRule =
+    EntityUsageSchemaRule(ps.toMap, p)
 }
 
-case class UsageSchemaRule(rules: Map[UsageKind, Schema]) {
-  def get(p: UsageKind) = rules.get(p)
+case class UsageSchemaRule(
+  rules: Map[UsageKind, Schema],
+  defaultRule: Schema
+) {
+  // def get(p: UsageKind) = rules.get(p)
+  def apply(p: UsageKind) = rules.get(p) getOrElse defaultRule
 }
 object UsageSchemaRule {
-  val empty = UsageSchemaRule(Map.empty)
+  val empty = UsageSchemaRule(Map.empty, Schema.empty)
 
   def create(p: (UsageKind, Schema), ps: (UsageKind, Schema)*): UsageSchemaRule =
-    UsageSchemaRule((p +: ps).toMap)
+    UsageSchemaRule((p +: ps).toMap, p._2)
+
+  def create(p: Schema, ps: (UsageKind, Schema)*): UsageSchemaRule =
+    UsageSchemaRule(ps.toMap, p)
 }
 
 case class SchemaRule(
-  byOperationMode: OperationScreenEntityUsageSchemaRule,
-  byScreen: ScreenEntityUsageSchemarRule, // MediaOperationMode
-  byEntity: EntityUsageSchemaRule, // DesktopScreen
-  byUsage: UsageSchemaRule, // common
-  default: Schema // AtomFeed
+  // byOperationMode: OperationScreenEntityUsageSchemaRule,
+  // byScreen: ScreenEntityUsageSchemaRule, // MediaOperationMode
+  // byEntity: EntityUsageSchemaRule, // DesktopScreen
+  // byUsage: UsageSchemaRule, // common
+  // default: Schema // AtomFeed
+  rule: OperationScreenEntityUsageSchemaRule
 ) {
   def resolve(p: RenderStrategy, t: Renderer.TableOrder): Schema = {
     val ctx = p.renderContext
@@ -530,46 +596,48 @@ case class SchemaRule(
     usage: UsageKind,
     schema: Schema
   ): Schema = {
-    val byscreen = byOperationMode.get(op) getOrElse byScreen
-    val byentity = byscreen.get(screen) getOrElse byEntity
-    val byusage = byentity.get(entitytype) getOrElse byUsage
-    val systemschema = byusage.get(usage) getOrElse default
+    val systemschema = rule(op)(screen)(entitytype)(usage)
     _converge(schema, systemschema)
   }
 
   private def _converge(app: Schema, system: Schema): Schema = {
     case class Z(r: Vector[Column] = Vector.empty) {
       def +(rhs: Column) = {
-        system.getColumn(rhs.name).fold(this) { c =>
-          val c1 = if (rhs.datatype == XString && c.datatype != XString)
-            rhs.copy(datatype = c.datatype)
-          else
-            rhs
+        app.getColumn(rhs.name).fold(this) { c =>
+          // val c1 = if (rhs.datatype == XString && c.datatype != XString)
+          //   rhs.copy(datatype = c.datatype)
+          // else
+          //   rhs
+          val c1 = c
           copy(r = r :+ c1)
         }
       }
     }
-    val columns = app.columns./:(Z())(_+_).r
+    val columns = system.columns./:(Z())(_+_).r
     app.copy(columns = columns)
   }
 }
 object SchemaRule {
   import SchemaBuilder._
   val empty = SchemaRule(
-    OperationScreenEntityUsageSchemaRule.empty,
-    ScreenEntityUsageSchemarRule.empty,
-    EntityUsageSchemaRule.empty,
-    UsageSchemaRule.empty,
-    SchemaBuilder.create(
-      CLT(PROP_DOMAIN_OBJECT_ID, "Id", XEverforthid), // TODO generic platform entity id
-//      CLiT(PROP_DOMAIN_OBJECT_NAME, "Name", "名前", XString),
-      CLiT(PROP_DOMAIN_OBJECT_TITLE, "Title", "タイトル", XString),
-//      CLiT(PROP_DOMAIN_OBJECT_SUBTITLE, "Sub Title", "サブタイトル", XString),
-//      CLiT(PROP_DOMAIN_OBJECT_SUMMARY, "Summary", "概要", XString),
-      CLiT(PROP_DOMAIN_OBJECT_CONTENT, "Content", "内容", XString),
-      CLiT(PROP_DOMAIN_OBJECT_IMAGE_ICON, "Icon", "アイコン", XImageLink), // TODO XImage
-      CLiT(PROP_DOMAIN_OBJECT_IMAGE_PRIMARY, "Image", "画像", XImageLink) // TODO XImage
-//      CLiT(PROP_DOMAIN_OBJECT_IMAGE_SECONDARY, "Image", "画像", XImageLink)
+    OperationScreenEntityUsageSchemaRule.create(
+      ScreenEntityUsageSchemaRule.create(
+        EntityUsageSchemaRule.create(
+          UsageSchemaRule.create(
+            SchemaBuilder.create(
+              CLT(PROP_DOMAIN_OBJECT_ID, "Id", XEverforthid), // TODO generic platform entity id
+                                                              //      CLiT(PROP_DOMAIN_OBJECT_NAME, "Name", "名前", XString),
+              CLiT(PROP_DOMAIN_OBJECT_TITLE, "Title", "タイトル", XString),
+              //      CLiT(PROP_DOMAIN_OBJECT_SUBTITLE, "Sub Title", "サブタイトル", XString),
+              //      CLiT(PROP_DOMAIN_OBJECT_SUMMARY, "Summary", "概要", XString),
+              CLiT(PROP_DOMAIN_OBJECT_CONTENT, "Content", "内容", XString),
+              CLiT(PROP_DOMAIN_OBJECT_IMAGE_ICON, "Icon", "アイコン", XImageLink), // TODO XImage
+              CLiT(PROP_DOMAIN_OBJECT_IMAGE_PRIMARY, "Image", "画像", XImageLink) // TODO XImage
+                                                                                  //      CLiT(PROP_DOMAIN_OBJECT_IMAGE_SECONDARY, "Image", "画像", XImageLink)
+            )
+          )
+        )
+      )
     )
   )
 }
@@ -633,6 +701,21 @@ object Partials {
   val empty = Partials(Map.empty)
 }
 
+case class Pages(
+  pages: Map[PathName, View]
+) {
+  def get(p: String): Option[View] = pages.get(PathName(p))
+
+  def complement(rhs: Pages): Pages = Pages(
+    MapUtils.complement(pages, rhs.pages)
+  )
+
+  def complements(rhs: Seq[Pages]): Pages =  rhs./:(this)(_ complement _)
+}
+object Pages {
+  val empty = Pages(Map.empty)
+}
+
 case class Components(
   components: Vector[ComponentView]
 ) {
@@ -653,7 +736,8 @@ case class RenderContext(
   cardKind: Option[CardKind],
   sectionLevel: Option[Int],
   entityType: Option[DomainEntityType],
-  schema: Option[Schema]
+  schema: Option[Schema],
+  dataHref: Option[URI]
 ) {
   def withScopeHtml = copy(scope = Html)
   def withScopeSection = copy(scope = Section)
@@ -669,6 +753,22 @@ case class RenderContext(
   def withUsageKind(p: UsageKind) = copy(usageKind = Some(p))
   def withTableKind(p: TableKind) = copy(tableKind = Some(p))
   def withCardKind(p: CardKind) = copy(cardKind = Some(p))
+
+  def uri(id: DomainEntityId): URI = uri(id.entityType, id.id)
+  def uri(base: URI, id: DomainObjectId): URI = {
+    val s = base.toString
+    val b = StringUtils.toPathnameBody(s)
+    StringUtils.getSuffix(s).fold(
+      new URI(s"${b}/${id.presentationId}")
+    )(suffix =>
+      new URI(s"${b}/${id.presentationId}.${suffix}"))
+  }
+  def uri(base: DomainEntityType, id: DomainObjectId): URI = new URI("${base.v}/${id.presentationId}${suffix}")
+
+  def suffix: String = ".html" // TODO
+
+  // protected def domain_entity_id(entitytype: DomainEntityType, id: Any): DomainEntityId =
+  //   DomainEntityId(entitytype, StringDomainObjectId(id.toString, None, None)) // TODO
 }
 object RenderContext {
   val empty = RenderContext(
@@ -677,6 +777,7 @@ object RenderContext {
     None,
     MediaOperationMode,
     DesktopScreen,
+    None,
     None,
     None,
     None,

@@ -4,9 +4,11 @@ import java.net.{URL, URI}
 import play.api.libs.json._
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
+import org.goldenport.record.v2.Record
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.json.JsonUtils
-import org.goldenport.values.Urn
+import org.goldenport.values.{Urn, PathName}
+import org.goldenport.util.StringUtils
 import arcadia._
 import arcadia.context._
 import arcadia.model._
@@ -18,7 +20,7 @@ import arcadia.scenario.ScenarioEngine
  *  version Aug. 29, 2017
  *  version Sep. 21, 2017
  *  version Oct. 31, 2017
- * @version Nov.  1, 2017
+ * @version Nov.  5, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -64,6 +66,12 @@ trait Action {
 
   protected final def fetch_request_parameter(parcel: Parcel, s: Source): Option[RequestParameter] =
     fetch_source_via_string(RequestParameter.parse)(parcel, s)
+
+  protected final def execute_pathname(parcel: Parcel)(body: PathName => Parcel): Parcel =
+    parcel.command.map {
+      case MaterialCommand(pathname) => body(pathname)
+      case _ => parcel
+    } getOrElse(parcel)
 }
 object Action {
   import org.goldenport.json.JsonUtils.Implicits._
@@ -196,25 +204,29 @@ object IndexAction {
       val q = Query(rsc, 0, 10, 20)
       rsc.v -> context.readEntityList(q)
     }
+  }
+}
 
-//     private def _read_resource_grid(c: EverforthClassKind) = {
-//       val q = QueryContext.create(c, 0, 10, 20) // TODO
-//       val m = resource_list_model(c, q)
-//       (c.resourceName, m)
-//     }
-
-//     private def _read_resource_grid_demo(c: EverforthClassKind) = {
-// //      val q = QueryContext.create(c, 0, 10, 20).withBrands(Vector(252)) // TODO
-//       val q = QueryContext.create(c, 0, 10, 20).withIdsBag(Vector(
-//         "pal-palshop-1377836961310-apparelcloud.blog-742c614e-bedd-4a18-ace3-447433b93f9f",
-//         "pal-palshop-1410983251862-apparelcloud.blog-1e1b8dcf-d662-4598-bd6d-d5ce72500755",
-//         "pal-palshop-1378000449352-apparelcloud.blog-37e2f626-2090-4f0f-ba76-535493d1d310",
-//         "pal-palshop-1377947431680-apparelcloud.blog-7a93aa55-e683-4dae-b15a-38a376f7cca2",
-//         "pal-palshop-1377946471327-apparelcloud.blog-d6cc560e-f0a4-429b-aaaa-245a3614a206"
-//       )) // TODO
-//       val m = resource_list_model(c, q)
-//       (c.resourceName, m)
-//     }
+case class ResourceDetailAction(
+) extends Action {
+  def apply(parcel: Parcel): Parcel = execute_pathname(parcel) { pathname =>
+    val a: Option[Parcel] = parcel.render.flatMap(_.viewContext.map(_.engine)).map { viewengine =>
+      pathname.components match {
+        case Nil => parcel
+        case x :: Nil => parcel
+        case x :: xx :: Nil =>
+          val a = MaterialCommand(PathName(x, xx))
+          def b = MaterialCommand(PathName(x))
+          if (viewengine.findView(parcel.withCommand(a)).isDefined)
+            parcel
+          else if (viewengine.findView(parcel.withCommand(b)).isDefined)
+            RAISE.notImplementedYetDefect
+          else
+            parcel
+        case xs => RAISE.notImplementedYetDefect
+      }
+    }
+    a.getOrElse(parcel)
   }
 }
 
@@ -242,14 +254,18 @@ case class OperationAction(
 }
 
 case class GetEntityAction(
-  entityType: String,
-  id: String,
+  entity: String,
+  id: Option[String],
   source: Option[Source],
   sink: Option[Sink]
 ) extends Action {
   def apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
-    val r = context.getEntity(DomainEntityType(entityType), StringDomainObjectId(id))
-    r.fold(parcel)(parcel.withModel)
+    (
+      for {
+        did <- id.map(StringDomainObjectId) orElse context.getIdInRequest
+        r <- context.getEntity(DomainEntityType(entity), did)
+      } yield parcel.withModel(r)
+    ).getOrElse(parcel)
   }
 }
 
@@ -257,6 +273,7 @@ case class ReadEntityListAction(
   entity: String,
   query: Option[Map[String, Any]],
   form: Option[Map[String, Any]],
+  data_href: Option[URI],
   source: Option[Source],
   sink: Option[Sink]
 ) extends SourceSinkAction {
@@ -266,9 +283,10 @@ case class ReadEntityListAction(
     )
     val q = Query(
       DomainEntityType(entity),
-      parameters = query.getOrElse(Map.empty)
+      parameters = query.map(Record.create).getOrElse(Record.empty)
     ).withParameter(params)
-    val r = context.readEntityList(q)
+    val r0 = context.readEntityList(q)
+    val r = r0.withDataHref(data_href)
     set_sink(parcel)(r)
   }
 }

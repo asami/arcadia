@@ -6,7 +6,8 @@ import org.scalatest._
 
 /*
  * @since   Oct. 28, 2017
- * @version Oct. 31, 2017
+ *  version Oct. 31, 2017
+ * @version Nov.  6, 2017
  * @author  ASAMI, Tomoharu
  */
 @RunWith(classOf[JUnitRunner])
@@ -62,6 +63,7 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
         Action.parseActionList(rule) should be(List(
           ReadEntityListAction(
             "productclass",
+            None,
             None,
             None,
             Some(UrnSource("urn:prefer:free:/web/recommended_products")),
@@ -142,6 +144,7 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
             "productclass",
             None,
             None,
+            None,
             Some(UrnSource("urn:prefer:free:/web/recommended_products")),
             Some(ModelHangerSink("recommended_products"))
           ),
@@ -150,11 +153,13 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
             Some(Map("limit" -> "20")),
             None,
             None,
+            None,
             Some(ModelHangerSink("ranking"))
           ),
           ReadEntityListAction(
             "article",
             Some(Map("limit" -> "20")),
+            None,
             None,
             None,
             Some(ModelHangerSink("news_column"))
@@ -166,6 +171,7 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
           ReadEntityListAction(
             "campaign",
             Some(Map("limit" -> "20")),
+            None,
             None,
             None,
             Some(ModelHangerSink("event"))

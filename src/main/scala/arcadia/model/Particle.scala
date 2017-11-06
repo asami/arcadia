@@ -14,19 +14,48 @@ import com.asamioffice.goldenport.text.UString
 import arcadia._
 import arcadia.context.Query
 import arcadia.scenario.Event
-import arcadia.domain.DomainEntityType
+import arcadia.view.RenderContext
+import arcadia.domain._
 
 /*
  * @since   Oct. 29, 2017
- * @version Nov.  1, 2017
+ * @version Nov.  5, 2017
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
 }
 
+sealed trait Link extends Particle {
+  def id: DomainObjectId
+  def getDataHref(ctx: RenderContext): Option[URI]
+}
+
+case class DomainEntityLink(
+  id: DomainEntityId,
+  base_href: Option[URI]
+) extends Link {
+  def getDataHref(ctx: RenderContext): Option[URI] = Some(dataHref(ctx))
+  def dataHref(ctx: RenderContext): URI = (
+    base_href.map(d => ctx.uri(d, id)) orElse
+      ctx.dataHref.map(d => ctx.uri(d, id)) getOrElse
+      ctx.uri(id.entityType, id)
+  )
+}
+
+case class DomainObjectLink(
+  id: DomainObjectId,
+  base_href: Option[URI]
+) extends Link {
+  def getDataHref(ctx: RenderContext): Option[URI] = (
+    base_href.map(d => ctx.uri(d, id)) orElse
+      ctx.dataHref.map(d => ctx.uri(d, id)) orElse
+      id.getEntityType.map(d => ctx.uri(d, id))
+  )
+}
+
 case class TitleLine(
   title: Option[I18NElement],
-  subTitle: Option[I18NElement]
+  subtitle: Option[I18NElement]
 ) extends Particle {
   def toOption: Option[TitleLine] =
     if (title.isEmpty)
@@ -69,17 +98,21 @@ case class Card(
   imagetop: Option[Picture],
   header: Option[TitleLine],
   footer: Option[TitleLine],
-  content: Option[I18NElement]
+  content: Option[I18NElement],
+  link: Option[DomainEntityLink]
 ) extends Particle {
+  def isImageTopOnly = imagetop.isDefined && header.isEmpty && footer.isEmpty && content.isEmpty
 }
 object Card {
-  def create(pic: Picture): Card = Card(Some(pic), None, None, None)
+  def create(pic: Picture): Card = Card(Some(pic), None, None, None, None)
 
-  def create(pic: Picture, header: TitleLine, content: NodeSeq): Card = Card(Some(pic), Some(header), None, Some(I18NElement(content)))
+  def create(pic: Picture, header: TitleLine, content: NodeSeq): Card = Card(Some(pic), Some(header), None, Some(I18NElement(content)), None)
 
-  def create(pic: Picture, header: Option[TitleLine], content: NodeSeq): Card = Card(Some(pic), header, None, Some(I18NElement(content)))
+  def create(pic: Picture, header: Option[TitleLine], content: NodeSeq): Card = Card(Some(pic), header, None, Some(I18NElement(content)), None)
 
-  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq]): Card = Card(Some(pic), header, None, content.map(I18NElement(_)))
+  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq]): Card = Card(Some(pic), header, None, content.map(I18NElement(_)), None)
+
+  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq], link: Option[DomainEntityLink]): Card = Card(Some(pic), header, None, content.map(I18NElement(_)), link)
 
   def parseList(p: String): List[Card] = Particle.parseParticleList(p) match {
     case JsSuccess(xs, _) => xs.collect {
@@ -264,6 +297,15 @@ case class BrokenParticle(error: JsError) extends Particle {
 object Particle {
   import org.goldenport.json.JsonUtils.Implicits._
 
+  implicit val DomainEntityTypeFormat = Json.format[DomainEntityType]
+  implicit object DomainObjectIdFormat extends Format[DomainObjectId] {
+    def reads(json: JsValue): JsResult[DomainObjectId] = json match {
+      case JsString(s) => JsSuccess(StringDomainObjectId(s))
+      case _ => JsError(s"Not json object: $json")
+    }
+    def writes(p: DomainObjectId): JsValue = RAISE.notImplementedYetDefect
+  }
+  implicit val DomainEntityIdFormat = Json.format[DomainEntityId]
   implicit object RecordFormat extends Format[Record] { // TODO migrate to record.
     def reads(json: JsValue): JsResult[Record] = json match {
       case m: JsObject => JsSuccess(Record.create(JsonUtils.toMapS(m)))
@@ -276,6 +318,7 @@ object Particle {
     def reads(json: JsValue): JsResult[LabelIndicator] = LabelIndicator.parseJsValue(json)
     def writes(p: LabelIndicator): JsValue = RAISE.notImplementedYetDefect
   }
+  implicit val DomainEntityLinkFormat = Json.format[DomainEntityLink]
   implicit val BadgeFormat = Json.format[Badge]
   implicit val TitleLineleFormat = Json.format[TitleLine]
   implicit val PictureFormat = Json.format[Picture]

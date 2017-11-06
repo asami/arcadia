@@ -14,7 +14,8 @@ import arcadia.domain._
 /*
  * @since   Aug. 29, 2017
  *  version Sep. 27, 2017
- * @version Oct. 30, 2017
+ *  version Oct. 30, 2017
+ * @version Nov.  3, 2017
  * @author  ASAMI, Tomoharu
  */
 trait PlatformExecutionContext {
@@ -35,6 +36,7 @@ trait PlatformExecutionContext {
   def fetchString(urn: UrnSource): Option[String]
   def fetchBadge(urn: UrnSource): Option[Badge]
   def controllerUri: URI
+  def getIdInRequest: Option[DomainObjectId]
   def inputFormParameters: Record
   def getFormParameter(key: String): Option[String]
   def assets: String

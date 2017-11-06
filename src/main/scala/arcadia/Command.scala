@@ -2,6 +2,7 @@ package arcadia
 
 import org.goldenport.record.v2.{Record, Schema}
 import org.goldenport.i18n.I18NElement
+import org.goldenport.values.PathName
 import arcadia.domain._
 import arcadia.view._
 import arcadia.view.ViewEngine._
@@ -12,7 +13,8 @@ import arcadia.scenario.Scenario
  * @since   Jul. 16, 2017
  *  version Aug. 29, 2017
  *  version Sep. 25, 2017
- * @version Oct. 24, 2017
+ *  version Oct. 24, 2017
+ * @version Nov.  5, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Command {
@@ -38,7 +40,10 @@ case class AssetsCommand(pathname: String) extends Command {
   override val getUseLayout = Some(false)
 }
 
-case class MaterialCommand(pathname: String) extends Command {
+case class MaterialCommand(pathname: PathName) extends Command {
+}
+object MaterialCommand {
+  def apply(p: String): MaterialCommand = MaterialCommand(PathName(p))
 }
 
 case class SetupCommand() extends Command {

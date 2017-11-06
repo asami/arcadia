@@ -1,5 +1,6 @@
 package arcadia
 
+import org.goldenport.values.PathName
 import com.asamioffice.goldenport.text.UPathString
 import arcadia.model._
 
@@ -7,11 +8,24 @@ import arcadia.model._
  * @since   Jul. 15, 2017
  *  version Aug. 29, 2017
  *  version Sep. 23, 2017
- * @version Oct.  8, 2017
+ *  version Oct.  8, 2017
+ * @version Nov.  5, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Guard {
   def isAccept(p: Parcel): Boolean
+
+  protected final def is_pathname_command(p: Parcel): Boolean =
+    p.command.map {
+      case m: MaterialCommand => true
+      case _ => false
+    } getOrElse(false)
+
+  protected final def execute_pathname(p: Parcel)(body: PathName => Parcel): Parcel =
+    p.command.map {
+      case MaterialCommand(pathname) => body(pathname)
+      case _ => p
+    } getOrElse(p)
 }
 
 case class CommandGuard(classes: Vector[Class[_]]) extends Guard {
@@ -31,7 +45,7 @@ case class PathnameGuard(pathname: String) extends Guard {
 }
 
 case class OperationNameGuard(pathname: String) extends Guard {
-  def isAccept(p: Parcel) = p.getOperationName == Some(pathname)
+  def isAccept(p: Parcel) = p.isOperationPathName(pathname)
 }
 
 case class ModelNameGuard(name: String) extends Guard {
