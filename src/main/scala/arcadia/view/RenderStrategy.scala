@@ -20,7 +20,7 @@ import arcadia.view.ViewEngine._
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
- * @version Nov.  6, 2017
+ * @version Nov.  7, 2017
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -294,7 +294,8 @@ object RenderTheme extends EnumerationClass[RenderTheme] {
     PlainTheme,
     PaperDashboardTheme,
     MatrialKitTheme,
-    NowUiKitTheme
+    NowUiKitTheme,
+    MyColorTheme
   )
 }
 
@@ -368,6 +369,9 @@ case object NowUiKitTheme extends Bootstrap4RenderThemaBase {
       case _ => default
     }.getOrElse(default)
   }
+}
+
+case object MyColorTheme extends Bootstrap4RenderThemaBase {
 }
 
 sealed trait TableKind extends NamedValueInstance {
