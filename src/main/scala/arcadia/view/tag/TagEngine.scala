@@ -13,7 +13,7 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
 /*
  * @since   Sep. 30, 2017
  *  version Oct. 31, 2017
- * @version Nov.  5, 2017
+ * @version Nov.  8, 2017
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -79,7 +79,8 @@ object Tags {
     BannerTag,
     CarouselTag,
     BadgeTag,
-    ModelTag
+    ModelTag,
+    ErrorTag
   ))
 }
 
@@ -140,7 +141,7 @@ case class Expression(
 
   def applyModel: XmlContent = {
     val c = engine.applyComponentOption(parcel) getOrElse {
-      model.apply(strategy)
+      model.apply(strategy.withScopeContent)
     }
     c.asXmlContent
   }

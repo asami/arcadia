@@ -12,7 +12,7 @@ import arcadia.model._
 /*
  * @since   Oct. 11, 2017
  *  version Oct. 31, 2017
- * @version Nov.  5, 2017
+ * @version Nov.  8, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -28,6 +28,14 @@ trait SelectByName { self: Tag =>
       None
 
   protected def eval_Expression(p: Expression): XmlContent
+}
+
+case object ErrorTag extends Tag with SelectByName {
+  val name = "error"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    p.applyModel
+  }
 }
 
 case object ModelTag extends Tag with SelectByName {

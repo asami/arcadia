@@ -19,7 +19,7 @@ import arcadia.domain._
 
 /*
  * @since   Oct. 29, 2017
- * @version Nov.  5, 2017
+ * @version Nov.  8, 2017
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -95,24 +95,27 @@ object Picture {
 }
 
 case class Card(
-  imagetop: Option[Picture],
+  image_top: Option[Picture],
   header: Option[TitleLine],
   footer: Option[TitleLine],
   content: Option[I18NElement],
-  link: Option[DomainEntityLink]
+  link: Option[DomainEntityLink],
+  record: Option[Record]
 ) extends Particle {
-  def isImageTopOnly = imagetop.isDefined && header.isEmpty && footer.isEmpty && content.isEmpty
+  def isImageTopOnly = image_top.isDefined && header.isEmpty && footer.isEmpty && content.isEmpty
 }
 object Card {
-  def create(pic: Picture): Card = Card(Some(pic), None, None, None, None)
+  def create(pic: Picture, rec: Record): Card = Card(Some(pic), None, None, None, None, Some(rec))
 
-  def create(pic: Picture, header: TitleLine, content: NodeSeq): Card = Card(Some(pic), Some(header), None, Some(I18NElement(content)), None)
+  def create(pic: Picture, header: TitleLine, content: NodeSeq, rec: Record): Card = Card(Some(pic), Some(header), None, Some(I18NElement(content)), None, Some(rec))
 
-  def create(pic: Picture, header: Option[TitleLine], content: NodeSeq): Card = Card(Some(pic), header, None, Some(I18NElement(content)), None)
+  def create(pic: Picture, header: Option[TitleLine], content: NodeSeq, rec: Record): Card = Card(Some(pic), header, None, Some(I18NElement(content)), None, Some(rec))
 
-  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq]): Card = Card(Some(pic), header, None, content.map(I18NElement(_)), None)
+  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq], rec: Record): Card = Card(Some(pic), header, None, content.map(I18NElement(_)), None, Some(rec))
 
-  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq], link: Option[DomainEntityLink]): Card = Card(Some(pic), header, None, content.map(I18NElement(_)), link)
+  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq], link: Option[DomainEntityLink], rec: Record): Card = Card(Some(pic), header, None, content.map(I18NElement(_)), link, Some(rec))
+
+  def create(pic: Option[Picture], header: Option[TitleLine], footer: Option[TitleLine], content: NodeSeq): Card = Card(pic, header, footer, Some(I18NElement(content)), None, None)
 
   def parseList(p: String): List[Card] = Particle.parseParticleList(p) match {
     case JsSuccess(xs, _) => xs.collect {

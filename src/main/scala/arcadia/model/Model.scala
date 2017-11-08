@@ -21,7 +21,7 @@ import arcadia.domain._
  *  version Aug. 30, 2017
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
- * @version Nov.  6, 2017
+ * @version Nov.  8, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -758,6 +758,23 @@ case class TableBodyRecordDataModel(
   }.apply
   def getEntityType = None
   def record = toRecord
+}
+
+case class CardModel(
+  card: Card,
+  override val featureName: String
+) extends Model with IRecordModel with IComponentModel {
+  def getEntityType = None
+  override protected def view_Bindings(strategy: RenderStrategy) = Map(
+    PROP_VIEW_CARD -> ViewCard.create(card, strategy),
+    PROP_VIEW_OBJECT -> ViewObject.create(record),
+    PROP_VIEW_RECORD -> ViewRecord.create(record)
+  )
+  def getSchema: Option[Schema] = None
+  def record = card.record getOrElse Record.empty
+  def expiresKind = None
+  def render(strategy: RenderStrategy) = RAISE.noReachDefect
+  def toRecord = RAISE.notImplementedYetDefect
 }
 
 case class RecordModel(

@@ -12,6 +12,7 @@ import org.goldenport.values.PathName
 import org.goldenport.util.{MapUtils, StringUtils}
 import arcadia._
 import arcadia.context._
+import arcadia.model.Picture
 import arcadia.domain._
 import arcadia.view.ViewEngine._
 
@@ -20,7 +21,7 @@ import arcadia.view.ViewEngine._
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
- * @version Nov.  7, 2017
+ * @version Nov.  8, 2017
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -41,6 +42,7 @@ case class RenderStrategy(
   def isLogined = executeOption(_.isLogined) getOrElse false
   def getOperationName: Option[String] = executeOption(_.getOperationName).flatten
   def gridContext: GridContext = renderContext.gridContext getOrElse theme.default.gridContext
+  lazy val noImagePicture: Picture = Picture.create(theme.default.noImageIcon)
 
   def withScopeHtml = if (scope == Html) this else copy(renderContext = renderContext.withScopeHtml)
   def withScopeSection = if (scope == Section) this else copy(renderContext = renderContext.withScopeSection)
@@ -154,9 +156,13 @@ object GridContext {
 
 sealed trait RenderTheme extends ClassNamedValueInstance {
   protected def name_Suffix = "Theme"
+  def isGridTable: Boolean = false
+  def isGridDiv: Boolean = false
+  def isCardTable: Boolean = false
+  def isCardDiv: Boolean = false
   object default {
-    def noImageIcon: URI = new URI("assets/img/no-image-icon.png")
-    def noUserImageIcon: URI = new URI("assets/img/no-user-image-icon.png")
+    def noImageIcon: URI = new URI(default_No_Image_Icon)
+    def noUserImageIcon: URI = new URI(default_No_User_Image_Icon)
     def usageKind: UsageKind = default_UsageKind
     def tableKind: TableKind = default_TableKind
     def cardKind: CardKind = default_CardKind
@@ -198,6 +204,11 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
         def tbody = grid_CssClass_Table_Tbody
         def tbodyTr = grid_CssClass_Table_TbodyTr
       }
+      object div {
+        def container = grid_CssClass_Div_Container
+        def row = grid_CssClass_Div_Row
+        def field = grid_CssClass_Div_Field
+      }
     }
   }
   object card {
@@ -205,6 +216,15 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
       object table {
         def td = card_CssClass_Table_Td
         def anchor = card_CssClass_Table_Anchor
+      }
+      object div {
+        def anchor = card_CssClass_Div_Anchor
+        def container = card_CssClass_Div_Container
+        def card = card_CssClass_Div_Card
+        def imageTop = card_CssClass_Div_ImageTop
+        def header = card_CssClass_Div_Header
+        def footer = card_CssClass_Div_Footer
+        def content = card_CssClass_Div_Content
       }
     }
   }
@@ -241,6 +261,8 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
   protected def default_TableKind: TableKind = ListTable
   protected def default_CardKind: CardKind = ImageTitleCard
   protected def default_GridContext: GridContext = GridContext.card
+  protected def default_No_Image_Icon: String = "assets/img/no-image-icon.png"
+  protected def default_No_User_Image_Icon: String = "assets/img/no-user-image-icon.png"
   protected def body_CssClass(strategy: RenderStrategy): String = ""
   protected def table_Container(p: Renderer.Table, body: => Node): Node = body
   protected def table_CssClass_Caption(p: Renderer.Table): String = ""
@@ -259,9 +281,19 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
   protected def grid_CssClass_Table_Table: String = ""
   protected def grid_CssClass_Table_Tbody: String = ""
   protected def grid_CssClass_Table_TbodyTr: String = ""
+  protected def grid_CssClass_Div_Container: String = ""
+  protected def grid_CssClass_Div_Row: String = ""
+  protected def grid_CssClass_Div_Field: String = ""
 
   protected def card_CssClass_Table_Td: String = ""
   protected def card_CssClass_Table_Anchor: String = ""
+  protected def card_CssClass_Div_Anchor: String = ""
+  protected def card_CssClass_Div_Container: String = ""
+  protected def card_CssClass_Div_Card: String = ""
+  protected def card_CssClass_Div_ImageTop: String = ""
+  protected def card_CssClass_Div_Header: String = ""
+  protected def card_CssClass_Div_Footer: String = ""
+  protected def card_CssClass_Div_Content: String = ""
 
   protected def sidebar_Feature_Item(
     view: ViewModel,
@@ -372,6 +404,18 @@ case object NowUiKitTheme extends Bootstrap4RenderThemaBase {
 }
 
 case object MyColorTheme extends Bootstrap4RenderThemaBase {
+  override val isGridDiv = true
+  override val isCardDiv = true
+
+  override protected def default_No_Image_Icon = "assets/images/sample-good.png"
+  override protected def grid_CssClass_Div_Container: String = "c-cardList"
+  override protected def grid_CssClass_Div_Row: String = ""
+  override protected def grid_CssClass_Div_Field: String = ""
+  override protected def card_CssClass_Div_Container: String = ""
+  override protected def card_CssClass_Div_Anchor: String = "c-card"
+  override protected def card_CssClass_Div_Card: String = ""
+  override protected def card_CssClass_Div_ImageTop: String = "c-card__imageArea"
+  override protected def card_CssClass_Div_Content: String = ""
 }
 
 sealed trait TableKind extends NamedValueInstance {
@@ -426,7 +470,7 @@ object CardKind extends EnumerationClass[CardKind] {
     ImageTitleSummaryCard,
     ImageTitleContentCard
   )
-  def take(p: String) = get(p) getOrElse BrokenCard(p)
+  def take(p: String) = get(p) getOrElse ComponentCard(p)
 }
 case object ImageCard extends CardKind {
   val name = "image"
@@ -455,6 +499,12 @@ case object ImageTitleContentCard extends CardKind {
   def isHeader: Boolean = true
   def isFooter: Boolean = false
   def isContent: Boolean = true
+}
+case class ComponentCard(name: String) extends CardKind {
+  def isImageTop: Boolean = false
+  def isHeader: Boolean = false
+  def isFooter: Boolean = false
+  def isContent: Boolean = false
 }
 case class BrokenCard(m: String) extends CardKind {
   val name = "broken"

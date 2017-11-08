@@ -17,7 +17,8 @@ import arcadia.view._
 /*
  * @since   Jul. 23, 2017
  *  version Aug. 29, 2017
- * @version Sep. 17, 2017
+ *  version Sep. 17, 2017
+ * @version Nov.  7, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class WebModule() {
@@ -121,7 +122,11 @@ object DirectoryWebModule {
 }
 
 class WarWebModule(war: URL) extends WebModule {
-  val basedir = new File("target/war")
+  val basedir = {
+    val r = new File("target/war")
+    r.mkdirs()
+    r
+  }
   val bag = ProjectVersionDirectoryBag.createFromZip(basedir, war)
   lazy val module = new DirectoryWebModule(bag.homeDirectory)
 

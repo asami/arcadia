@@ -17,7 +17,7 @@ import org.goldenport.util.DateTimeUtils.httpDateTimeString
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
  *  version Oct. 27, 2017
- * @version Nov.  6, 2017
+ * @version Nov.  8, 2017
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
@@ -54,6 +54,7 @@ sealed trait Content {
   def asXml: NodeSeq = RAISE.noReachDefect
   def asXmlContent: XmlContent = RAISE.noReachDefect
 
+  def withCode(code: Int): Content
   def withExpiresPeriod(p: FiniteDuration): Content
 }
 object Content {
@@ -67,8 +68,10 @@ case class StringContent(
   expiresPeriod: Option[FiniteDuration],
   proxyExpiresPeriod: Option[FiniteDuration],
   etag: Option[ETag],
-  lastModified: Option[DateTime]
+  lastModified: Option[DateTime],
+  code: Int = 200
 ) extends Content {
+  def withCode(p: Int) = copy(code = p)
   def withExpiresPeriod(p: FiniteDuration): StringContent = copy(expiresPeriod = Some(p))
 }
 object StringContent {
@@ -85,13 +88,15 @@ case class XmlContent(
   expiresPeriod: Option[FiniteDuration],
   proxyExpiresPeriod: Option[FiniteDuration],
   etag: Option[ETag],
-  lastModified: Option[DateTime]
+  lastModified: Option[DateTime],
+  code: Int = 200
 ) extends Content {
   override def asXml: NodeSeq = xml
   override def asXmlContent: XmlContent = this
 
   lazy val toHtmlString: String = XmlPrinter.html(xml)
 
+  def withCode(p: Int) = copy(code = p)
   def withXml(xml: NodeSeq) = copy(xml = xml)
   def withExpiresPeriod(p: FiniteDuration): XmlContent = copy(expiresPeriod = Some(p))
 
@@ -132,8 +137,10 @@ case class BinaryContent(
   expiresPeriod: Option[FiniteDuration],
   proxyExpiresPeriod: Option[FiniteDuration],
   etag: Option[ETag],
-  lastModified: Option[DateTime]
+  lastModified: Option[DateTime],
+  code: Int = 200
 ) extends Content {
+  def withCode(p: Int) = copy(code = p)
   def withExpiresPeriod(p: FiniteDuration): BinaryContent = copy(expiresPeriod = Some(p))
 }
 object BinaryContent {
@@ -142,7 +149,8 @@ object BinaryContent {
 }
 
 case class RedirectContent(
-  uri: URI = new URI("index.html")
+  uri: URI = new URI("index.html"),
+  code: Int = 303
 ) extends Content {
   def mimetype: MimeType = MimeType.text_html
   lazy val xml: NodeSeq = Group(Nil)
@@ -152,6 +160,7 @@ case class RedirectContent(
   def etag: Option[ETag] = None
   def lastModified: Option[DateTime] = None
   def withExpiresPeriod(p: FiniteDuration): RedirectContent = this
+  def withCode(p: Int) = copy(code = p)
 }
 object RedirectContent {
   def apply(p: String): RedirectContent = RedirectContent(new URI(p))
@@ -166,6 +175,8 @@ case class NotFoundContent(pathname: String) extends Content {
   def etag: Option[ETag] = None
   def lastModified: Option[DateTime] = None
   def withExpiresPeriod(p: FiniteDuration): Content = this
+  def withCode(p: Int) = this
+  def code = 404
 }
 
 // https://stackoverflow.com/questions/18148884/difference-between-no-cache-and-must-revalidate

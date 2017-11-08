@@ -17,7 +17,7 @@ import arcadia.model.{Model, ErrorModel}
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
  *  version Oct. 31, 2017
- * @version Nov.  6, 2017
+ * @version Nov.  8, 2017
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -174,7 +174,7 @@ class ViewEngine(
     (pages.get(name(m.code)) orElse pages.get(default)).map { x =>
       // val page = getLayout(parcel).getOrElse(content)
       val page = x
-      page.apply(this, p.withModel(m).withView(x))
+      page.apply(this, p.withModel(m).withView(x)).withCode(m.code)
     }.getOrElse {
       p.render.fold(RAISE.noReachDefect)(m.apply)
     }
@@ -190,6 +190,17 @@ class ViewEngine(
     _template_engine.layout(template, bindings)
 
   def render(template: TemplateSource, bindings: Map[String, Object]): NodeSeq = {
+    // val keys = bindings.keySet
+    // val meta = Vector(
+    //   Binding(PROP_VIEW_MODEL, "_root_.arcadia.view.ViewModel", true, None, "val", false),
+    //   Binding(PROP_VIEW_SERVICE, "_root_.arcadia.view.ViewService", true, None, "val", false),
+    //   Binding(PROP_VIEW_OBJECT, "_root_.arcadia.view.ViewObject", true, None, "val", false),
+    //   Binding(PROP_VIEW_LIST, "_root_.arcadia.view.ViewList", true, None, "val", false),
+    //   Binding(PROP_VIEW_CARD, "_root_.arcadia.view.ViewCard", true, None, "val", false),
+    //   Binding(PROP_VIEW_RECORD, "_root_.arcadia.view.ViewRecord", true, None, "val", false)
+    //  // Binding(PROP_VIEW_RECORD, "_root_.arcadia.view.ViewRecords", true, None, "val", false)
+    // ).filter(x => keys.contains(x.name))
+    // _template_engine.layoutAsNodes(template.uri, bindings, meta)
     _template_engine.layoutAsNodes(template.uri, bindings)
   }
 
@@ -201,6 +212,7 @@ object ViewEngine {
   final val PROP_VIEW_SERVICE = "service"
   final val PROP_VIEW_OBJECT = "o"
   final val PROP_VIEW_LIST = "list"
+  final val PROP_VIEW_CARD = "card"
   final val PROP_VIEW_RECORD = "record"
   final val PROP_VIEW_RECORDS = "records"
 
