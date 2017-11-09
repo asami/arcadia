@@ -17,7 +17,7 @@ import arcadia.model.{Model, ErrorModel}
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
  *  version Oct. 31, 2017
- * @version Nov.  8, 2017
+ * @version Nov.  9, 2017
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -130,14 +130,29 @@ class ViewEngine(
           )
       }
     } { content =>
-      val a: Option[Content] = content match {
-        case m: MaterialView => m.getControlContent(parcel)
-        case _ => None
-      }
-      a orElse {
+      def go = {
         val page = getLayout(parcel).getOrElse(content)
         Some(page.apply(this, parcel.withView(content)))
       }
+      content match {
+        case m: MaterialView =>
+          m.getControlContent(parcel) orElse {
+            m.apply(this, parcel) match {
+              case m: BinaryContent => Some(m)
+              case m: StringContent => Some(m) // TODO layout
+              case _ => go
+            }
+          }
+        case _ => go
+      }
+      // val a: Option[Content] = content match {
+      //   case m: MaterialView => m.getControlContent(parcel)
+      //   case _ => None
+      // }
+      // a orElse {
+      //   val page = getLayout(parcel).getOrElse(content)
+      //   Some(page.apply(this, parcel.withView(content)))
+      // }
     }
   }
 
