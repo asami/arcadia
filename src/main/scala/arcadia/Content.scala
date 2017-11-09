@@ -1,6 +1,7 @@
 package arcadia
 
 import scalaz._, Scalaz._
+import scala.util.control.NonFatal
 import scala.xml._
 import scala.concurrent.duration._
 import java.net.URI
@@ -17,7 +18,7 @@ import org.goldenport.util.DateTimeUtils.httpDateTimeString
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
  *  version Oct. 27, 2017
- * @version Nov.  8, 2017
+ * @version Nov.  9, 2017
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
@@ -73,6 +74,21 @@ case class StringContent(
 ) extends Content {
   def withCode(p: Int) = copy(code = p)
   def withExpiresPeriod(p: FiniteDuration): StringContent = copy(expiresPeriod = Some(p))
+  override def asXml: NodeSeq = try {
+    XmlUtils.parseNodeSeq(string)
+  } catch {
+    case NonFatal(e) => Text(string)
+  }
+  override def asXmlContent = XmlContent(
+    mimetype,
+    asXml,
+    expiresKind,
+    expiresPeriod,
+    proxyExpiresPeriod,
+    etag,
+    lastModified,
+    code
+  )
 }
 object StringContent {
   def apply(s: String): StringContent =
