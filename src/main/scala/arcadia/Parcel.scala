@@ -16,7 +16,7 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
- * @version Nov.  5, 2017
+ * @version Nov. 10, 2017
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -95,6 +95,7 @@ case class Parcel(
   def goError(s: String): Parcel = withModel(ErrorModel.create(this, s))
   def goUnknownEvent(p: scenario.Event): Parcel = withModel(ErrorModel.create(this, p))
 
+  def inputQueryParameters: Record = context.map(_.inputQueryParameters) getOrElse Record.empty
   def inputFormParameters: Record = context.map(_.inputFormParameters) getOrElse Record.empty
   def controllerUri: URI = context.map(_.controllerUri) getOrElse RAISE.noReachDefect
 //  def eventName: String = context.flatMap(_.getFormParameter("Submit")) getOrElse RAISE.notImplementedYetDefect

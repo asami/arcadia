@@ -20,7 +20,7 @@ import arcadia.scenario.ScenarioEngine
  *  version Aug. 29, 2017
  *  version Sep. 21, 2017
  *  version Oct. 31, 2017
- * @version Nov.  5, 2017
+ * @version Nov. 10, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -278,13 +278,16 @@ case class ReadEntityListAction(
   sink: Option[Sink]
 ) extends SourceSinkAction {
   def apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
-    val params = source.flatMap(src =>
+    val srcparams = source.flatMap(src =>
       fetch_request_parameter(parcel, src).flatMap(_.query)
     )
+    val queryparams = parcel.inputQueryParameters
+    // srcparams > queryparams (> srcparams) > query
     val q = Query(
       DomainEntityType(entity),
       parameters = query.map(Record.create).getOrElse(Record.empty)
-    ).withParameter(params)
+    ).withParameter(queryparams)
+      .withParameter(srcparams)
     val r0 = context.readEntityList(q)
     val r = r0.withDataHref(data_href)
     set_sink(parcel)(r)
