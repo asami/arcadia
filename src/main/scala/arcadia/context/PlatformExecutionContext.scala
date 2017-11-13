@@ -4,7 +4,7 @@ import scala.xml._
 import java.net.URI
 import play.api.libs.json.JsValue
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2.{Record, Schema}
+import org.goldenport.record.v2.{Record, Schema, Column}
 import arcadia._
 import arcadia.model._
 import arcadia.view._
@@ -15,7 +15,7 @@ import arcadia.domain._
  * @since   Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
- * @version Nov. 10, 2017
+ * @version Nov. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 trait PlatformExecutionContext {
@@ -28,6 +28,7 @@ trait PlatformExecutionContext {
   def put(uri: String, query: Map[String, Any], form: Map[String, Any]): Response
   def delete(uri: String, query: Map[String, Any], form: Map[String, Any]): Response
   def getEntitySchema(name: String): Option[Schema]
+  def getDefaultPropertyColumn(name: String): Option[Column]
   def getEntity(entitytype: DomainEntityType, id: DomainObjectId): Option[EntityDetailModel]
   def readEntityList(p: Query): EntityListModel
   def createEntity(klass: DomainEntityType, data: Record): DomainObjectId

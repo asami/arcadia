@@ -21,7 +21,7 @@ import arcadia.view.ViewEngine._
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
- * @version Nov.  8, 2017
+ * @version Nov. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -43,6 +43,8 @@ case class RenderStrategy(
   def getOperationName: Option[String] = executeOption(_.getOperationName).flatten
   def gridContext: GridContext = renderContext.gridContext getOrElse theme.default.gridContext
   lazy val noImagePicture: Picture = Picture.create(theme.default.noImageIcon)
+
+  def show: String = s"RenderStrategy"
 
   def withScopeHtml = if (scope == Html) this else copy(renderContext = renderContext.withScopeHtml)
   def withScopeSection = if (scope == Section) this else copy(renderContext = renderContext.withScopeSection)

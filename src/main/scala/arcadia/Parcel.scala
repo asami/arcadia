@@ -1,8 +1,11 @@
 package arcadia
 
+import scala.util.control.NonFatal
 import java.net.URI
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2.Record
+import org.goldenport.trace.{TraceContext, Result}
+import org.goldenport.util.SeqUtils
 import arcadia.context._
 import arcadia.domain._
 import arcadia.model.{Model, ErrorModel, Badge}
@@ -16,7 +19,7 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
- * @version Nov. 10, 2017
+ * @version Nov. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -27,7 +30,8 @@ case class Parcel(
   content: Option[Content],
   render: Option[RenderStrategy],
   platformContext: Option[PlatformExecutionContext],
-  context: Option[ExecutionContext]
+  context: Option[ExecutionContext],
+  trace: Option[TraceContext]
 ) {
   def withCommand(p: Command) = copy(command = Some(p))
   def withModel(model: Model) = copy(model = Some(model))
@@ -41,6 +45,7 @@ case class Parcel(
   def withApplication(p: WebApplication) = platformContext.
     map(x => copy(context = Some(ExecutionContext(x, p)))).
     getOrElse(RAISE.noReachDefect)
+  def withTrace(p: TraceContext) = copy(trace = Some(p))
 
   def withUsageKind(p: UsageKind) = render.
     fold(RAISE.noReachDefect)(x => withRenderStrategy(x.withUsageKind(p)))
@@ -62,6 +67,21 @@ case class Parcel(
     render.map(x => copy(render = Some(x.withScopeContent))) getOrElse {
       RAISE.noReachDefect
     }
+
+  lazy val show: String = {
+    val a = SeqUtils.buildTupleVector(
+      "command" -> command.map(_.show),
+      "model" -> model.map(_.show),
+      "modelHanger" -> (if (modelHanger.isEmpty) None else Some(modelHanger.mapValues(_.show))),
+      "view" -> view.map(_.show),
+      "content" -> content.map(_.show),
+      "strategy" -> render.map(_.show)
+    )
+    val b = a.map {
+      case (k, v) => s"${k}=${v}"
+    }.mkString(",")
+    s"Parcel(${b})"
+  }
 
   def toStrategy: RenderStrategy = render getOrElse {
     RAISE.noReachDefect
@@ -113,6 +133,16 @@ case class Parcel(
     RAISE.noReachDefect
   }
 
+  def executeWithTrace[T](label: String, entermessage: String)(body: => Result[T]): T = trace.
+    map(_.execute(label, entermessage)(body)).
+    getOrElse(try {
+      body.r
+    } catch {
+      case NonFatal(e) => throw e
+    })
+
+  def log(msg: String): Unit = trace.foreach(_.log(msg))
+
   def sink(s: Sink, m: Model): Parcel = s match {
     case ModelHangerSink(key) => copy(modelHanger = modelHanger ++ Map(key -> m))
   }
@@ -120,7 +150,7 @@ case class Parcel(
 
 object Parcel {
   def apply(model: Model, strategy: RenderStrategy): Parcel = Parcel(
-    None, Some(model), Map.empty, None, None, Some(strategy), None, None
+    None, Some(model), Map.empty, None, None, Some(strategy), None, None, None
   )
 
   // def apply(command: Command, req: ServiceRequest): Parcel = Parcel(

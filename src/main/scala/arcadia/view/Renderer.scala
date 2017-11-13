@@ -7,10 +7,11 @@ import java.net.{URI, URL}
 import org.joda.time.DateTime
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2._
-import org.goldenport.record.v2.util.RecordUtils
+import org.goldenport.record.v2.util.{RecordUtils, SchemaBuilder}
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.xml.XmlUtils
 import org.goldenport.xml.dom.DomUtils
+import org.goldenport.trace.TraceContext
 import org.goldenport.util.{DateTimeUtils, DateUtils, StringUtils, SeqUtils}
 import arcadia.model._
 import arcadia.domain._
@@ -19,15 +20,15 @@ import arcadia.domain._
  * @since   Aug.  1, 2017
  *  version Sep. 26, 2017
  *  version Oct. 31, 2017
- * @version Nov.  8, 2017
+ * @version Nov. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
   strategy: RenderStrategy,
-  pageName: Option[I18NString],
-  headline: Option[I18NElement],
-  title: Option[I18NElement],
-  caption: Option[I18NElement]
+  pageName: Option[I18NString] = None,
+  headline: Option[I18NElement] = None,
+  title: Option[I18NElement] = None,
+  caption: Option[I18NElement] = None
 ) {
   import Renderer._
   protected lazy val l10n_page_name = pageName.map(string)
@@ -58,7 +59,7 @@ abstract class Renderer(
     })
   }
 
-  protected def generate_id = java.util.UUID.randomUUID().toString
+  protected def generate_id() = java.util.UUID.randomUUID().toString
 
   protected def render_html = <html>{render_head}{render_body}</html>
   protected def render_head = <head>
@@ -98,17 +99,30 @@ abstract class Renderer(
     message: Option[I18NElement],
     exception: Option[Throwable],
     topUri: Option[URI],
-    backUri: Option[URI]
+    backUri: Option[URI],
+    trace: Option[TraceContext]
   ): NodeSeq = {
-    val rec = Record.dataApp(
-      "Code" -> code,
-      "Message" -> (message.map(_(locale)) getOrElse ""),
-      "Top URI" -> (topUri getOrElse ""),
-      "Back URI" -> (backUri getOrElse ""),
-      "Exception Message" -> (exception.flatMap(x => Option(x.getMessage)) getOrElse ""),
-      "Exception Stack" -> (exception.map(x => StringUtils.makeStack(x)) getOrElse "")
+    import SchemaBuilder._
+    val schema = SchemaBuilder.create(
+      CL("code", "Code"),
+      CL("message", "Message"),
+      CLT("topuri", "Top URI", XLink),
+      CLT("backuri", "Back URI", XLink),
+      CL("exception_message", "Exception Message"),
+      CLT("exception_stack", "Exception Stack", XText),
+      CLT("call_tree", "Call Tree", XText)
     )
-    property_sheet(rec)
+
+    val rec = Record.dataAppOption(
+      "code" -> Some(code),
+      "message" -> message.map(_(locale)),
+      "topuri" -> topUri,
+      "backuri" -> backUri,
+      "exception_message" -> exception.flatMap(x => Option(x.getMessage)),
+      "exception_stack" -> exception.map(x => StringUtils.makeStack(x)),
+      "call_tree" -> trace.map(_.showTree)
+    )
+    property_sheet(schema, rec)
   }
 
   protected def text(p: String): Text = Text(p)
@@ -379,6 +393,7 @@ abstract class Renderer(
       case XLink => table_get_value_link(column, record)
       case XImageLink => table_get_value_image_link(column, record)
       case XHtml => table_get_value_html(column, record)
+      case XText => table_get_value_text(column, record)
       case _ => table_get_value_string(column, record)
     }
   }
@@ -409,6 +424,9 @@ abstract class Renderer(
 
   protected def table_get_value_html(column: Column, record: Record): Option[Node] =
     record.getFormString(column.name).map(table_value_html)
+
+  protected def table_get_value_text(column: Column, record: Record): Option[Node] =
+    record.getFormString(column.name).map(table_value_text)
 
   protected def table_get_value_string(column: Column, record: Record): Option[Node] =
     record.getString(column.name).map(Text(_))
@@ -515,6 +533,8 @@ abstract class Renderer(
     case m: org.w3c.dom.Node => DomUtils.toXml(m)
   }
 
+  protected def table_value_text(p: Any): Node = <pre>{p.toString}</pre>
+
   protected def table_value_string(x: Any): Node = Text(x.toString)
 
   protected def property_table(schema: Option[Schema], records: Seq[Record]): NodeSeq =
@@ -564,6 +584,32 @@ abstract class Renderer(
   protected def property_sheet_confirm(): NodeSeq = RAISE.notImplementedYetDefect
 
   protected def property_input_form(
+    action: URI,
+    method: Method,
+    schema: Schema,
+    record: Record,
+    hidden: Hidden,
+    submits: Submits
+  ): NodeSeq =
+    strategy.theme match {
+      case m: Bootstrap4RenderThemaBase => 
+        property_input_form_bootstrap(action, method, schema, record, hidden, submits)
+      case m =>
+        property_input_form_table(action, method, schema, record, hidden, submits)
+    }
+
+  protected def property_input_form_bootstrap(
+    action: URI,
+    method: Method,
+    schema: Schema,
+    record: Record,
+    hidden: Hidden,
+    submits: Submits
+  ): NodeSeq = {
+    property_input_form_table(action, method, schema, record, hidden, submits) // TODO
+  }
+
+  protected def property_input_form_table(
     action: URI,
     method: Method,
     schema: Schema,
@@ -654,6 +700,103 @@ abstract class Renderer(
       {hidden.render}
     </form>
   }
+
+  protected def searchbox_form(p: SearchBox): Elem = {
+    <form class="form-horizontal" method="GET">{
+      for (c <- p.schema.columns) yield searchbox_form_item(p, c)
+      <div class="form-group">
+      <div class="col-sm-offset-2 col-sm-10">
+      <button type="submit" class="btn btn-default">Submit</button>
+      </div>
+      </div>
+    }</form>
+  }
+
+  protected def searchbox_form_item(p: SearchBox, c: Column): Elem =
+    c.datatype match {
+      case XDateTime => _searchbox_form_item_datetime(p, c)
+      case m: XPowertype => _searchbox_form_item_powertype(p, c, m)
+      case _ => _searchbox_form_item(p, c)
+    }
+
+  private def _searchbox_form_item_datetime(p: SearchBox, c: Column): Elem = {
+    val id = generate_id()
+    val idstart = generate_id()
+    val startproperty = s"${c.name}.start"
+    val idend = generate_id()
+    val endproperty = s"${c.name}.end"
+    <div class="form-group">
+    <label class="control-label col-sm-2" for={id}>c.label(locale):</label>
+    <div class="input-group date col-sm-10" id={idstart}>
+    XmlUtils.appendAttributes(
+      <input type={_form_type(c)} name={startproperty} class="form-control" id={id} />,
+      placeholder -> c.form.placeholder
+    )
+    <span class="input-group-addon">
+    <span class="glyphicon glyphicon-calendar"></span>
+    </span>
+    </div>
+    <div class="input-group date col-sm-10" id={idend}>
+    XmlUtils.appendAttributes(
+      <input type={_form_type(c)} name={endproperty} class="form-control" id={id} />,
+      placeholder -> c.form.placeholder
+    )
+    <span class="input-group-addon">
+    <span class="glyphicon glyphicon-calendar"></span>
+    </span>
+    </div>
+    <script type="text/javascript">{"""
+      $(function () {
+        $('#{%s}').datetimepicker(
+          locale: 'ja'
+        );
+      });
+      $(function () {
+        $('#{%s}').datetimepicker(
+          locale: 'ja'
+        );
+      });""".format(idstart, idend)
+    }</script>
+    </div>
+  }
+
+  private def _searchbox_form_item_powertype(p: SearchBox, c: Column, pt: XPowertype): Elem = {
+    val id = generate_id()
+    <div class="form-group">
+    <label class="control-label col-sm-2" for={id}>c.label(locale):</label>
+    <div class="col-sm-10">
+    <select class="custom-select" id={id}>{
+      List(
+        c.form.placeholder.map(x =>
+          <option selected="">{x}</option>
+        ).getOrElse(Group(Nil)),
+        for (t <- pt.powertype.elements) yield {
+          <option value={t.name}>t.label</option>
+        }
+      )
+    }
+    </select>
+    </div>
+    </div>
+  }
+
+  private def _searchbox_form_item(p: SearchBox, c: Column): Elem = {
+    val id = generate_id()
+    <div class="form-group">
+    <label class="control-label col-sm-2" for={id}>c.label(locale):</label>
+    <div class="col-sm-10">
+    XmlUtils.appendAttributes(
+      <input type={_form_type(c)} class="form-control" id={id} />,
+      "placeholder" -> c.form.placeholder
+    )
+    </div>
+    </div>
+  }
+
+  private def _form_type(c: Column): String = _form_type(c.datatype)
+  // control type: button, hidden, reset, submit
+  private def _form_type(p: DataType): String =
+    p.getHtmlInputTypeName getOrElse "text"
 
   protected def grid(p: TableWithRecords): Elem = {
     val cards = p.records.map(to_card(p.table, _)).toList
@@ -1241,5 +1384,9 @@ object Renderer {
   case class TableColumnWithRecord(
     tableColumn: TableColumn,
     record: Record
+  )
+
+  case class SearchBox(
+    schema: Schema
   )
 }

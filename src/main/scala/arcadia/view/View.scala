@@ -8,6 +8,7 @@ import org.goldenport.Strings
 import org.goldenport.record.v2._
 import org.goldenport.bag.{ChunkBag, UrlBag}
 import org.goldenport.io.UrlUtils
+import org.goldenport.trace.Result
 import org.goldenport.util.StringUtils
 import com.asamioffice.goldenport.io.UURL
 import arcadia._
@@ -20,10 +21,12 @@ import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL}
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
  *  version Oct. 27, 2017
- * @version Nov.  6, 2017
+ * @version Nov. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
+  def show: String = s"${getClass.getSimpleName}"
+
   def guard: Guard
   def apply(engine: ViewEngine, parcel: Parcel): Content = 
     execute_apply(engine, parcel.forView(engine))
@@ -36,7 +39,10 @@ abstract class View() {
   def gv: (Guard, View) = (guard, this)
 
   protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content =
-    engine.eval(parcel, execute_Apply(engine, parcel))
+    parcel.executeWithTrace(s"${getClass.getSimpleName}#execute_apply", parcel.show) {
+      val r = engine.eval(parcel, execute_Apply(engine, parcel))
+      Result(r, r.show)
+    }
 
   protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content
 }

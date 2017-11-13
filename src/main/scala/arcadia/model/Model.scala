@@ -7,6 +7,7 @@ import org.goldenport.exception.RAISE
 import org.goldenport.record.v2._
 import org.goldenport.record.v2.util.RecordUtils
 import org.goldenport.i18n.{I18NString, I18NElement}
+import org.goldenport.trace.TraceContext
 import org.goldenport.util.StringUtils
 import arcadia._
 import arcadia.context._
@@ -21,7 +22,7 @@ import arcadia.domain._
  *  version Aug. 30, 2017
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
- * @version Nov.  8, 2017
+ * @version Nov. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -30,6 +31,8 @@ trait Model {
   def featureNameAliases: Set[String] = Set.empty
   def expiresKind: Option[ExpiresKind]
   def toRecord: Record // for API
+  def show: String = s"${getClass.getSimpleName}"
+
   def apply(strategy: RenderStrategy): Content = XmlContent(render(strategy), expiresKind)
   def render(strategy: RenderStrategy): NodeSeq
   final def viewBindings(strategy: RenderStrategy): Map[String, AnyRef] = Map(
@@ -185,24 +188,25 @@ case class ErrorModel(
   message: Option[I18NElement],
   exception: Option[Throwable],
   topUri: Option[URI],
-  backUri: Option[URI]
+  backUri: Option[URI],
+  trace: Option[TraceContext]
 ) extends Model {
   val expiresKind = Some(NoCacheExpires)
   def toRecord: Record = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, None
   ) {
-    protected def render_Content: NodeSeq = error(code, message, exception, topUri, backUri)
+    protected def render_Content: NodeSeq = error(code, message, exception, topUri, backUri, trace)
   }.apply
 }
 object ErrorModel {
   def create(parcel: Parcel, code: Int): ErrorModel = {
     val backuri = _back_uri(parcel)
-    ErrorModel(code, None, None, None, backuri)
+    ErrorModel(code, None, None, None, backuri, parcel.trace)
   }
   def create(parcel: Parcel, code: Int, e: Throwable): ErrorModel = {
     val backuri = _back_uri(parcel)
-    ErrorModel(code, None, Some(e), None, backuri)
+    ErrorModel(code, None, Some(e), None, backuri, parcel.trace)
   }
   def create(parcel: Parcel, e: Throwable): ErrorModel = {
     val code = parcel.context.fold {
@@ -211,17 +215,17 @@ object ErrorModel {
       ctx.toCode(e)
     }
     val backuri = _back_uri(parcel)
-    ErrorModel(code, None, Some(e), None, backuri)
+    ErrorModel(code, None, Some(e), None, backuri, parcel.trace)
   }
   def create(parcel: Parcel, m: String): ErrorModel = {
     val backuri = _back_uri(parcel)
-    ErrorModel(500, Some(I18NElement(m)), None, None, backuri)
+    ErrorModel(500, Some(I18NElement(m)), None, None, backuri, parcel.trace)
   }
   def create(parcel: Parcel, evt: scenario.Event): ErrorModel = RAISE.notImplementedYetDefect
   def notFound(parcel: Parcel, m: String): ErrorModel = {
     val backuri = _back_uri(parcel)
     val msg = I18NElement(m)
-    ErrorModel(404, Some(msg), None, None, backuri)
+    ErrorModel(404, Some(msg), None, None, backuri, parcel.trace)
   }
 
   private def _back_uri(parcel: Parcel): Option[URI] = None // TODO
@@ -846,6 +850,18 @@ case class TableCardModel(
 object TableCardModel {
   def apply(title: I18NElement, schema: Schema, records: Seq[Record]): TableCardModel =
     TableCardModel(TableModel(None, Some(schema), records.toList, Some(DashboardTable)), None, Some(TitleLine.create(title)))
+}
+
+case class SearchBoxModel(
+  schema: Schema
+) extends Model with IFormModel with IComponentModel {
+  val expiresKind: Option[ExpiresKind] = None
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  def render(strategy: RenderStrategy): NodeSeq = new Renderer(strategy) {
+    protected def render_Content: NodeSeq = searchbox_form(
+      Renderer.SearchBox(schema)
+    )
+  }.apply
 }
 
 case class PropertyInputFormModel(

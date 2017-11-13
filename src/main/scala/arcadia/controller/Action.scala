@@ -4,10 +4,11 @@ import java.net.{URL, URI}
 import play.api.libs.json._
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2.Record
+import org.goldenport.record.v2._
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.json.JsonUtils
 import org.goldenport.values.{Urn, PathName}
+import org.goldenport.trace.Result
 import org.goldenport.util.StringUtils
 import arcadia._
 import arcadia.context._
@@ -20,11 +21,16 @@ import arcadia.scenario.ScenarioEngine
  *  version Aug. 29, 2017
  *  version Sep. 21, 2017
  *  version Oct. 31, 2017
- * @version Nov. 10, 2017
+ * @version Nov. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Action {
-  def apply(parcel: Parcel): Parcel
+  def apply(parcel: Parcel): Parcel = parcel.executeWithTrace(s"${getClass.getSimpleName}#apply", parcel.show) {
+    val r = execute_Apply(parcel)
+    Result(r, r.show)
+  }
+
+  protected def execute_Apply(parcel: Parcel): Parcel
 
   protected final def fetch_source_via_string[T](f: String => T)(parcel: Parcel, s: Source): Option[T] = {
     s match {
@@ -67,6 +73,12 @@ trait Action {
   protected final def fetch_request_parameter(parcel: Parcel, s: Source): Option[RequestParameter] =
     fetch_source_via_string(RequestParameter.parse)(parcel, s)
 
+  protected final def fetch_schema(parcel: Parcel, s: Source): Option[Schema] =
+    fetch_source_via_string(Schema.json.unmarshall)(parcel, s)
+
+  protected final def fetch_columns(parcel: Parcel, s: Source): Option[Seq[FormColumn]] =
+    fetch_source_via_string(FormColumn.parseList)(parcel, s)
+
   protected final def execute_pathname(parcel: Parcel)(body: PathName => Parcel): Parcel =
     parcel.command.map {
       case MaterialCommand(pathname) => body(pathname)
@@ -75,6 +87,7 @@ trait Action {
 }
 object Action {
   import org.goldenport.json.JsonUtils.Implicits._
+  import Schema.json._
 
   implicit val SinkFormat = new Format[Sink] {
     def reads(json: JsValue): JsResult[Sink] = json match {
@@ -90,6 +103,7 @@ object Action {
     }
     def writes(p: Source): JsValue = RAISE.notImplementedYetDefect
   }
+  implicit val FormColumnFormat = Json.format[FormColumn]
   implicit val OperationActionFormat = Json.format[OperationAction]
   implicit val GetEntityActionFormat = Json.format[GetEntityAction]
   implicit val ReadEntityListActionFormat = Json.format[ReadEntityListAction]
@@ -98,6 +112,7 @@ object Action {
   implicit val BadgeActionFormat = Json.format[BadgeAction]
   implicit val NoticeActionFormat = Json.format[NoticeAction]
   implicit val ContentActionFormat = Json.format[ContentAction]
+  implicit val SearchBoxActionFormat = Json.format[SearchBoxAction]
 
   implicit object ActionReads extends Reads[Action] {
     def reads(json: JsValue): JsResult[Action] = parseJsValue(json)
@@ -122,6 +137,7 @@ object Action {
         case "badge" => Json.fromJson[BadgeAction](json)
         case "notice" => Json.fromJson[NoticeAction](json)
         case "content" => Json.fromJson[ContentAction](json)
+        case "searchbox" => Json.fromJson[SearchBoxAction](json)
         case _ => JsError(s"Unknown action '$s'")
       }
       case None => JsError(s"No action")
@@ -166,7 +182,7 @@ trait SourceSinkAction extends Action {
 case class IndexAction(
 ) extends Action {
   import IndexAction._
-  def apply(parcel: Parcel): Parcel =
+  protected def execute_Apply(parcel: Parcel): Parcel =
     if (parcel.getEffectiveModel.isDefined) parcel else {
       val pagename = I18NString("Index page name") // TODO
       val headline = I18NElement("Index headline") // TODO
@@ -209,7 +225,7 @@ object IndexAction {
 
 case class ResourceDetailAction(
 ) extends Action {
-  def apply(parcel: Parcel): Parcel = execute_pathname(parcel) { pathname =>
+  protected def execute_Apply(parcel: Parcel): Parcel = execute_pathname(parcel) { pathname =>
     val a: Option[Parcel] = parcel.render.flatMap(_.viewContext.map(_.engine)).map { viewengine =>
       pathname.components match {
         case Nil => parcel
@@ -233,7 +249,7 @@ case class ResourceDetailAction(
 case class ScenarioAction(
   engine: ScenarioEngine
 ) extends Action {
-  def apply(parcel: Parcel): Parcel = engine.apply(parcel)
+  protected def execute_Apply(parcel: Parcel): Parcel = engine.apply(parcel)
 }
 
 case class OperationAction(
@@ -244,7 +260,7 @@ case class OperationAction(
   source: Option[Source],
   sink: Option[Sink]
 ) extends Action {
-  def apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
+  protected def execute_Apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
     def param = ModelParameter(model)
     val r = context.get(operation, query, form)
     Model.get(param, r).map(parcel.withModel(_)).getOrElse {
@@ -259,7 +275,7 @@ case class GetEntityAction(
   source: Option[Source],
   sink: Option[Sink]
 ) extends Action {
-  def apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
+  protected def execute_Apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
     (
       for {
         did <- id.map(StringDomainObjectId) orElse context.getIdInRequest
@@ -277,7 +293,7 @@ case class ReadEntityListAction(
   source: Option[Source],
   sink: Option[Sink]
 ) extends SourceSinkAction {
-  def apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
+  protected def execute_Apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
     val srcparams = source.flatMap(src =>
       fetch_request_parameter(parcel, src).flatMap(_.query)
     )
@@ -298,7 +314,7 @@ case class CarouselAction(
   source: Option[Source],
   sink: Option[Sink]
 ) extends SourceSinkAction {
-  def apply(parcel: Parcel): Parcel = execute_source_sink(parcel) { src =>
+  protected def execute_Apply(parcel: Parcel): Parcel = execute_source_sink(parcel) { src =>
     val a = fetch_picture_list(parcel, src)
     CarouselModel(a)
   }
@@ -308,7 +324,7 @@ case class BannerAction(
   source: Option[Source],
   sink: Option[Sink]
 ) extends SourceSinkAction {
-  def apply(parcel: Parcel): Parcel = execute_source_sink(parcel) { src =>
+  protected def execute_Apply(parcel: Parcel): Parcel = execute_source_sink(parcel) { src =>
     val a = fetch_picture_list(parcel, src)
     BannerModel(a)
   }
@@ -320,7 +336,7 @@ case class BadgeAction(
   source: Option[Source],
   sink: Option[Sink]
 ) extends SourceSinkAction {
-  def apply(parcel: Parcel): Parcel = execute_source_sink(parcel) { src =>
+  protected def execute_Apply(parcel: Parcel): Parcel = execute_source_sink(parcel) { src =>
     val a = fetch_badge(parcel, src) getOrElse Badge.empty
     BadgeModel(a)
   }
@@ -330,7 +346,7 @@ case class NoticeAction(
   source: Option[Source],
   sink: Option[Sink]
 ) extends SourceSinkAction {
-  def apply(parcel: Parcel): Parcel = execute_source_sink(parcel) { src =>
+  protected def execute_Apply(parcel: Parcel): Parcel = execute_source_sink(parcel) { src =>
     val a = fetch_xml_option(parcel, src)
     NoticeModel(a)
   }
@@ -340,20 +356,49 @@ case class ContentAction(
   source: Option[Source],
   sink: Option[Sink]
 ) extends SourceSinkAction {
-  def apply(parcel: Parcel): Parcel = execute_source_sink(parcel) { src =>
+  protected def execute_Apply(parcel: Parcel): Parcel = execute_source_sink(parcel) { src =>
     val a = fetch_xml(parcel, src) getOrElse Xml.empty
     XmlModel(a)
   }
 }
 
+case class SearchBoxAction(
+  columns: Option[Seq[FormColumn]],
+  source: Option[Source],
+  sink: Option[Sink]
+) extends SourceSinkAction {
+  protected def execute_Apply(parcel: Parcel): Parcel = execute_source_sink(parcel) { src =>
+    val cs: Seq[FormColumn] = fetch_columns(parcel, src) orElse columns getOrElse {
+      List(FormColumn.create("keywords", "search", "1", "検索"))
+    }
+    val a = cs.map { c =>
+      Column(
+        c.name,
+        c.datatype.map(_datatype) getOrElse _datatype_by_property(parcel, c.name),
+        c.multiplicity.map(_multiplicity) getOrElse MZeroOne,
+        label = c.label,
+        form = Column.Form(false, c.placeholder.map(I18NString(_)))
+      )
+    }
+    SearchBoxModel(Schema(a))
+  }
+
+  private def _datatype(name: String): DataType =
+    DataType.get(name) getOrElse XString
+  private def _datatype_by_property(parcel: Parcel, name: String): DataType = parcel.execute { ctx =>
+    ctx.getDefaultPropertyColumn(name).map(_.datatype) getOrElse XString
+  }
+  private def _multiplicity(p: String): Multiplicity = Multiplicity.to(p)
+}
+
 case class LoginAction(
 ) extends Action {
-  def apply(parcel: Parcel): Parcel = parcel.withContent(RedirectContent())
+  protected def execute_Apply(parcel: Parcel): Parcel = parcel.withContent(RedirectContent())
 }
 
 case class LogoutAction(
 ) extends Action {
-  def apply(parcel: Parcel): Parcel = parcel.withContent(RedirectContent())
+  protected def execute_Apply(parcel: Parcel): Parcel = parcel.withContent(RedirectContent())
 }
 
 case class BrokenAction(
@@ -361,7 +406,7 @@ case class BrokenAction(
   json: Option[JsValue],
   jsonError: Option[JsError]
 ) extends Action {
-  def apply(parcel: Parcel): Parcel = parcel
+  protected def execute_Apply(parcel: Parcel): Parcel = parcel
 }
 object BrokenAction {
   def apply(msg: String, json: JsValue): BrokenAction = BrokenAction(I18NString(msg), Some(json), None)

@@ -12,7 +12,7 @@ import arcadia.model._
 /*
  * @since   Oct. 11, 2017
  *  version Oct. 31, 2017
- * @version Nov.  8, 2017
+ * @version Nov. 12, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -86,6 +86,28 @@ case object DetailTag extends Tag with SelectByName {
       case m => m
     }
 //    p.withTable(GridTable).withCard(card).applyModel(model)
+    p.applyModel(model)
+  }
+}
+
+case object SearchBoxTag extends Tag with SelectByName {
+  val name = "searchbox"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val columns = p.getStringList("column")
+    // keywords
+    // created_at
+    // updated_at
+    // publish_at
+    // public_at
+    // close_at
+    // start_at
+    // end_at
+    val model = p.effectiveModel match {
+      case m: SearchBoxModel => m // .withSchemaKind(column, GridTable)
+      case m => m
+    }
+    // p.withTable(GridTable).withCard(card).applyModel(model)
     p.applyModel(model)
   }
 }

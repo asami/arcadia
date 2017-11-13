@@ -4,7 +4,7 @@ import scala.xml._
 import java.net.URI
 import play.api.libs.json.JsValue
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2.{Record, Schema}
+import org.goldenport.record.v2.{Record, Schema, Column}
 import org.goldenport.record.v2.util.SchemaBuilder
 import arcadia._
 import arcadia.model._
@@ -16,7 +16,7 @@ import arcadia.domain._
  * @since   Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
- * @version Nov. 10, 2017
+ * @version Nov. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -39,6 +39,10 @@ case class ExecutionContext(
   def getEntitySchema(name: String): Option[Schema] = {
     // TODO config
     platformExecutionContext.getEntitySchema(name)
+  }
+  def getDefaultPropertyColumn(name: String): Option[Column] = {
+    // TODO config
+    platformExecutionContext.getDefaultPropertyColumn(name)
   }
   def getEntity(entitytype: DomainEntityType, id: DomainObjectId): Option[EntityDetailModel] = platformExecutionContext.getEntity(entitytype, id)
   def readEntityList(p: Query): EntityListModel = platformExecutionContext.readEntityList(p)

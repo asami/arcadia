@@ -6,6 +6,7 @@ import org.fusesource.scalate.support.URLTemplateSource
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2._
 import org.goldenport.value._
+import org.goldenport.trace.Result
 import org.goldenport.util.MapUtils
 import arcadia._
 import arcadia.context._
@@ -17,7 +18,7 @@ import arcadia.model.{Model, ErrorModel}
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
  *  version Oct. 31, 2017
- * @version Nov.  9, 2017
+ * @version Nov. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -101,13 +102,13 @@ class ViewEngine(
     error(p, 404)
   }
 
-  def applyOption(p: Parcel): Option[Content] = {
+  def applyOption(p: Parcel): Option[Content] = p.executeWithTrace("ViewEngine#applyOption", p.show) {
     val render = {
       val t = theme getOrElse PlainTheme
       (p.render getOrElse PlainHtml).withThemePartials(t, partials)
     }
     val parcel = p.withRenderStrategy(render)
-    findView(parcel).fold {
+    val r = findView(parcel).fold {
       extend.toStream.flatMap(_.applyOption(parcel)).headOption orElse {
         // val model = p.getEffectiveModel orElse Some(ErrorModel.notFound(parcel, "View and Model is not found."))
         // model map { m =>
@@ -154,6 +155,7 @@ class ViewEngine(
       //   Some(page.apply(this, parcel.withView(content)))
       // }
     }
+    Result(r, r.map(_.show))
   }
 
   private def _apply_option(p: Parcel): Option[Content] = findView(p).
@@ -162,9 +164,10 @@ class ViewEngine(
     )(page =>
       Some(page.apply(this, p)))
 
-  def applySectionOption(p: Parcel): Option[Content] = {
+  def applySectionOption(p: Parcel): Option[Content] = p.executeWithTrace("ViewEngine#applySectionOption", p.show) {
     val parcel = p.sectionScope
-    _apply_option(parcel)
+    val r = _apply_option(parcel)
+    Result(r, r.map(_.show))
   }
 
   def applyComponentOption(p: Parcel): Option[Content] = {

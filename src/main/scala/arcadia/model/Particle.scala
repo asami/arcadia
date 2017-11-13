@@ -19,7 +19,7 @@ import arcadia.domain._
 
 /*
  * @since   Oct. 29, 2017
- * @version Nov.  8, 2017
+ * @version Nov. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -294,6 +294,30 @@ object RequestParameter {
   }
 }
 
+case class FormColumn(
+  name: String,
+  datatype: Option[String],
+  multiplicity: Option[String], // required
+  label: Option[String],
+  placeholder: Option[String]
+) extends Particle
+object FormColumn {
+  def create(
+    name: String,
+    datatype: String,
+    multiplicity: String,
+    label: String
+  ): FormColumn =
+    FormColumn(name, Some(datatype), Some(multiplicity), Some(label), None)
+
+  def parseList(p: String): List[FormColumn] = Particle.parseParticleList(p) match {
+    case JsSuccess(xs, _) => xs.collect {
+      case m: FormColumn => m
+    }
+    case m: JsError => RAISE.syntaxErrorFault(m.toString)
+  }
+}
+
 case class BrokenParticle(error: JsError) extends Particle {
 }
 
@@ -327,6 +351,7 @@ object Particle {
   implicit val PictureFormat = Json.format[Picture]
   implicit val CardFormat = Json.format[Card]
   implicit val XmlFormat = Json.format[Xml]
+  implicit val FormColumnFormat = Json.format[FormColumn]
   // implicit object QueryFormat extends Format[Query] {
   //   def reads(json: JsValue): JsResult[Query] = json match {
   //     case m: JsObject => JsSuccess(Query(Record.create(JsonUtils.toMapS(m))))
@@ -360,6 +385,7 @@ object Particle {
       case "card" => Json.fromJson[Card](o)
       case "xml" => Json.fromJson[Xml](o)
       case "parameter" => Json.fromJson[RequestParameter](o)
+      case "column" => Json.fromJson[FormColumn](o)
       case m => JsError(s"Unknown particle: $o")
     }
     a.getOrElse {

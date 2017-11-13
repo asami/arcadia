@@ -18,7 +18,7 @@ import org.goldenport.util.DateTimeUtils.httpDateTimeString
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
  *  version Oct. 27, 2017
- * @version Nov.  9, 2017
+ * @version Nov. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
@@ -57,6 +57,8 @@ sealed trait Content {
 
   def withCode(code: Int): Content
   def withExpiresPeriod(p: FiniteDuration): Content
+
+  def show: String
 }
 object Content {
 }
@@ -74,6 +76,9 @@ case class StringContent(
 ) extends Content {
   def withCode(p: Int) = copy(code = p)
   def withExpiresPeriod(p: FiniteDuration): StringContent = copy(expiresPeriod = Some(p))
+
+  lazy val show = "StringContent"
+
   override def asXml: NodeSeq = try {
     XmlUtils.parseNodeSeq(string)
   } catch {
@@ -115,6 +120,8 @@ case class XmlContent(
   def withCode(p: Int) = copy(code = p)
   def withXml(xml: NodeSeq) = copy(xml = xml)
   def withExpiresPeriod(p: FiniteDuration): XmlContent = copy(expiresPeriod = Some(p))
+
+  lazy val show = "XmlContent"
 
   def +(rhs: XmlContent): XmlContent = {
     import ExpiresKind.Implicits._
@@ -158,6 +165,8 @@ case class BinaryContent(
 ) extends Content {
   def withCode(p: Int) = copy(code = p)
   def withExpiresPeriod(p: FiniteDuration): BinaryContent = copy(expiresPeriod = Some(p))
+
+  lazy val show = "BinaryContent"
 }
 object BinaryContent {
   def apply(mimetype: MimeType, binary: ChunkBag, expireskind: ExpiresKind): BinaryContent =
@@ -177,6 +186,9 @@ case class RedirectContent(
   def lastModified: Option[DateTime] = None
   def withExpiresPeriod(p: FiniteDuration): RedirectContent = this
   def withCode(p: Int) = copy(code = p)
+
+  lazy val show = "RedirectContent"
+
 }
 object RedirectContent {
   def apply(p: String): RedirectContent = RedirectContent(new URI(p))
@@ -193,6 +205,8 @@ case class NotFoundContent(pathname: String) extends Content {
   def withExpiresPeriod(p: FiniteDuration): Content = this
   def withCode(p: Int) = this
   def code = 404
+
+  lazy val show = "NotFoundContent"
 }
 
 // https://stackoverflow.com/questions/18148884/difference-between-no-cache-and-must-revalidate

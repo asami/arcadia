@@ -3,6 +3,7 @@ package arcadia.controller
 import scala.util.control.NonFatal
 import play.api.libs.json._
 import org.goldenport.exception.RAISE
+import org.goldenport.trace.Result
 import arcadia._
 import arcadia.scenario.ScenarioEngine
 
@@ -11,14 +12,15 @@ import arcadia.scenario.ScenarioEngine
  *  version Aug. 29, 2017
  *  version Sep. 17, 2017
  *  version Oct. 14, 2017
- * @version Nov.  5, 2017
+ * @version Nov. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Controller(rule: Controller.Rule) {
-  def apply(parcel: Parcel): Parcel = {
+  def apply(parcel: Parcel): Parcel = parcel.executeWithTrace(s"${getClass.getSimpleName}#apply", parcel.show) {
     val a = prologue_Apply(parcel)
     val b = rule.apply(parcel)
-    epilogue_Apply(b)
+    val r = epilogue_Apply(b)
+    Result(r, r.show)
   }
 
   def guard: Guard = NoneGuard

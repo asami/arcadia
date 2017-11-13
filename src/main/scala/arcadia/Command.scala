@@ -14,7 +14,7 @@ import arcadia.scenario.Scenario
  *  version Aug. 29, 2017
  *  version Sep. 25, 2017
  *  version Oct. 24, 2017
- * @version Nov.  5, 2017
+ * @version Nov. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Command {
@@ -22,6 +22,7 @@ trait Command {
 //  def toRecord: Record = Record.empty // TODO
   def getModel: Option[Model] = None
   def getUseLayout: Option[Boolean] = None
+  def show: String = toString()
 }
 
 case class IndexCommand() extends Command {

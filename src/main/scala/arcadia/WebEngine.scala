@@ -4,6 +4,7 @@ import scala.util.control.NonFatal
 import org.goldenport.exception.RAISE
 import org.goldenport.values.ResourceName
 import org.goldenport.record.v2.Record
+import org.goldenport.trace.{TraceContext, Result}
 import arcadia.context._
 import arcadia.controller.ControllerEngine
 import arcadia.view.ViewEngine
@@ -15,7 +16,7 @@ import arcadia.scenario._
  *  version Aug. 29, 2017
  *  version Sep.  2, 2017
  *  version Oct. 27, 2017
- * @version Nov.  6, 2017
+ * @version Nov. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -35,22 +36,31 @@ class WebEngine(
     extend.map(_.controller),
     systemcontroller
   )
+  val isTrace = true
 
   def apply(p: Parcel): Content = try {
-    val parcel =
+    val parcel0 =
       p.withApplicationRule(rule).withApplication(application)
-    val a = controller.apply(parcel)
-    a.content getOrElse {
-      view.apply(a) match {
-        case m: NotFoundContent => view.error(p, 404)
-        case r =>
-          if (r.expiresPeriod.isDefined)
-            r
-          else
-            r.expiresKind.fold(r) { x =>
-              application.config.getExpiresPeriod(x).fold(r)(r.withExpiresPeriod)
-            }
+    val parcel =
+      if (isTrace)
+        parcel0.withTrace(new TraceContext)
+      else
+        parcel0
+    parcel.executeWithTrace("WebEngine#apply", p.show) {
+      val a = controller.apply(parcel)
+      val r = a.content getOrElse {
+        view.apply(a) match {
+          case m: NotFoundContent => view.error(p, 404)
+          case m =>
+            if (m.expiresPeriod.isDefined)
+              m
+            else
+              m.expiresKind.fold(m) { x =>
+                application.config.getExpiresPeriod(x).fold(m)(m.withExpiresPeriod)
+              }
+        }
       }
+      Result(r, r.show)
     }
   } catch {
     case NonFatal(e) => view.error(p, e)
