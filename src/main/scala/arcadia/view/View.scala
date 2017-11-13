@@ -21,11 +21,17 @@ import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL}
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
  *  version Oct. 27, 2017
- * @version Nov. 13, 2017
+ * @version Nov. 14, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
-  def show: String = s"${getClass.getSimpleName}"
+  lazy val show: String = s"${getClass.getSimpleName}${show_info}"
+  protected def show_info: String =
+    if (Strings.blankp(show_Info))
+      ""
+    else
+      s"($show_Info)"
+  protected def show_Info: String = ""
 
   def guard: Guard
   def apply(engine: ViewEngine, parcel: Parcel): Content = 
@@ -39,7 +45,7 @@ abstract class View() {
   def gv: (Guard, View) = (guard, this)
 
   protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content =
-    parcel.executeWithTrace(s"${getClass.getSimpleName}#execute_apply", parcel.show) {
+    parcel.executeWithTrace(s"${show}#execute_apply", parcel.show) {
       val r = engine.eval(parcel, execute_Apply(engine, parcel))
       Result(r, r.show)
     }
@@ -62,6 +68,8 @@ trait ModelViewBase[T <: Model] extends View {
 }
 
 abstract class TemplateViewBase(template: TemplateSource) extends View() {
+  override def show_Info = StringUtils.shortUri(template.uri)
+
   protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content = {
     val bindings = _build_bindings(engine, parcel)
     XmlContent(engine.render(template, bindings))

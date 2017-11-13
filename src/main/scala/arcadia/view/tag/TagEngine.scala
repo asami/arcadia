@@ -5,6 +5,7 @@ import scala.xml._
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
 import org.goldenport.xml.XmlUtils
+import org.goldenport.trace.Result
 import arcadia._
 import arcadia.context._
 import arcadia.view._
@@ -13,7 +14,7 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
 /*
  * @since   Sep. 30, 2017
  *  version Oct. 31, 2017
- * @version Nov.  8, 2017
+ * @version Nov. 14, 2017
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -22,12 +23,21 @@ class TagEngine(
   def call(parcel: Parcel): Call = Call(parcel)
 
   case class Call(parcel: Parcel) {
-    def apply(p: Content): Content = p match {
-      case m: XmlContent => apply(m)
-      case m => m
-    }
+    // def apply(p: Content): Content = parcel.executeWithTrace(s"TagEngine#apply", p.show) {
+    //   val r = p match {
+    //     case m: XmlContent => _apply(m)
+    //     case m => m
+    //   }
+    //   Result(r, r.show)
+    // }
 
-    def apply(p: XmlContent): XmlContent = p.xml match {
+    def apply(p: Content): Content =
+      p match {
+        case m: XmlContent => _apply(m)
+        case m => m
+      }
+
+    private def _apply(p: XmlContent): XmlContent = p.xml match {
       case m: Text => p
       case m: Elem =>
         val xs = m.child.flatMap(_eval_node)
@@ -74,6 +84,7 @@ object Tags {
     TableTag,
     GridTag,
     DetailTag,
+    SearchBoxTag,
     ContentTag,
     NoticeTag,
     BannerTag,

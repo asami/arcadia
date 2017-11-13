@@ -2,8 +2,10 @@ package arcadia.view.tag
 
 import scalaz.{Node => _, _}, Scalaz._
 import scala.xml._
+import org.goldenport.Strings
 import org.goldenport.exception.RAISE
 import org.goldenport.xml.XmlUtils
+import org.goldenport.trace.Result
 import arcadia._
 import arcadia.context._
 import arcadia.view._
@@ -11,17 +13,30 @@ import arcadia.model._
 
 /*
  * @since   Oct. 11, 2017
- *  version Oct. 31, 2017
- * @version Nov. 12, 2017
+ * @version Nov. 14, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
-  def eval(p: Expression): Option[XmlContent]
+  lazy val show: String = s"${getClass.getSimpleName}${show_info}"
+  protected def show_info: String =
+    if (Strings.blankp(show_Info))
+      ""
+    else
+      s"($show_Info)"
+  protected def show_Info: String = ""
+
+  final def eval(p: Expression): Option[XmlContent] =
+    execute_Eval(p)
+    // p.parcel.executeWithTraceOption(s"${show}#eval", p.parcel.show) {
+    //   val r = execute_Eval(p)
+    //   r.map(x => Result(x, x.show))
+    // }
+  protected def execute_Eval(p: Expression): Option[XmlContent]
 }
 
 trait SelectByName { self: Tag =>
   def name: String
-  def eval(p: Expression): Option[XmlContent] =
+  protected def execute_Eval(p: Expression): Option[XmlContent] =
     if (p.isLabel(name))
       Some(eval_Expression(p))
     else

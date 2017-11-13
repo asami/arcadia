@@ -58,6 +58,8 @@ sealed trait Content {
   def withCode(code: Int): Content
   def withExpiresPeriod(p: FiniteDuration): Content
 
+  def addCallTree(p: String): Content = this
+
   def show: String
 }
 object Content {
@@ -94,6 +96,8 @@ case class StringContent(
     lastModified,
     code
   )
+
+  override def addCallTree(p: String) = copy(string = string + "\n===== Call Tree (StringContent) =====\n" + p)
 }
 object StringContent {
   def apply(s: String): StringContent =
@@ -128,6 +132,11 @@ case class XmlContent(
     val ek: Option[ExpiresKind] = expiresKind |+| rhs.expiresKind
     copy(xml = XmlUtils.concat(xml, rhs.xml), expiresKind = ek)
   }
+
+  override def addCallTree(p: String) = copy(xml = XmlUtils.concat(
+    xml,
+    <div><h4>===== Call Tree (XmlContent) ====</h4><pre>{p}</pre></div>
+  ))
 }
 object XmlContent {
   val empty = apply(Group(Nil))

@@ -5,7 +5,7 @@ import java.net.URI
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2.Record
 import org.goldenport.trace.{TraceContext, Result}
-import org.goldenport.util.SeqUtils
+import org.goldenport.util.{SeqUtils, MapUtils}
 import arcadia.context._
 import arcadia.domain._
 import arcadia.model.{Model, ErrorModel, Badge}
@@ -19,7 +19,7 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
- * @version Nov. 13, 2017
+ * @version Nov. 14, 2017
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -68,18 +68,31 @@ case class Parcel(
       RAISE.noReachDefect
     }
 
+  // lazy val show: String = {
+  //   val a = SeqUtils.buildTupleVector(
+  //     "command" -> command.map(_.show),
+  //     "model" -> model.map(_.show),
+  //     "modelHanger" -> (if (modelHanger.isEmpty) None else Some(modelHanger.mapValues(_.show))),
+  //     "view" -> view.map(_.show),
+  //     "content" -> content.map(_.show),
+  //     "strategy" -> render.map(_.show)
+  //   )
+  //   val b = a.map {
+  //     case (k, v) => s"${k}=${v}"
+  //   }.mkString(",")
+  //   s"Parcel(${b})"
+  // }
+
   lazy val show: String = {
-    val a = SeqUtils.buildTupleVector(
-      "command" -> command.map(_.show),
-      "model" -> model.map(_.show),
-      "modelHanger" -> (if (modelHanger.isEmpty) None else Some(modelHanger.mapValues(_.show))),
-      "view" -> view.map(_.show),
-      "content" -> content.map(_.show),
-      "strategy" -> render.map(_.show)
-    )
-    val b = a.map {
-      case (k, v) => s"${k}=${v}"
-    }.mkString(",")
+    val a = Vector(
+      command.map(_.show),
+      model.map(_.show),
+      (if (modelHanger.isEmpty) None else Some(MapUtils.show(modelHanger.mapValues(_.show)))),
+      view.map(_.show),
+      content.map(_.show),
+      render.map(_.show)
+    ).flatten
+    val b = a.mkString(",")
     s"Parcel(${b})"
   }
 
@@ -118,8 +131,12 @@ case class Parcel(
   def inputQueryParameters: Record = context.map(_.inputQueryParameters) getOrElse Record.empty
   def inputFormParameters: Record = context.map(_.inputFormParameters) getOrElse Record.empty
   def controllerUri: URI = context.map(_.controllerUri) getOrElse RAISE.noReachDefect
+
+  def webMeta: List[String] = inputQueryParameters.eagerStringList("_web")
+  def isShowTrace: Boolean = webMeta.contains("show.trace")
+
 //  def eventName: String = context.flatMap(_.getFormParameter("Submit")) getOrElse RAISE.notImplementedYetDefect
-  def exception: Throwable = RAISE.notImplementedYetDefect
+//  def exception: Throwable = RAISE.notImplementedYetDefect
 //  def domainEntityType: DomainEntityType = context.flatMap(_.getFormParameter("web.entity.type")).map(DomainEntityType(_)) getOrElse RAISE.noReachDefect
 //  def domainEntityId: DomainObjectId = context.flatMap(_.getFormParameter("web.entity.id").map(StringDomainObjectId(_))) getOrElse RAISE.noReachDefect
 
@@ -137,6 +154,14 @@ case class Parcel(
     map(_.execute(label, entermessage)(body)).
     getOrElse(try {
       body.r
+    } catch {
+      case NonFatal(e) => throw e
+    })
+
+  def executeWithTraceOption[T](label: String, entermessage: String)(body: => Option[Result[T]]): Option[T] = trace.
+    map(_.executeOption(label, entermessage)(body)).
+    getOrElse(try {
+      body.map(_.r)
     } catch {
       case NonFatal(e) => throw e
     })

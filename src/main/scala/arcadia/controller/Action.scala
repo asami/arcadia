@@ -9,7 +9,7 @@ import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.json.JsonUtils
 import org.goldenport.values.{Urn, PathName}
 import org.goldenport.trace.Result
-import org.goldenport.util.StringUtils
+import org.goldenport.util.{StringUtils, SeqUtils, MapUtils}
 import arcadia._
 import arcadia.context._
 import arcadia.model._
@@ -25,7 +25,20 @@ import arcadia.scenario.ScenarioEngine
  * @author  ASAMI, Tomoharu
  */
 trait Action {
-  def apply(parcel: Parcel): Parcel = parcel.executeWithTrace(s"${getClass.getSimpleName}#apply", parcel.show) {
+  lazy val show: String = s"${getClass.getSimpleName}${show_info}"
+  protected def show_info: String =
+    show_Info match {
+      case m if m.isEmpty => ""
+      case m => 
+        val a = m.map {
+          case (k, v) => s"${k}=${v}"
+        }.mkString(",")
+        s"($a)"
+    }
+
+  protected def show_Info: Vector[(String, String)] = Vector.empty
+
+  def apply(parcel: Parcel): Parcel = parcel.executeWithTrace(s"${show}#apply", parcel.show) {
     val r = execute_Apply(parcel)
     Result(r, r.show)
   }
@@ -165,6 +178,11 @@ trait SourceSinkAction extends Action {
   def source: Option[Source]
   def sink: Option[Sink]
 
+  override protected def show_Info = SeqUtils.buildTupleVector(
+    "source" -> source.map(_.show),
+    "sink" -> source.map(_.show)
+  )
+
   protected final def execute_source_sink(parcel: Parcel)(body: Source => Model): Parcel =
     source.fold(parcel) { src =>
       val r = body(src)
@@ -274,7 +292,13 @@ case class GetEntityAction(
   id: Option[String],
   source: Option[Source],
   sink: Option[Sink]
-) extends Action {
+) extends SourceSinkAction {
+  override protected def show_Info =
+    SeqUtils.buildTupleVector(
+      "entity" -> Some(entity),
+      "id" -> id
+    ) ++ super.show_Info
+
   protected def execute_Apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
     (
       for {
@@ -293,6 +317,14 @@ case class ReadEntityListAction(
   source: Option[Source],
   sink: Option[Sink]
 ) extends SourceSinkAction {
+  override protected def show_Info =
+    SeqUtils.buildTupleVector(
+      "entity" -> Some(entity),
+      "query" -> query.map(x => s"query${MapUtils.show(x)}"),
+      "form" -> form.map(x => s"form${MapUtils.show(x)}"),
+      "data_href" -> data_href.map(_.toString)
+    ) ++ super.show_Info
+
   protected def execute_Apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
     val srcparams = source.flatMap(src =>
       fetch_request_parameter(parcel, src).flatMap(_.query)
@@ -413,7 +445,9 @@ object BrokenAction {
   def apply(p: JsError): BrokenAction = BrokenAction(JsonUtils.messageI18N(p), None, Some(p))
 }
 
-sealed trait Source
+sealed trait Source {
+  def show: String
+}
 object Source {
   def apply(p: String): Source = {
     val uri = new URI(p)
@@ -425,20 +459,32 @@ object Source {
     }.getOrElse(BrokenSource(p))
   }
 }
-case class UrlSource(url: URL) extends Source
-case class UriSource(uri: URI) extends Source
+case class UrlSource(url: URL) extends Source {
+  def show = StringUtils.shortUrl(url)
+}
+case class UriSource(uri: URI) extends Source {
+  def show = StringUtils.shortUri(uri)
+}
 case class UrnSource(urn: Urn) extends Source {
   def nid = urn.nid
   def module = urn.module
   def submodule = urn.submodule
+
+  def show = StringUtils.shortUrn(urn)
 }
 object UrnSource {
   def apply(p: String): UrnSource = UrnSource(Urn(p))
 }
-case class BrokenSource(v: String) extends Source
+case class BrokenSource(v: String) extends Source {
+  def show = v
+}
 
-sealed trait Sink
+sealed trait Sink {
+  def show: String
+}
 object Sink {
   def apply(p: String): Sink = ModelHangerSink(p)
 }
-case class ModelHangerSink(key: String) extends Sink
+case class ModelHangerSink(key: String) extends Sink {
+  def show = key
+}

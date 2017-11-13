@@ -16,7 +16,7 @@ import arcadia.scenario._
  *  version Aug. 29, 2017
  *  version Sep.  2, 2017
  *  version Oct. 27, 2017
- * @version Nov. 13, 2017
+ * @version Nov. 14, 2017
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -46,9 +46,9 @@ class WebEngine(
         parcel0.withTrace(new TraceContext)
       else
         parcel0
-    parcel.executeWithTrace("WebEngine#apply", p.show) {
+    val r = parcel.executeWithTrace("WebEngine#apply", p.show) {
       val a = controller.apply(parcel)
-      val r = a.content getOrElse {
+      val c = a.content getOrElse {
         view.apply(a) match {
           case m: NotFoundContent => view.error(p, 404)
           case m =>
@@ -60,8 +60,15 @@ class WebEngine(
               }
         }
       }
-      Result(r, r.show)
+      Result(c, c.show)
     }
+    parcel.trace.fold(r)(x =>
+      if (parcel.isShowTrace)
+        //        r.addCallTree(x.showTreeSplit)
+        r.addCallTree(x.showTree)
+      else
+        r
+    )
   } catch {
     case NonFatal(e) => view.error(p, e)
   }
