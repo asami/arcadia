@@ -1,5 +1,6 @@
 package arcadia.view
 
+import scala.collection.mutable
 import scala.xml.{NodeSeq, Group, Elem, Node, Text}
 import java.util.Locale
 import java.net.URI
@@ -21,7 +22,7 @@ import arcadia.view.ViewEngine._
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
- * @version Nov. 13, 2017
+ * @version Nov. 16, 2017
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -41,7 +42,7 @@ case class RenderStrategy(
   def cardKind = renderContext.cardKind getOrElse theme.default.cardKind
   def isLogined = executeOption(_.isLogined) getOrElse false
   def getOperationName: Option[String] = executeOption(_.getOperationName).flatten
-  def gridContext: GridContext = renderContext.gridContext getOrElse theme.default.gridContext
+  def gridContext: GridContext = renderContext.gridContext getOrElse theme.default.gridContext(this)
   lazy val noImagePicture: Picture = Picture.create(theme.default.noImageIcon)
 
   def show: String = s"RenderStrategy"
@@ -79,6 +80,10 @@ case class RenderStrategy(
       this
     else
       copy(viewContext = Some(ViewContext(engine, parcel)))
+
+  def addJavaScriptInFooter(p: String): Unit = renderContext.addJavaScriptInFooter(p)
+
+  def getConfigString(p: String): Option[String] = application.getString(p)
 
   def getEntityType = renderContext.entityType
 
@@ -124,33 +129,65 @@ case object TinySize extends RenderSize { // 8pt
 
 case class GridContext(
   width: Int,
-  ncolumns: Map[ScreenKind, Int], // xs, sm, md, lg
+  ncolumns: Map[ScreenKind, Int], // xs, sm, md, lg, lx
   isNoGutters: Boolean = false
 ) {
-  def withTabletColumns(p: Int): GridContext = copy(ncolumns = ncolumns + (TabletScreen -> p))
-  def defaultNColumns: Int = 4 // TODO
+  def withTabletColumns(ncolumns: Int): GridContext = {
+    val a: Map[ScreenKind, Int] = ncolumns match {
+      case 0 => GridContext.banner.ncolumns
+      case 1 => Map(
+        TabletScreen -> 1,
+        PhabletScreen -> 1,
+        PhoneScreen -> 1
+      )
+      case 2 => Map(
+        TabletScreen -> 2,
+        PhabletScreen -> 1,
+        PhoneScreen -> 1
+      )
+      case 3 => Map(
+        TabletScreen -> 3,
+        PhabletScreen -> 1,
+        PhoneScreen -> 1
+      )
+      case 4 => Map(
+        TabletScreen -> 4,
+        PhabletScreen -> 2,
+        PhoneScreen -> 1
+      )
+      case _ => GridContext.banner.ncolumns
+    }
+    copy(ncolumns = a)
+  }
+  def defaultNColumns: Int = 4 // TODO customizable
 }
 object GridContext {
   val image = GridContext(
     12,
     Map(
-      LargeScreen -> 12,
-      DesktopScreen -> 6,
-      TabletScreen -> 4,
+      DesktopScreen -> 12,
+      LaptopScreen -> 12,
+      TabletScreen -> 6,
+      PhabletScreen -> 4,
       PhoneScreen -> 3
     )
   )
   val card = GridContext(
     12,
     Map(
+      DesktopScreen -> 12,
+      LaptopScreen -> 6,
       TabletScreen -> 4,
-      PhoneScreen -> 3
+      PhabletScreen -> 2,
+      PhoneScreen -> 1
     )
   )
   val banner = GridContext(
     12,
     Map(
-      TabletScreen -> 4
+      TabletScreen -> 1,
+      PhabletScreen -> 1,
+      PhoneScreen -> 1
     ),
     true
   )
@@ -168,7 +205,7 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
     def usageKind: UsageKind = default_UsageKind
     def tableKind: TableKind = default_TableKind
     def cardKind: CardKind = default_CardKind
-    def gridContext: GridContext = default_GridContext
+    def gridContext(strategy: RenderStrategy): GridContext = default_GridContext(strategy)
   }
   object head {
     def charset(strategy: RenderStrategy): Node = <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
@@ -262,7 +299,7 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
   protected def default_UsageKind: UsageKind = ListUsage
   protected def default_TableKind: TableKind = ListTable
   protected def default_CardKind: CardKind = ImageTitleCard
-  protected def default_GridContext: GridContext = GridContext.card
+  protected def default_GridContext(strategy: RenderStrategy): GridContext = GridContext.card
   protected def default_No_Image_Icon: String = "assets/img/no-image-icon.png"
   protected def default_No_User_Image_Icon: String = "assets/img/no-user-image-icon.png"
   protected def body_CssClass(strategy: RenderStrategy): String = ""
@@ -406,8 +443,19 @@ case object NowUiKitTheme extends Bootstrap4RenderThemaBase {
 }
 
 case object MyColorTheme extends Bootstrap4RenderThemaBase {
-  override val isGridDiv = true
   override val isCardDiv = true
+
+  override protected def default_GridContext(strategy: RenderStrategy) =
+    GridContext(
+      12,
+      Map(
+        DesktopScreen -> 12,
+        LaptopScreen -> 12,
+        TabletScreen -> 6,
+        PhabletScreen -> 4,
+        PhoneScreen -> 3
+      )
+    )
 
   override protected def default_No_Image_Icon = "assets/images/sample-good.png"
   override protected def grid_CssClass_Div_Container: String = "c-cardList"
@@ -535,10 +583,11 @@ case object ConsoleOperationMode extends OperationMode
 
 sealed trait ScreenKind {
 }
-case object LargeScreen extends ScreenKind // lg
-case object DesktopScreen extends ScreenKind // md
-case object TabletScreen extends ScreenKind // sm
-case object PhoneScreen extends ScreenKind // xs
+case object DesktopScreen extends ScreenKind // xl: >= 1200px
+case object LaptopScreen extends ScreenKind // lg: >= 992px
+case object TabletScreen extends ScreenKind // md: >= 768px
+case object PhabletScreen extends ScreenKind // sm:  >= 576px
+case object PhoneScreen extends ScreenKind // sx: < 576px
 
 sealed trait UsageKind {
 }
@@ -793,7 +842,8 @@ case class RenderContext(
   sectionLevel: Option[Int],
   entityType: Option[DomainEntityType],
   schema: Option[Schema],
-  dataHref: Option[URI]
+  dataHref: Option[URI],
+  epilogue: Option[EpilogueContext]
 ) {
   def withScopeHtml = copy(scope = Html)
   def withScopeSection = copy(scope = Section)
@@ -809,6 +859,11 @@ case class RenderContext(
   def withUsageKind(p: UsageKind) = copy(usageKind = Some(p))
   def withTableKind(p: TableKind) = copy(tableKind = Some(p))
   def withCardKind(p: CardKind) = copy(cardKind = Some(p))
+  def withEpilogue = copy(epilogue = Some(new EpilogueContext()))
+
+  def addJavaScriptInFooter(p: String): Unit = epilogue.
+    map(_.addJavaScript(p)).
+    getOrElse(RAISE.noReachDefect)
 
   def uri(id: DomainEntityId): URI = uri(id.entityType, id.id)
   def uri(base: URI, id: DomainObjectId): URI = {
@@ -839,6 +894,7 @@ object RenderContext {
     None,
     None,
     None,
+    None,
     None
   )
 }
@@ -848,4 +904,25 @@ case class ViewContext(
   parcel: Parcel
 ) {
   def isMatch(e: ViewEngine, p: Parcel) = engine == e && parcel == p
+}
+
+class EpilogueContext {
+  private val _javascripts = mutable.ArrayBuffer.empty[String]
+
+  def addJavaScript(p: String): Unit = _javascripts += p
+
+  def getScriptElement: Option[Elem] =
+    if (_javascripts.isEmpty)
+      None
+    else
+      Some(_make_script_tag())
+
+  private def _make_script_tag() = <script type="text/javascript">{"""
+  //<![CDATA[
+    $(function(){
+%s
+    });
+  //]]>
+""".format(_javascripts.mkString("\n"))
+        }</script>
 }

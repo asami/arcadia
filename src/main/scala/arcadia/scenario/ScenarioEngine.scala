@@ -7,7 +7,8 @@ import arcadia.context._
 
 /*
  * @since   Sep. 17, 2017
- * @version Oct. 25, 2017
+ *  version Oct. 25, 2017
+ * @version Nov. 16, 2017
  * @author  ASAMI, Tomoharu
  */
 class ScenarioEngine(
@@ -21,7 +22,7 @@ class ScenarioEngine(
   private def _apply(parcel: Parcel, command: ScenarioCommand): Parcel =
     command.getScenario.fold {
       Scenario.launch(parcel, command).map(_.start(parcel)).getOrElse {
-        RAISE.notImplementedYetDefect
+        parcel.goNotFound(s"Unkown scenario: ${command.name}")
       }
     } { scenario =>
       Event.get(parcel, command).fold {

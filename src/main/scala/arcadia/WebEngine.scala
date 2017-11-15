@@ -9,6 +9,7 @@ import arcadia.context._
 import arcadia.controller.ControllerEngine
 import arcadia.view.ViewEngine
 import arcadia.controller._
+import arcadia.model.ErrorModel
 import arcadia.scenario._
 
 /*
@@ -16,7 +17,7 @@ import arcadia.scenario._
  *  version Aug. 29, 2017
  *  version Sep.  2, 2017
  *  version Oct. 27, 2017
- * @version Nov. 14, 2017
+ * @version Nov. 16, 2017
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -38,7 +39,7 @@ class WebEngine(
   )
   val isTrace = true
 
-  def apply(p: Parcel): Content = try {
+  def apply(p: Parcel): Content = {
     val parcel0 =
       p.withApplicationRule(rule).withApplication(application)
     val parcel =
@@ -46,31 +47,43 @@ class WebEngine(
         parcel0.withTrace(new TraceContext)
       else
         parcel0
-    val r = parcel.executeWithTrace("WebEngine#apply", p.show) {
-      val a = controller.apply(parcel)
-      val c = a.content getOrElse {
-        view.apply(a) match {
-          case m: NotFoundContent => view.error(p, 404)
-          case m =>
-            if (m.expiresPeriod.isDefined)
-              m
-            else
-              m.expiresKind.fold(m) { x =>
-                application.config.getExpiresPeriod(x).fold(m)(m.withExpiresPeriod)
-              }
+    try {
+      val r = parcel.executeWithTrace("WebEngine#apply", p.show) {
+        val a = controller.apply(parcel)
+        val c = a.content getOrElse {
+          a.model.flatMap {
+            case m: ErrorModel => Some(ErrorModelContent(m))
+            case _ => None
+          }.getOrElse {
+            view.apply(a) match {
+              case m: ErrorContent => m
+              case m =>
+                if (m.expiresPeriod.isDefined)
+                  m
+                else
+                  m.expiresKind.fold(m) { x =>
+                    application.config.getExpiresPeriod(x).fold(m)(m.withExpiresPeriod)
+                  }
+            }
+          }
         }
+        Result(c, c.show)
       }
-      Result(c, c.show)
+      r match {
+        case m: NotFoundContent => view.error(parcel, 404)
+        case ErrorModelContent(m) => view.error(parcel, m)
+        case _ =>
+          parcel.trace.fold(r)(x =>
+            if (parcel.isShowTrace)
+              //        r.addCallTree(x.showTreeSplit)
+              r.addCallTree(x.showTree)
+            else
+              r
+          )
+      }
+    } catch {
+      case NonFatal(e) => view.error(parcel, e)
     }
-    parcel.trace.fold(r)(x =>
-      if (parcel.isShowTrace)
-        //        r.addCallTree(x.showTreeSplit)
-        r.addCallTree(x.showTree)
-      else
-        r
-    )
-  } catch {
-    case NonFatal(e) => view.error(p, e)
   }
 
   def render(p: Parcel): String = {
@@ -80,6 +93,7 @@ class WebEngine(
       case m: XmlContent => m.xml.toString
       case m: RedirectContent => RAISE.noReachDefect
       case m: NotFoundContent => RAISE.noReachDefect // TODO
+      case m: ErrorContent => RAISE.noReachDefect // TODO
     }
   }
 

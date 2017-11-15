@@ -18,7 +18,7 @@ import arcadia.model.{Model, ErrorModel}
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
  *  version Oct. 31, 2017
- * @version Nov. 13, 2017
+ * @version Nov. 15, 2017
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -108,7 +108,7 @@ class ViewEngine(
       (p.render getOrElse PlainHtml).withThemePartials(t, partials)
     }
     val parcel = p.withRenderStrategy(render)
-    val r = findView(parcel).fold {
+    val r1 = findView(parcel).fold {
       extend.toStream.flatMap(_.applyOption(parcel)).headOption orElse {
         // val model = p.getEffectiveModel orElse Some(ErrorModel.notFound(parcel, "View and Model is not found."))
         // model map { m =>
@@ -154,6 +154,16 @@ class ViewEngine(
       //   val page = getLayout(parcel).getOrElse(content)
       //   Some(page.apply(this, parcel.withView(content)))
       // }
+    }
+    val r: Option[Content] = {
+      val a: Option[Content] = r1.flatMap {
+        case m: XmlContent =>
+          parcel.render.flatMap(_.renderContext.epilogue.flatMap(
+            _.getScriptElement).map(m.addScriptElement)
+          )
+        case _ => None
+      }
+      a.orElse(r1)
     }
     Result(r, r.map(_.show))
   }

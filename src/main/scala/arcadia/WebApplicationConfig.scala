@@ -5,6 +5,7 @@ import scala.concurrent.duration._
 import java.util.Locale
 import java.net.URI
 import com.typesafe.config.{Config, ConfigFactory}
+import org.goldenport.record.v2.Record
 import org.goldenport.i18n.I18NElement
 import org.goldenport.xml.XhtmlUtils
 import org.goldenport.json.JsonUtils.Implicits._
@@ -13,7 +14,8 @@ import org.goldenport.util.HoconUtils.Implicits._
 /*
  * @since   Aug. 12, 2017
  *  version Sep.  2, 2017
- * @version Oct. 27, 2017
+ *  version Oct. 27, 2017
+ * @version Nov. 15, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationConfig(
@@ -73,7 +75,8 @@ case class WebApplicationConfig(
     usecase_list.map(_.toRule),
     admin_list.map(_.toRule),
     info_list.map(_.toRule),
-    singlePageApplication.map(_.toRule)
+    singlePageApplication.map(_.toRule),
+    Record.empty // TODO
   )
 
   def getAssets: Option[String] = lifecycle.

@@ -4,6 +4,7 @@ import scala.xml._
 import java.util.Locale
 import java.net.URI
 import com.typesafe.config.{Config, ConfigFactory}
+import org.goldenport.record.v2.Record
 import org.goldenport.i18n.I18NElement
 import org.goldenport.i18n.I18NString
 import org.goldenport.xml.XhtmlUtils
@@ -13,7 +14,8 @@ import arcadia.model.SubmitKind
 
 /*
  * @since   Aug. 12, 2017
- * @version Oct. 27, 2017
+ *  version Oct. 27, 2017
+ * @version Nov. 15, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationRule(
@@ -27,7 +29,8 @@ case class WebApplicationRule(
   usecase_list: Option[WebApplicationRule.UsecaseList], // navigator
   admin_list: Option[WebApplicationRule.AdminList], // navigator
   info_list: Option[WebApplicationRule.InfoList], // footer
-  singlePageApplication: Option[WebApplicationRule.SinglePageApplication]
+  singlePageApplication: Option[WebApplicationRule.SinglePageApplication],
+  properties: Record
 ) {
   def applicationTitle(locale: Locale): NodeSeq = application_title.flatMap(_.get(locale)) getOrElse Group(Nil)
 
@@ -47,13 +50,16 @@ case class WebApplicationRule(
       usecase_list orElse rhs.usecase_list,
       admin_list orElse rhs.admin_list,
       info_list orElse rhs.info_list,
-      singlePageApplication orElse rhs.singlePageApplication
+      singlePageApplication orElse rhs.singlePageApplication,
+      properties.complements(rhs.properties)
     )
   }
 
   def complements(xs: Seq[WebApplicationRule]) = xs./:(this)(_ complement _)
 
   def submitLabel(kind: SubmitKind): I18NString = kind.label
+
+  def getString(key: String): Option[String] = properties.getString(key)
 }
 
 object WebApplicationRule {
@@ -68,7 +74,8 @@ object WebApplicationRule {
     None,
     None,
     None,
-    None
+    None,
+    Record.empty
   )
 
   case class Page(

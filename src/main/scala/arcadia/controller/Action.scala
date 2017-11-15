@@ -180,7 +180,7 @@ trait SourceSinkAction extends Action {
 
   override protected def show_Info = SeqUtils.buildTupleVector(
     "source" -> source.map(_.show),
-    "sink" -> source.map(_.show)
+    "sink" -> sink.map(_.show)
   )
 
   protected final def execute_source_sink(parcel: Parcel)(body: Source => Model): Parcel =

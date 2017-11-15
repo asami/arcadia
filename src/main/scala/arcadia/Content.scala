@@ -1,6 +1,6 @@
 package arcadia
 
-import scalaz._, Scalaz._
+import scalaz.{Node => _, _}, Scalaz._
 import scala.util.control.NonFatal
 import scala.xml._
 import scala.concurrent.duration._
@@ -12,13 +12,14 @@ import org.goldenport.record.v2.Record
 import org.goldenport.xml.{XmlUtils, XmlPrinter}
 import org.goldenport.util.SeqUtils.mkStringOption
 import org.goldenport.util.DateTimeUtils.httpDateTimeString
+import arcadia.model.ErrorModel
 
 /*
  * @since   Jul. 16, 2017
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
  *  version Oct. 27, 2017
- * @version Nov. 13, 2017
+ * @version Nov. 16, 2017
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
@@ -137,6 +138,30 @@ case class XmlContent(
     xml,
     <div><h4>===== Call Tree (XmlContent) ====</h4><pre>{p}</pre></div>
   ))
+
+  def addScriptElement(p: Elem): XmlContent = {
+    def go(x: NodeSeq): Node = x match {
+      case m: Elem =>
+        if (m.label == "html")
+          f(m)
+        else
+          m
+      case Group(ms) => Group(ms.map(go))
+      case m: Node => m
+      case m: NodeSeq => Group(m)
+    }
+    def f(x: Elem): Elem = x.copy(child = x.child :+ p).asInstanceOf[Elem]
+    xml match {
+      case m: Elem =>
+        if (m.label == "html")
+          copy(xml = f(m))
+        else
+          this
+      case Group(ms) => copy(xml = Group(ms.map(go)))
+      case m: Node => this
+      case m => this
+    }
+  }
 }
 object XmlContent {
   val empty = apply(Group(Nil))
@@ -203,7 +228,8 @@ object RedirectContent {
   def apply(p: String): RedirectContent = RedirectContent(new URI(p))
 }
 
-case class NotFoundContent(pathname: String) extends Content {
+trait ErrorContent extends Content {
+  def code: Int
   def mimetype: MimeType = MimeType.text_html
   lazy val xml: NodeSeq = Group(Nil)
   def expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
@@ -213,9 +239,16 @@ case class NotFoundContent(pathname: String) extends Content {
   def lastModified: Option[DateTime] = None
   def withExpiresPeriod(p: FiniteDuration): Content = this
   def withCode(p: Int) = this
-  def code = 404
+}
 
-  lazy val show = "NotFoundContent"
+case class ErrorModelContent(model: ErrorModel) extends ErrorContent {
+  def code = model.code
+  lazy val show = s"ErrorModelContent: $code"
+}
+
+case class NotFoundContent(pathname: String) extends ErrorContent {
+  def code = 404
+  lazy val show = s"NotFoundContent: $pathname"
 }
 
 // https://stackoverflow.com/questions/18148884/difference-between-no-cache-and-must-revalidate

@@ -20,7 +20,7 @@ import arcadia.domain._
  * @since   Aug.  1, 2017
  *  version Sep. 26, 2017
  *  version Oct. 31, 2017
- * @version Nov. 13, 2017
+ * @version Nov. 16, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -60,6 +60,31 @@ abstract class Renderer(
   }
 
   protected def generate_id() = java.util.UUID.randomUUID().toString
+
+  protected def add_javascript_in_footer(p: String): Unit = strategy.addJavaScriptInFooter(p)
+
+  protected def get_html_suffix: Option[String] = Some("html")
+  protected def make_html_uri(p: String): URI = {
+    val a = get_html_suffix.fold(p) { suffix =>
+      if (_has_suffix(p))
+        p
+      else
+        s"${p}.${suffix}"
+    }
+    new URI(a)
+  }
+
+  private def _has_suffix(p: String): Boolean =
+    (p.lastIndexOf('-'), p.lastIndexOf('.')) match {
+      case (-1, -1) => false
+      case (-1, r) => true
+      case (l, r) => r > l
+    }
+
+  // TODO customizable
+  protected def button_search = I18NString("Search", "検索").apply(locale)
+  protected def placeholder_start = I18NString("Start", "開始").apply(locale)
+  protected def placeholder_end = I18NString("End", "終了").apply(locale)
 
   protected def render_html = <html>{render_head}{render_body}</html>
   protected def render_head = <head>
@@ -138,7 +163,7 @@ abstract class Renderer(
     (
       p.getConcreteString(KEY_DOMAIN_OBJECT_HREF_BASE) orElse
       p.getConcreteString(KEY_DOMAIN_OBJECT_ENTITYTYPE)
-    ).map(new URI(_))
+    ).map(make_html_uri)
 
   protected def get_link(table: Table, rec: Record): Option[DomainEntityLink] = {
     val id = DomainEntityId.get(rec, table.entityType)
@@ -163,12 +188,15 @@ abstract class Renderer(
   }
 
   protected def table_data_url(p: Table, record: Record): Option[DomainEntityLink] = {
-    def base = (p.dataHref.map(x => StringUtils.toPathnameBody(x.toString)) orElse p.entityType.map(_.v)).map(x => new URI(x)) orElse {
+    def base = (p.dataHref.map(x => StringUtils.toPathnameBody(x.toString)) orElse p.entityType.map(_.v)).map(make_html_uri) orElse {
       _get_href_base(record)
     }
     DomainEntityId.get(record, p.entityType).map(id =>
       DomainEntityLink(id, base))
   }
+
+  protected final def table_data_url_string(p: Table, record: Record): Option[String] =
+    table_data_url(p, record).map(_.dataHref(strategy.renderContext).toString)
 
   protected def tabular(schema: Option[Schema], records: Seq[Record]): NodeSeq =
     schema.fold(tabular(records))(tabular(_, records))
@@ -313,10 +341,10 @@ abstract class Renderer(
     table_record(Table(kind, strategy.size, schema), record)
 
   protected def table_record_standard(p: Table, record: Record): Elem = {
-    val attrs = SeqUtils.buildTupleVector(
+    val attrs: Vector[(String, String)] = SeqUtils.buildTupleVector(
       Vector(
         "class" -> theme_table.css.getTbodyTr(p),
-        "data-href" -> table_data_url(p, record)
+        "data-href" -> table_data_url_string(p, record)
       )
     )
     val children = for (c <- p.schema.columns) yield {
@@ -329,7 +357,7 @@ abstract class Renderer(
     val attrs = SeqUtils.buildTupleVector(
       Vector(
         "class" -> theme_table.css.getTbodyTr(p),
-        "data-href" -> table_data_url(p, record)
+        "data-href" -> table_data_url_string(p, record)
       )
     )
     val icon: Picture = picture_icon(record)
@@ -463,7 +491,7 @@ abstract class Renderer(
   protected def table_value_link(p: Any): Node = {
     val x = p.toString
     val s = try {
-      val a = new URI(x)
+      val a = make_html_uri(x)
       StringUtils.pathLastComponentBody(a.getPath())
     } catch {
       case NonFatal(e) => x
@@ -593,20 +621,118 @@ abstract class Renderer(
   ): NodeSeq =
     strategy.theme match {
       case m: Bootstrap4RenderThemaBase => 
-        property_input_form_bootstrap(action, method, schema, record, hidden, submits)
+        property_input_form_bootstrap(
+          InputForm(action, method, schema, record, hidden, submits))
       case m =>
         property_input_form_table(action, method, schema, record, hidden, submits)
     }
 
-  protected def property_input_form_bootstrap(
-    action: URI,
-    method: Method,
-    schema: Schema,
-    record: Record,
-    hidden: Hidden,
-    submits: Submits
-  ): NodeSeq = {
-    property_input_form_table(action, method, schema, record, hidden, submits) // TODO
+  protected def property_input_form_bootstrap(p: InputForm): NodeSeq = {
+    <div class="container">
+    <form method="GET" action="">{
+      val a = for (c <- p.schema.columns) yield property_input_form_item_bootstrap(p, c)
+      a ++ List(
+        <div class="form-group row justify-content-center">{
+          for (s <- p.submits.submits) yield {
+            <div class="col-2">
+            <button type="submit" class="btn btn-default btn-lg btn-block" name={s.name} value={s.value(strategy.locale)}>{s.value(strategy.locale)}</button>
+            </div>
+          }
+        }</div>
+      )
+    }</form>
+    </div>
+  }
+
+  protected def property_input_form_item_bootstrap(p: InputForm, c: Column): Elem =
+    c.datatype match {
+      case XDateTime => _property_input_form_item_datetime_bootstrap(p, c)
+      case m: XPowertype => _property_input_form_item_powertype_bootstrap(p, c, m)
+      case XImageLink => _property_input_form_item_imagelink_bootstrap(p, c)
+      case XFile => _property_input_form_item_file_bootstrap(p, c)
+      case _ => _property_input_form_item_bootstrap(p, c)
+    }
+
+  private def _property_input_form_item_datetime_bootstrap(p: InputForm, c: Column): Elem = {
+    val id = generate_id()
+    val idproperty = generate_id()
+    val property = c.name
+    add_javascript_in_footer("""
+        $('#%s').datetimepicker({
+          autoclose: true,
+          todayBtn: true,
+          language: 'ja'
+        });
+      """.format(idproperty)
+    )
+    <div class="form-group row">
+    <label class="col-form-label col-sm-2" for={id}>{c.label(locale)}:</label>
+    <div class="input-group date col-sm-5" id={idproperty}>{
+      List(
+        XmlUtils.appendAttributes(
+          <input type="text" name={property} class="form-control" id={id} />,
+          "placeholder" -> None
+        ),
+        <span class="input-group-addon">
+          <i class="fa fa-times"/>
+          <i class="fa fa-calendar"/>
+        </span>
+      )
+    }</div>
+    </div>
+  }
+
+  private def _property_input_form_item_powertype_bootstrap(p: InputForm, c: Column, pt: XPowertype): Elem = {
+    val id = generate_id()
+    <div class="form-group row">
+    <label class="control-label col-sm-2" for={id}>{c.label(locale)}:</label>
+    <div class="col-sm-10">
+    <select class="custom-select" id={id}>{
+      List(
+        c.form.placeholder.map(x =>
+          <option selected="">{x}</option>
+        ).getOrElse(Group(Nil)),
+        for (t <- pt.powertype.elements) yield {
+          <option value={t.name}>t.label</option>
+        }
+      )
+    }
+    </select>
+    </div>
+    </div>
+  }
+
+  private def _property_input_form_item_imagelink_bootstrap(p: InputForm, c: Column): Elem = {
+    val id = generate_id()
+    <div class="form-group row">
+    <label class="control-label col-sm-2" for={id}>{c.label(locale)}:</label>
+    <div class="col-sm-10">
+      <input type="file" class="form-control" id={id} name={c.name} />
+    </div>
+    </div>
+  }
+
+  private def _property_input_form_item_file_bootstrap(p: InputForm, c: Column): Elem = {
+    val id = generate_id()
+    <div class="form-group row">
+    <label class="control-label col-sm-2" for={id}>{c.label(locale)}:</label>
+    <div class="col-sm-10">
+      <input type="file" class="form-control" id={id} name={c.name} />
+    </div>
+    </div>
+  }
+
+  private def _property_input_form_item_bootstrap(p: InputForm, c: Column): Elem = {
+    val id = generate_id()
+    <div class="form-group row">
+    <label class="control-label col-sm-2" for={id}>{c.label(locale)}:</label>
+    <div class="col-sm-10">{
+      XmlUtils.appendAttributes(
+        <input type={_form_type(c)} class="form-control" id={id} name={c.name} />,
+        "placeholder" -> c.form.placeholder.map(_(locale))
+      )
+    }</div>
+    </div>
   }
 
   protected def property_input_form_table(
@@ -701,15 +827,20 @@ abstract class Renderer(
     </form>
   }
 
+  // Bootstrap4
   protected def searchbox_form(p: SearchBox): Elem = {
-    <form class="form-horizontal" method="GET">{
-      for (c <- p.schema.columns) yield searchbox_form_item(p, c)
-      <div class="form-group">
-      <div class="col-sm-offset-2 col-sm-10">
-      <button type="submit" class="btn btn-default">Submit</button>
-      </div>
-      </div>
+    <div class="container">
+    <form method="GET">{
+      val a = for (c <- p.schema.columns) yield searchbox_form_item(p, c)
+      a ++ List(
+        <div class="form-group row justify-content-center">
+        <div class="col">
+        <button type="submit" class="btn btn-default btn-lg btn-block">{button_search}</button>
+        </div>
+        </div>
+      )
     }</form>
+    </div>
   }
 
   protected def searchbox_form_item(p: SearchBox, c: Column): Elem =
@@ -725,45 +856,52 @@ abstract class Renderer(
     val startproperty = s"${c.name}.start"
     val idend = generate_id()
     val endproperty = s"${c.name}.end"
-    <div class="form-group">
-    <label class="control-label col-sm-2" for={id}>c.label(locale):</label>
-    <div class="input-group date col-sm-10" id={idstart}>
-    XmlUtils.appendAttributes(
-      <input type={_form_type(c)} name={startproperty} class="form-control" id={id} />,
-      placeholder -> c.form.placeholder
+    add_javascript_in_footer("""
+        $('#%s').datetimepicker({
+          autoclose: true,
+          todayBtn: true,
+          language: 'ja'
+        });
+        $('#%s').datetimepicker({
+          autoclose: true,
+          todayBtn: true,
+          language: 'ja'
+        });
+      """.format(idstart, idend)
     )
-    <span class="input-group-addon">
-    <span class="glyphicon glyphicon-calendar"></span>
-    </span>
-    </div>
-    <div class="input-group date col-sm-10" id={idend}>
-    XmlUtils.appendAttributes(
-      <input type={_form_type(c)} name={endproperty} class="form-control" id={id} />,
-      placeholder -> c.form.placeholder
-    )
-    <span class="input-group-addon">
-    <span class="glyphicon glyphicon-calendar"></span>
-    </span>
-    </div>
-    <script type="text/javascript">{"""
-      $(function () {
-        $('#{%s}').datetimepicker(
-          locale: 'ja'
-        );
-      });
-      $(function () {
-        $('#{%s}').datetimepicker(
-          locale: 'ja'
-        );
-      });""".format(idstart, idend)
-    }</script>
+    <div class="form-group row">
+    <label class="col-form-label col-sm-2" for={id}>{c.label(locale)}:</label>
+    <div class="input-group date col-sm-5" id={idstart}>{
+      List(
+        XmlUtils.appendAttributes(
+          <input type="text" name={startproperty} class="form-control" id={id} />,
+          "placeholder" -> Some(placeholder_start)
+        ),
+        <span class="input-group-addon">
+          <i class="fa fa-times"/>
+          <i class="fa fa-calendar"/>
+        </span>
+      )
+    }</div>
+    <div class="input-group date col-sm-5" id={idend}>{
+      List(
+        XmlUtils.appendAttributes(
+          <input type="text" name={endproperty} class="form-control" id={id} />,
+          "placeholder" -> Some(placeholder_end)
+        ),
+        <span class="input-group-addon">
+          <i class="fa fa-times"/>
+          <i class="fa fa-calendar"/>
+        </span>
+      )
+    }</div>
     </div>
   }
 
   private def _searchbox_form_item_powertype(p: SearchBox, c: Column, pt: XPowertype): Elem = {
     val id = generate_id()
-    <div class="form-group">
-    <label class="control-label col-sm-2" for={id}>c.label(locale):</label>
+    <div class="form-group row">
+    <label class="control-label col-sm-2" for={id}>{c.label(locale)}:</label>
     <div class="col-sm-10">
     <select class="custom-select" id={id}>{
       List(
@@ -782,14 +920,14 @@ abstract class Renderer(
 
   private def _searchbox_form_item(p: SearchBox, c: Column): Elem = {
     val id = generate_id()
-    <div class="form-group">
-    <label class="control-label col-sm-2" for={id}>c.label(locale):</label>
-    <div class="col-sm-10">
-    XmlUtils.appendAttributes(
-      <input type={_form_type(c)} class="form-control" id={id} />,
-      "placeholder" -> c.form.placeholder
-    )
-    </div>
+    <div class="form-group row">
+    <label class="control-label col-sm-2" for={id}>{c.label(locale)}:</label>
+    <div class="col-sm-10">{
+      XmlUtils.appendAttributes(
+        <input type={_form_type(c)} class="form-control" id={id} name={c.name} />,
+        "placeholder" -> c.form.placeholder.map(_(locale))
+      )
+    }</div>
     </div>
   }
 
@@ -827,28 +965,59 @@ abstract class Renderer(
     strategy.theme match {
       case m if (m.isGridDiv) => grid_div(ps)(f)
       case m if (m.isGridTable) => grid_table(ps)(f)
-      case m: Bootstrap4RenderThemaBase => grid_bootstrap(ps)(f)
-      case m: Bootstrap3RenderThemaBase => grid_bootstrap(ps)(f)
+      case m: Bootstrap4RenderThemaBase => grid_bootstrap4(ps)(f)
+      case m: Bootstrap3RenderThemaBase => grid_bootstrap3(ps)(f)
       case m => grid_table(ps)(f)
     }
 
   protected def grid_with_content_bootstrap[T](ps: List[T])(f: T => NodeSeq): Elem =
     strategy.theme match {
-      case m: Bootstrap4RenderThemaBase => grid_bootstrap(ps)(f)
-      case m: Bootstrap3RenderThemaBase => grid_bootstrap(ps)(f)
+      case m: Bootstrap4RenderThemaBase => grid_bootstrap4(ps)(f)
+      case m: Bootstrap3RenderThemaBase => grid_bootstrap3(ps)(f)
       case m => grid_table(ps)(f)
     }
 
-  // bootstrap 3/4
-  protected def grid_bootstrap[T](ps: List[T])(f: T => NodeSeq): Elem = {
+  protected def grid_bootstrap4[T](ps: List[T])(f: T => NodeSeq): Elem = {
     val g = strategy.gridContext
     val w = g.width
-    val sxcolumns = g.ncolumns.get(PhoneScreen)
-    val smcolumns = g.ncolumns.get(TabletScreen)
-    val mdcolumns = g.ncolumns.get(DesktopScreen)
-    val lgcolumns = g.ncolumns.get(LargeScreen)
+    val xscolumns = g.ncolumns.get(PhoneScreen) // < 576px
+    val smcolumns = g.ncolumns.get(PhabletScreen) // >= 576px
+    val mdcolumns = g.ncolumns.get(TabletScreen) // >= 768px
+    val lgcolumns = g.ncolumns.get(LaptopScreen) // >= 992px
+    val xlcolumns = g.ncolumns.get(DesktopScreen) // >= 1200px
     val colclass = Vector(
-      sxcolumns.map(x => s"col-sx-${w / x}"),
+      xscolumns.map(x => s"col-${w / x}"),
+      smcolumns.map(x => s"col-sm-${w / x}"),
+      mdcolumns.map(x => s"col-md-${w / x}"),
+      lgcolumns.map(x => s"col-lg-${w / x}"),
+      xlcolumns.map(x => s"col-xl-${w / x}")
+    ).flatten.mkString(" ")
+    <div class="container"> { // container-fluid
+      for (row <- ps.grouped(w)) yield {
+        val rowclass = if (g.isNoGutters)
+          "row no-gutters"
+        else
+          "row"
+        <div class={rowclass}> {
+          for (x <- row) yield {
+            <div class={colclass}> {
+              f(x)
+            } </div>
+          }
+        } </div>
+      }
+    } </div>
+  }
+
+  protected def grid_bootstrap3[T](ps: List[T])(f: T => NodeSeq): Elem = {
+    val g = strategy.gridContext
+    val w = g.width
+    val xscolumns = g.ncolumns.get(PhoneScreen) // < 768px
+    val smcolumns = g.ncolumns.get(PhabletScreen) // >= 768px
+    val mdcolumns = g.ncolumns.get(TabletScreen) // >= 992px
+    val lgcolumns = g.ncolumns.get(LaptopScreen) orElse g.ncolumns.get(DesktopScreen) // >= 1200px
+    val colclass = Vector(
+      xscolumns.map(x => s"col-xs-${w / x}"),
       smcolumns.map(x => s"col-sm-${w / x}"),
       mdcolumns.map(x => s"col-md-${w / x}"),
       lgcolumns.map(x => s"col-lg-${w / x}")
@@ -1008,7 +1177,7 @@ abstract class Renderer(
           "src" -> p.src.toString
         ),
         Vector(
-          "alt" -> p.alt.map(node)
+          "alt" -> p.alt.map(node).map(_.text)
         )
       ),
       Nil
@@ -1169,7 +1338,7 @@ abstract class Renderer(
     isCaption: Boolean = true
   ): Elem = {
     val id = generate_id
-    <div id={s"$id"} class="carousel slide w-50 ml-auto mr-auto" data-ride="carousel">
+    <div id={s"$id"} class="carousel slide w-100 ml-auto mr-auto" data-ride="carousel">
       {
         if (isIndicator)
           <ol class="carousel-indicators" role="listbox"> {
@@ -1226,15 +1395,7 @@ abstract class Renderer(
       _banner(ps)
 
   private def _banner(ps: List[Picture]): Elem = {
-    val width = ps.length match {
-      case 0 => 1
-      case 1 => 12
-      case 2 => 6
-      case 3 => 4
-      case 4 => 3
-      case _ => 3
-    }
-    val g = GridContext.banner.withTabletColumns(width)
+    val g = GridContext.banner.withTabletColumns(ps.length)
     val s: RenderStrategy = strategy.withCardKind(ImageCard).withGridContext(g)
     execute(s)(_.grid_with_content_bootstrap(ps)(picture(_)))
   }
@@ -1253,7 +1414,7 @@ abstract class Renderer(
         "src" -> p.src.toString
       ),
       Vector(
-        "alt" -> p.alt.map(node)
+        "alt" -> p.alt.map(node).map(_.text)
       )
     ),
     Nil
@@ -1384,6 +1545,15 @@ object Renderer {
   case class TableColumnWithRecord(
     tableColumn: TableColumn,
     record: Record
+  )
+
+  case class InputForm(
+    action: URI,
+    method: Method,
+    schema: Schema,
+    record: Record,
+    hidden: Hidden,
+    submits: Submits
   )
 
   case class SearchBox(

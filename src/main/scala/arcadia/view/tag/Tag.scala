@@ -5,6 +5,7 @@ import scala.xml._
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
 import org.goldenport.xml.XmlUtils
+import org.goldenport.record.v2.{Schema, Column}
 import org.goldenport.trace.Result
 import arcadia._
 import arcadia.context._
@@ -13,7 +14,7 @@ import arcadia.model._
 
 /*
  * @since   Oct. 11, 2017
- * @version Nov. 14, 2017
+ * @version Nov. 15, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -107,22 +108,28 @@ case object DetailTag extends Tag with SelectByName {
 
 case object SearchBoxTag extends Tag with SelectByName {
   val name = "searchbox"
-
+  // keywords, created_at, updated_at, publish_at,
+  // public_at, close_at, start_at, end_at
   protected def eval_Expression(p: Expression): XmlContent = {
-    val columns = p.getStringList("column")
-    // keywords
-    // created_at
-    // updated_at
-    // publish_at
-    // public_at
-    // close_at
-    // start_at
-    // end_at
-    val model = p.effectiveModel match {
-      case m: SearchBoxModel => m // .withSchemaKind(column, GridTable)
-      case m => m
+    def defaults = Vector("keywords")
+    val columns = p.getStringList("column").map {
+      case Nil => defaults
+      case xs => xs // TODO parse column
+    }.getOrElse {
+      defaults
     }
-    // p.withTable(GridTable).withCard(card).applyModel(model)
+    val model = p.effectiveModel match {
+      case m: SearchBoxModel => m
+      case m => p.parcel.execute { context =>
+        val a = columns.map(x =>
+          context.
+            getDefaultPropertyColumn(x).
+            getOrElse(Column(x))
+        )
+        val schema = Schema(a)
+        SearchBoxModel(schema)
+      }
+    }
     p.applyModel(model)
   }
 }

@@ -19,7 +19,7 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
- * @version Nov. 14, 2017
+ * @version Nov. 16, 2017
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -126,6 +126,7 @@ case class Parcel(
   def goOrigin: Parcel = RAISE.notImplementedYetDefect
   def goError(e: Throwable): Parcel = withModel(ErrorModel.create(this, e))
   def goError(s: String): Parcel = withModel(ErrorModel.create(this, s))
+  def goNotFound(s: String): Parcel = withModel(ErrorModel.notFound(this, s))
   def goUnknownEvent(p: scenario.Event): Parcel = withModel(ErrorModel.create(this, p))
 
   def inputQueryParameters: Record = context.map(_.inputQueryParameters) getOrElse Record.empty
