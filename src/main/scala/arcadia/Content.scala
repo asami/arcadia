@@ -19,11 +19,12 @@ import arcadia.model.ErrorModel
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
  *  version Oct. 27, 2017
- * @version Nov. 16, 2017
+ * @version Nov. 17, 2017
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
   def mimetype: MimeType
+  def contenttype: String = mimetype.name
   def expiresKind: Option[ExpiresKind]
   def expiresPeriod: Option[FiniteDuration]
   def proxyExpiresPeriod: Option[FiniteDuration]
@@ -62,6 +63,9 @@ sealed trait Content {
   def addCallTree(p: String): Content = this
 
   def show: String
+
+  protected final def to_contenttype(charset: Option[String]) =
+    charset.fold(mimetype.name)(x => s"${mimetype.name}; charset=$x")
 }
 object Content {
 }
@@ -82,6 +86,7 @@ case class StringContent(
 
   lazy val show = "StringContent"
 
+  override def contenttype = to_contenttype(charset)
   override def asXml: NodeSeq = try {
     XmlUtils.parseNodeSeq(string)
   } catch {
