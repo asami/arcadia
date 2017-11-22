@@ -19,7 +19,7 @@ import arcadia.domain._
 
 /*
  * @since   Oct. 29, 2017
- * @version Nov. 13, 2017
+ * @version Nov. 22, 2017
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -71,7 +71,12 @@ object TitleLine {
 case class Picture( // HTML5 picture
   // TODO source
   // TODO map/area
-  src: URI,
+  src: URI, // (1280)
+  src_l: Option[URI], // 1280
+  src_m: Option[URI], // 640
+  src_s: Option[URI], // 320
+  src_xs: Option[URI], // 160
+  src_raw: Option[URI],
   alt: Option[I18NString],
   href: Option[URI],
   size: Option[Int],
@@ -80,11 +85,17 @@ case class Picture( // HTML5 picture
   caption: Option[I18NElement],
   description: Option[I18NElement]
 ) extends Particle {
-  def srcString = src.toString
-  def altString(locale: Locale): String = alt.map(_.as(locale)).getOrElse("")
+  // def srcString = src.toString
+  lazy val img = src.toString
+  lazy val l = (src_l getOrElse src).toString
+  lazy val m = (src_m orElse src_l getOrElse src).toString
+  lazy val s = (src_s orElse src_m orElse src_l getOrElse src).toString
+  lazy val xs = (src_xs orElse src_s orElse src_m orElse src_l getOrElse src).toString
+  // def altString(locale: Locale): String = alt(locale)
+  def alt(locale: Locale): String = alt.map(_.as(locale)).getOrElse("")
 }
 object Picture {
-  def create(src: URI): Picture = Picture(src, None, None, None, None, None, None, None)
+  def create(src: URI): Picture = Picture(src, None, None, None, None, None, None, None, None, None, None, None, None)
 
   def parseList(p: String): List[Picture] = Particle.parseParticleList(p) match {
     case JsSuccess(xs, _) => xs.collect {

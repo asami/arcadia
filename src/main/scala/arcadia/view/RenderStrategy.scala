@@ -22,7 +22,7 @@ import arcadia.view.ViewEngine._
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
- * @version Nov. 16, 2017
+ * @version Nov. 22, 2017
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -233,6 +233,7 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
       def tbodyTd(p: Renderer.TableColumn) = table_CssClass_TbodyTd(p)
       def tfootTr(p: Renderer.Table) = table_CssClass_TfootTr(p)
       def tfootTd(p: Renderer.TableColumn) = table_CssClass_TfootTd(p)
+      def img(p: TableKind) = table_CssClass_Img(p)
     }
   }
   object grid {
@@ -315,6 +316,7 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
   protected def table_CssClass_TbodyTd(p: Renderer.TableColumn): String = ""
   protected def table_CssClass_TfootTr(p: Renderer.Table): String = ""
   protected def table_CssClass_TfootTd(p: Renderer.TableColumn): String = ""
+  protected def table_CssClass_Img(p: TableKind): String = ""
 
   protected def grid_CssClass_Table_Container: String = ""
   protected def grid_CssClass_Table_Table: String = ""
@@ -551,10 +553,10 @@ case object ImageTitleContentCard extends CardKind {
   def isContent: Boolean = true
 }
 case class ComponentCard(name: String) extends CardKind {
-  def isImageTop: Boolean = false
-  def isHeader: Boolean = false
-  def isFooter: Boolean = false
-  def isContent: Boolean = false
+  def isImageTop: Boolean = true
+  def isHeader: Boolean = true
+  def isFooter: Boolean = true
+  def isContent: Boolean = true
 }
 case class BrokenCard(m: String) extends CardKind {
   val name = "broken"

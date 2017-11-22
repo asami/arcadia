@@ -20,7 +20,7 @@ import arcadia.domain._
  * @since   Aug.  1, 2017
  *  version Sep. 26, 2017
  *  version Oct. 31, 2017
- * @version Nov. 16, 2017
+ * @version Nov. 22, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -383,12 +383,12 @@ abstract class Renderer(
     table_data(p.tableColumn(column), record)
 
   protected def table_data(p: TableColumn, record: Record): Elem =
-    <td class={theme_table.css.tbodyTd(p)}>{table_value(p.column, record)}</td>
+    <td class={theme_table.css.tbodyTd(p)}>{table_value(p, record)}</td>
 
   protected def table_data(p: TableColumn, v: ValueModel): Elem =
     <td class={theme_table.css.tbodyTd(p)}>{table_value(v)}</td>
 
-  protected def table_value(column: Column, record: Record): Node =
+  protected def table_value(column: TableColumn, record: Record): Node =
     get_table_value(column, record).getOrElse(Text(""))
 
   protected def table_value(v: ValueModel): Node = v match {
@@ -406,23 +406,24 @@ abstract class Renderer(
       case XTime => table_value_time(v)
       case XEverforthid => table_value_everforthid(v)
       case XLink => table_value_link(v)
-      case XImageLink => table_value_image_link(v)
+      case XImageLink => table_value_img(v)
       case XHtml => table_value_html(v)
       case _ => table_value_string(v)
     }
 
-  protected def get_table_value(column: Column, record: Record): Option[Node] = {
+  protected def get_table_value(column: TableColumn, record: Record): Option[Node] = {
     // TODO datetime formatting
-    column.datatype match {
-      case XDateTime => table_get_value_datetime(column, record)
-      case XDate => table_get_value_date(column, record)
-      case XTime => table_get_value_time(column, record)
-      case XEverforthid => table_get_value_everforthid(column, record)
-      case XLink => table_get_value_link(column, record)
-      case XImageLink => table_get_value_image_link(column, record)
-      case XHtml => table_get_value_html(column, record)
-      case XText => table_get_value_text(column, record)
-      case _ => table_get_value_string(column, record)
+    val c = column.column
+    c.datatype match {
+      case XDateTime => table_get_value_datetime(c, record)
+      case XDate => table_get_value_date(c, record)
+      case XTime => table_get_value_time(c, record)
+      case XEverforthid => table_get_value_everforthid(c, record)
+      case XLink => table_get_value_link(c, record)
+      case XImageLink => table_get_value_img(column, record)
+      case XHtml => table_get_value_html(c, record)
+      case XText => table_get_value_text(c, record)
+      case _ => table_get_value_string(c, record)
     }
   }
 
@@ -449,6 +450,9 @@ abstract class Renderer(
 
   protected def table_get_value_image_link(column: Column, record: Record): Option[Node] =
     record.getFormOne(column.name).map(table_value_image_link)
+
+  protected def table_get_value_img(column: TableColumn, record: Record): Option[Node] =
+    record.getFormOne(column.name).map(table_value_img(column, _))
 
   protected def table_get_value_html(column: Column, record: Record): Option[Node] =
     record.getFormString(column.name).map(table_value_html)
@@ -525,6 +529,32 @@ abstract class Renderer(
     <span data-toggle="tooltip" title={src}>{s}</span>
   }
 
+  protected def table_value_img(column: TableColumn, p: Any): Node = p match {
+    case m: String => table_value_img_string(column, m)
+    case m: URI => table_value_img_uri(column, m)
+    case m: URL => table_value_img_url(column, m)
+    case m: Picture => table_value_img_picture(column, m)
+    case m => table_value_img_string(column, m.toString)
+  }
+
+  protected def table_value_img_string(column: TableColumn, p: String): Node =
+    table_value_img_uri(new URI(p))
+
+  protected def table_value_img_url(column: TableColumn, p: URL): Node =
+    table_value_img_uri(p.toURI)
+
+  protected def table_value_img_uri(column: TableColumn, p: URI): Node =
+    <img src={p.toString}></img>
+
+  protected def table_value_img_picture(column: TableColumn, p: Picture): Node = {
+    val alt: String = p.alt.map(string).getOrElse("")
+    val src = column.kind match {
+      case PropertyTable => p.l
+      case _ => p.xs
+    }
+    <img class={theme_table.css.img(strategy.tableKind)} src={src} alt={alt}></img>
+  }
+
   protected def table_value_img(p: Any): Node = p match {
     case m: String => table_value_img_string(m)
     case m: URI => table_value_img_uri(m)
@@ -544,8 +574,11 @@ abstract class Renderer(
 
   protected def table_value_img_picture(p: Picture): Node = {
     val alt: String = p.alt.map(string).getOrElse("")
-    val style = "width: 256px" // TODO media
-    <img src={p.src.toString} alt={alt} style={style}></img>
+    val src = strategy.tableKind match {
+      case PropertyTable => p.l
+      case _ => p.xs
+    }
+    <img class={theme_table.css.img(strategy.tableKind)} src={src} alt={alt}></img>
   }
 
   protected def table_value_html(p: Any): Node = p match {
@@ -1356,7 +1389,7 @@ abstract class Renderer(
         for ((x, i) <- ps.zipWithIndex) yield {
           val c = if (i == 0) "carousel-item active" else "carousel-item"
           <div class={c}>
-  	    <img class="d-block w-100" src={x.srcString} alt={x.altString(locale)}></img>
+  	    <img class="d-block w-100" src={x.l} alt={x.alt(locale)}></img>
             {
               if (!isCaption || (x.caption.isEmpty && x.description.isEmpty))
                 Group(Nil)
@@ -1540,7 +1573,10 @@ object Renderer {
     kind: TableKind,
     size: RenderSize,
     column: Column
-  )
+  ) {
+    def name = column.name
+    def datatype = column.datatype
+  }
 
   case class TableColumnWithRecord(
     tableColumn: TableColumn,
