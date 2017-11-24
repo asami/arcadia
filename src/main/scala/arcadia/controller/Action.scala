@@ -331,11 +331,12 @@ case class ReadEntityListAction(
     )
     val queryparams = parcel.inputQueryParameters
     // srcparams > queryparams (> srcparams) > query
-    val q = Query(
-      DomainEntityType(entity),
-      parameters = query.map(Record.create).getOrElse(Record.empty)
-    ).withParameter(queryparams)
-      .withParameter(srcparams)
+    // val q = Query(
+    //   DomainEntityType(entity),
+    //   parameters = query.map(Record.create).getOrElse(Record.empty)
+    val q = Query.create(entity, query).
+      withParameter(queryparams).
+      withParameter(srcparams)
     val r0 = context.readEntityList(q)
     val r = r0.withDataHref(data_href)
     set_sink(parcel)(r)

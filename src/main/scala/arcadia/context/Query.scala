@@ -8,7 +8,7 @@ import arcadia.domain._
 
 /*
  * @since   Oct.  8, 2017
- * @version Nov.  3, 2017
+ * @version Nov. 23, 2017
  * @author  ASAMI, Tomoharu
  */
 case class Query(
@@ -31,4 +31,11 @@ case class Query(
 //      val ts = params.getEagerStringList('tags) getOrElse tags
       Query(et, s, l, ml, parameters + params)
     }
+}
+
+object Query {
+  def create(entity: String, params: Option[Map[String, Any]]): Query = {
+    val a = Query(DomainEntityType(entity))
+    params.map(x => a.withParameter(Record.create(x))).getOrElse(a)
+  }
 }
