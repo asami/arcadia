@@ -20,7 +20,8 @@ import arcadia.domain._
  * @since   Aug.  1, 2017
  *  version Sep. 26, 2017
  *  version Oct. 31, 2017
- * @version Nov. 22, 2017
+ *  version Nov. 22, 2017
+ * @version Dec. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -148,6 +149,14 @@ abstract class Renderer(
       "call_tree" -> trace.map(_.showTree)
     )
     property_sheet(schema, rec)
+  }
+
+  protected def widget(p: WidgetModel): NodeSeq = {
+    val r = strategy.viewContext.flatMap { x =>
+      val a = x.parcel.withModel(p)
+      strategy.viewContext.flatMap(_.engine.renderComponentOption(a))
+    }
+    r.getOrElse(<div class="arcaida_warning">{s"No widget ${p.name}"}</div>)
   }
 
   protected def text(p: String): Text = Text(p)

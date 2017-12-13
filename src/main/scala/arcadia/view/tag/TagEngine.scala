@@ -14,7 +14,8 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
 /*
  * @since   Sep. 30, 2017
  *  version Oct. 31, 2017
- * @version Nov. 14, 2017
+ *  version Nov. 14, 2017
+ * @version Dec. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -91,7 +92,8 @@ object Tags {
     CarouselTag,
     BadgeTag,
     ModelTag,
-    ErrorTag
+    ErrorTag,
+    WidgetTag
   ))
 }
 
@@ -106,7 +108,7 @@ case class Expression(
   def get(key: String): Option[String] = XmlUtils.getAttribute(elem, key)
   def getStringList(key: String): Option[List[String]] = get(key).map(Strings.totokens)
   def take(key: String): String = get(key) getOrElse {
-    RAISE.notImplementedYetDefect // TODO
+    RAISE.missingPropertyFault(key)
   }
   def take(key: String, d: String): String = get(key) | d
 

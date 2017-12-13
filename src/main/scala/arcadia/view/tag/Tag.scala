@@ -14,7 +14,8 @@ import arcadia.model._
 
 /*
  * @since   Oct. 11, 2017
- * @version Nov. 15, 2017
+ *  version Nov. 15, 2017
+ * @version Dec. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -59,6 +60,16 @@ case object ModelTag extends Tag with SelectByName {
 
   protected def eval_Expression(p: Expression): XmlContent = {
     p.applyModel
+  }
+}
+
+case object WidgetTag extends Tag with SelectByName {
+  val name = "widget"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val name = p.take("name")
+    val model = WidgetModel(name, p)
+    p.applyModel(model)
   }
 }
 

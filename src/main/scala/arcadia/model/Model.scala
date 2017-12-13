@@ -13,7 +13,7 @@ import arcadia._
 import arcadia.context._
 import arcadia.view._
 import arcadia.view.ViewEngine._
-import arcadia.view.tag.Tag
+import arcadia.view.tag.{Tag, Expression}
 import arcadia.scenario.Event
 import arcadia.domain._
 
@@ -22,7 +22,8 @@ import arcadia.domain._
  *  version Aug. 30, 2017
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
- * @version Nov. 13, 2017
+ *  version Nov. 13, 2017
+ * @version Dec. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -263,6 +264,21 @@ object AutoModel extends ModelClass {
     else
       None
   }
+}
+
+case class WidgetModel(
+  name: String,
+  expression: Expression,
+  expiresKind: Option[ExpiresKind] = None
+) extends Model with IComponentModel {
+  override val featureName = s"widget__$name"
+  def toRecord: Record = RAISE.notImplementedYetDefect
+  override protected def view_Bindings(strategy: RenderStrategy) = Map(
+    PROP_VIEW_WIDGET -> ViewWidget(WidgetModel.this, strategy)
+  )
+  def render(strategy: RenderStrategy) = new Renderer(strategy) {
+    protected def render_Content: NodeSeq = widget(WidgetModel.this)
+  }.apply
 }
 
 case class IndexModel(

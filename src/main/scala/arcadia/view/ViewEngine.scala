@@ -18,7 +18,8 @@ import arcadia.model.{Model, ErrorModel}
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
  *  version Oct. 31, 2017
- * @version Nov. 15, 2017
+ *  version Nov. 15, 2017
+ * @version Dec. 13, 2017
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -243,6 +244,7 @@ object ViewEngine {
   final val PROP_VIEW_CARD = "card"
   final val PROP_VIEW_RECORD = "record"
   final val PROP_VIEW_RECORDS = "records"
+  final val PROP_VIEW_WIDGET = "widget"
 
   case class Rule(
     theme: Option[RenderTheme],
