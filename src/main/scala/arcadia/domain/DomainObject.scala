@@ -4,12 +4,14 @@ import java.net.URI
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2.Record
 import org.goldenport.values.ResourceName
+import arcadia.model.Picture
 
 /*
  * @since   Aug. 30, 2017
  *  version Sep. 20, 2017
  *  version Oct. 24, 2017
- * @version Nov.  5, 2017
+ *  version Nov.  5, 2017
+ * @version Dec. 17, 2017
  * @author  ASAMI, Tomoharu
  */
 trait DomainObject {
@@ -17,19 +19,20 @@ trait DomainObject {
   def name: String
   def title: Option[String]
   def content: Option[String]
-  def imageIcon: Option[URI]
-  def imagePrimary: Option[URI]
+  def imageIcon: Option[Picture]
+  def imagePrimary: Option[Picture]
+  def record: Record
 }
 
-case class RecordDomainObject(rec: Record) extends DomainObject {
-  def id: DomainObjectId = DomainObjectId.get(rec).getOrElse {
+case class RecordDomainObject(record: Record) extends DomainObject {
+  def id: DomainObjectId = DomainObjectId.get(record).getOrElse {
     RAISE.notImplementedYetDefect
   }
-  def name: String = rec.getString(KEY_DOMAIN_OBJECT_NAME) getOrElse ""
-  def title: Option[String] = rec.getString(KEY_DOMAIN_OBJECT_TITLE)
-  def content: Option[String] = rec.getString(KEY_DOMAIN_OBJECT_CONTENT)
-  def imageIcon: Option[URI] = rec.getUri(KEY_DOMAIN_OBJECT_IMAGE_ICON)
-  def imagePrimary: Option[URI] = rec.getUri(KEY_DOMAIN_OBJECT_IMAGE_PRIMARY)
+  def name: String = record.getString(KEY_DOMAIN_OBJECT_NAME) getOrElse ""
+  def title: Option[String] = record.getString(KEY_DOMAIN_OBJECT_TITLE)
+  def content: Option[String] = record.getString(KEY_DOMAIN_OBJECT_CONTENT)
+  def imageIcon: Option[Picture] = Picture.get(record, KEY_DOMAIN_OBJECT_IMAGE_ICON)
+  def imagePrimary: Option[Picture] = Picture.get(record, KEY_DOMAIN_OBJECT_IMAGE_PRIMARY)
 }
 
 trait DomainObjectId {

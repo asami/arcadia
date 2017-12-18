@@ -1,6 +1,7 @@
 package arcadia
 
 import scala.xml._
+import scala.concurrent.duration._
 import java.util.Locale
 import java.net.URI
 import com.typesafe.config.{Config, ConfigFactory}
@@ -8,6 +9,7 @@ import org.goldenport.record.v2.Record
 import org.goldenport.i18n.I18NElement
 import org.goldenport.i18n.I18NString
 import org.goldenport.xml.XhtmlUtils
+import org.goldenport.value._
 import org.goldenport.util.StringUtils
 import org.goldenport.util.HoconUtils.Implicits._
 import arcadia.model.SubmitKind
@@ -15,7 +17,8 @@ import arcadia.model.SubmitKind
 /*
  * @since   Aug. 12, 2017
  *  version Oct. 27, 2017
- * @version Nov. 15, 2017
+ *  version Nov. 15, 2017
+ * @version Dec. 18, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationRule(
@@ -30,6 +33,7 @@ case class WebApplicationRule(
   admin_list: Option[WebApplicationRule.AdminList], // navigator
   info_list: Option[WebApplicationRule.InfoList], // footer
   singlePageApplication: Option[WebApplicationRule.SinglePageApplication],
+  http: Option[WebApplicationRule.Http],
   properties: Record
 ) {
   def applicationTitle(locale: Locale): NodeSeq = application_title.flatMap(_.get(locale)) getOrElse Group(Nil)
@@ -51,6 +55,12 @@ case class WebApplicationRule(
       admin_list orElse rhs.admin_list,
       info_list orElse rhs.info_list,
       singlePageApplication orElse rhs.singlePageApplication,
+      (http, rhs.http) match {
+        case (Some(l), Some(r)) => Some(l complement r)
+        case (Some(l), None) => Some(l)
+        case (None, Some(r)) => Some(r)
+        case (None, None) => None
+      },
       properties.complements(rhs.properties)
     )
   }
@@ -63,7 +73,11 @@ case class WebApplicationRule(
 }
 
 object WebApplicationRule {
+  val DEFAULT_LOGIN_MAXAGE = 14.days
+  val DEFAULT_ACCESS_MAXAGE = (10*365).days
+
   val empty = WebApplicationRule(
+    None,
     None,
     None,
     None,
@@ -120,4 +134,36 @@ object WebApplicationRule {
     def isRootPagePathname(p: String): Boolean = p == rootPagePathname
     def redirectCommand: MaterialCommand = MaterialCommand(rootPagePathname)
   }
+
+  case class Http(
+    cookieSecureKind: CookieSecureKind,
+    loginMaxAge: FiniteDuration,
+    accessMaxAge: FiniteDuration
+  ) {
+    def complement(rhs: Http) = this
+  }
+  object Http {
+    val default = Http(SecureProductionCookieSecureKind, DEFAULT_LOGIN_MAXAGE, DEFAULT_ACCESS_MAXAGE)
+  }
+
+  sealed trait CookieSecureKind extends NamedValueInstance
+  object SecureCookieSecureKind extends CookieSecureKind {
+    val name = "secure"
+  }
+  object PublicCookieSecureKind extends CookieSecureKind {
+    val name = "public"
+  }
+  object SecureProductionCookieSecureKind extends CookieSecureKind {
+    val name = "secure-production"
+  }
+
+  object CookieSecureKind extends EnumerationClass[CookieSecureKind] {
+    val elements = Vector(
+      SecureCookieSecureKind,
+      PublicCookieSecureKind,
+      SecureProductionCookieSecureKind
+    )
+  }
+
+  def parse(s: String): WebApplicationRule = WebApplicationConfig.parse(s).toRule
 }

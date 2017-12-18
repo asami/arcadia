@@ -19,7 +19,7 @@ import arcadia.model.{Model, ErrorModel}
  *  version Sep. 30, 2017
  *  version Oct. 31, 2017
  *  version Nov. 15, 2017
- * @version Dec. 13, 2017
+ * @version Dec. 18, 2017
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -106,7 +106,11 @@ class ViewEngine(
   def applyOption(p: Parcel): Option[Content] = p.executeWithTrace("ViewEngine#applyOption", p.show) {
     val render = {
       val t = theme getOrElse PlainTheme
-      (p.render getOrElse PlainHtml).withThemePartials(t, partials)
+      val style = "MM" // TODO
+      val f = FormatterContext.createStyle(style)
+      (p.render getOrElse PlainHtml).
+        withThemePartials(t, partials).
+        withFormatter(f)
     }
     val parcel = p.withRenderStrategy(render)
     val r1 = findView(parcel).fold {

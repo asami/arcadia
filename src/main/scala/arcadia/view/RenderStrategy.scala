@@ -2,15 +2,18 @@ package arcadia.view
 
 import scala.collection.mutable
 import scala.xml.{NodeSeq, Group, Elem, Node, Text}
-import java.util.Locale
+import java.util.{Locale, Date}
 import java.net.URI
+import java.sql.Timestamp
+import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
 import org.goldenport.Strings.blankopt
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2._
 import org.goldenport.record.v2.util.{SchemaBuilder, RecordUtils}
+import org.goldenport.xml.XhtmlUtils
 import org.goldenport.value._
 import org.goldenport.values.PathName
-import org.goldenport.util.{MapUtils, StringUtils}
+import org.goldenport.util.{MapUtils, StringUtils, AnyUtils}
 import arcadia._
 import arcadia.context._
 import arcadia.model.Picture
@@ -22,7 +25,8 @@ import arcadia.view.ViewEngine._
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
- * @version Nov. 22, 2017
+ *  version Nov. 22, 2017
+ * @version Dec. 18, 2017
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -43,7 +47,9 @@ case class RenderStrategy(
   def isLogined = executeOption(_.isLogined) getOrElse false
   def getOperationName: Option[String] = executeOption(_.getOperationName).flatten
   def gridContext: GridContext = renderContext.gridContext getOrElse theme.default.gridContext(this)
-  lazy val noImagePicture: Picture = Picture.create(theme.default.noImageIcon)
+  lazy val noImageIcon: Picture = Picture.create(theme.default.noImageIcon)
+  lazy val noImagePicture: Picture = Picture.create(theme.default.noImagePicture)
+  lazy val formatter = renderContext.formatter.withLocale(locale)
 
   def show: String = s"RenderStrategy"
 
@@ -66,6 +72,7 @@ case class RenderStrategy(
   def withUsageKind(p: UsageKind) = copy(renderContext = renderContext.withUsageKind(p))
   def withTableKind(p: TableKind) = copy(renderContext = renderContext.withTableKind(p))
   def withCardKind(p: CardKind) = copy(renderContext = renderContext.withCardKind(p))
+  def withFormatter(p: FormatterContext) = copy(renderContext = renderContext.withFormatter(p))
 
   def withViewContext(engine: ViewEngine, parcel: Parcel) = copy(viewContext = Some(ViewContext(engine, parcel)))
   def withThemePartials(t: RenderTheme, p: Partials) = copy(
@@ -99,9 +106,27 @@ case class RenderStrategy(
 
   def format(column: Column, rec: Record): String = {
     rec.getOne(column.name).map {
-      case m => m.toString // TODO
+      case m => column.datatype.format(m)
     }.getOrElse("")
   }
+
+  def format(p: Any): String = p match {
+    case m: Timestamp => formatDateTime(m)
+    case m: Date => formatDate(m)
+    case _ => AnyUtils.toString(p)
+  }
+
+  def formatDateTime(p: Any): String =
+    formatter.datetime.print(AnyUtils.toDateTime(p))
+
+  def formatDate(p: Any): String =
+    formatter.date.print(AnyUtils.toLocalDate(p))
+
+  def formatTime(p: Any): String =
+    formatter.time.print(AnyUtils.toLocalTime(p))
+
+  def formatXml(p: Any): NodeSeq =
+    XhtmlUtils.parseNode(p.toString)
 }
 
 sealed trait RenderScope {
@@ -201,6 +226,7 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
   def isCardDiv: Boolean = false
   object default {
     def noImageIcon: URI = new URI(default_No_Image_Icon)
+    def noImagePicture: URI = new URI(default_No_Image_Picture)
     def noUserImageIcon: URI = new URI(default_No_User_Image_Icon)
     def usageKind: UsageKind = default_UsageKind
     def tableKind: TableKind = default_TableKind
@@ -302,6 +328,7 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
   protected def default_CardKind: CardKind = ImageTitleCard
   protected def default_GridContext(strategy: RenderStrategy): GridContext = GridContext.card
   protected def default_No_Image_Icon: String = "assets/img/no-image-icon.png"
+  protected def default_No_Image_Picture: String = "assets/img/no-image-picture.png"
   protected def default_No_User_Image_Icon: String = "assets/img/no-user-image-icon.png"
   protected def body_CssClass(strategy: RenderStrategy): String = ""
   protected def table_Container(p: Renderer.Table, body: => Node): Node = body
@@ -845,7 +872,8 @@ case class RenderContext(
   entityType: Option[DomainEntityType],
   schema: Option[Schema],
   dataHref: Option[URI],
-  epilogue: Option[EpilogueContext]
+  epilogue: Option[EpilogueContext],
+  formatter: FormatterContext
 ) {
   def withScopeHtml = copy(scope = Html)
   def withScopeSection = copy(scope = Section)
@@ -862,6 +890,7 @@ case class RenderContext(
   def withTableKind(p: TableKind) = copy(tableKind = Some(p))
   def withCardKind(p: CardKind) = copy(cardKind = Some(p))
   def withEpilogue = copy(epilogue = Some(new EpilogueContext()))
+  def withFormatter(p: FormatterContext) = copy(formatter = p)
 
   def addJavaScriptInFooter(p: String): Unit = epilogue.
     map(_.addJavaScript(p)).
@@ -897,8 +926,42 @@ object RenderContext {
     None,
     None,
     None,
-    None
+    None,
+    FormatterContext.default
   )
+}
+
+case class FormatterContext(
+  datetime: DateTimeFormatter,
+  date: DateTimeFormatter,
+  time: DateTimeFormatter
+) {
+  def withLocale(locale: Locale) = FormatterContext(
+    datetime.withLocale(locale),
+    date.withLocale(locale),
+    time.withLocale(locale)
+  )
+}
+object FormatterContext {
+  val default = FormatterContext(
+    DateTimeFormat.mediumDateTime().withLocale(Locale.ENGLISH),
+    DateTimeFormat.mediumDate().withLocale(Locale.ENGLISH),
+    DateTimeFormat.mediumTime().withLocale(Locale.ENGLISH)
+  )
+
+  def create(locale: Locale, style: String): FormatterContext =
+    FormatterContext(
+      DateTimeFormat.forStyle(style).withLocale(locale),
+      DateTimeFormat.forStyle(style).withLocale(locale),
+      DateTimeFormat.forStyle(style).withLocale(locale)
+    )
+
+  def createStyle(style: String): FormatterContext =
+    FormatterContext(
+      DateTimeFormat.forStyle(style),
+      DateTimeFormat.forStyle(style),
+      DateTimeFormat.forStyle(style)
+    )
 }
 
 case class ViewContext(

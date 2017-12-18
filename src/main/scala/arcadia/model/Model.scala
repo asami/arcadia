@@ -23,7 +23,7 @@ import arcadia.domain._
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
  *  version Nov. 13, 2017
- * @version Dec. 13, 2017
+ * @version Dec. 16, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -407,8 +407,8 @@ case class EntityDetailModel(
 ) extends Model with IEntityDetailModel with IComponentModel {
   def getEntityType = Some(entityType)
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
-    PROP_VIEW_OBJECT -> ViewObject.create(record),
-    PROP_VIEW_RECORD -> ViewRecord.create(record)
+    PROP_VIEW_OBJECT -> ViewObject.create(record, strategy),
+    PROP_VIEW_RECORD -> ViewRecord.create(record, strategy)
   )
   def toRecord: Record = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy) = new Renderer(
@@ -446,8 +446,8 @@ case class EntityListModel(
 ) extends Model with IEntityListModel with IComponentModel {
   override def getEntityType: Option[DomainEntityType] = Some(entityType)
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
-    PROP_VIEW_LIST -> records.map(ViewObject.create),
-    PROP_VIEW_RECORD -> records.map(ViewRecord.create)
+    PROP_VIEW_LIST -> records.map(ViewObject.create(_, strategy)),
+    PROP_VIEW_RECORD -> records.map(ViewRecord.create(_, strategy))
   )
   def toRecord: Record = throw new UnsupportedOperationException()
 
@@ -525,7 +525,7 @@ case class PropertySheetModel(
 ) extends Model with IRecordModel with IComponentModel {
   def getEntityType = None
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
-    PROP_VIEW_RECORD -> ViewRecord.create(record)
+    PROP_VIEW_RECORD -> ViewRecord.create(record, strategy)
   )
   def toRecord: Record = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
@@ -560,7 +560,7 @@ case class PropertyTableModel(
 ) extends ITableModel with IComponentModel {
   def getEntityType = None
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
-    PROP_VIEW_RECORDS -> records.map(ViewRecord.create)
+    PROP_VIEW_RECORDS -> records.map(ViewRecord.create(_, strategy))
   )
 
   def withSchemaKind(
@@ -620,7 +620,7 @@ case class TableModel(
 ) extends ITableModel with IComponentModel {
   def getEntityType = None
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
-    PROP_VIEW_RECORDS -> records.map(ViewRecord.create)
+    PROP_VIEW_RECORDS -> records.map(ViewRecord.create(_, strategy))
   )
   def withSchemaKind(
     schema: Option[List[String]],
@@ -787,8 +787,8 @@ case class CardModel(
   def getEntityType = None
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_CARD -> ViewCard.create(card, strategy),
-    PROP_VIEW_OBJECT -> ViewObject.create(record),
-    PROP_VIEW_RECORD -> ViewRecord.create(record)
+    PROP_VIEW_OBJECT -> ViewObject.create(record, strategy),
+    PROP_VIEW_RECORD -> ViewRecord.create(record, strategy)
   )
   def getSchema: Option[Schema] = None
   def record = card.record getOrElse Record.empty
@@ -805,7 +805,7 @@ case class RecordModel(
 ) extends Model with IRecordModel with IComponentModel {
   def getEntityType = None
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
-    PROP_VIEW_RECORD -> ViewRecord.create(record)
+    PROP_VIEW_RECORD -> ViewRecord.create(record, strategy)
   )
   def toRecord: Record = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
@@ -828,7 +828,7 @@ case class RecordsModel(
 ) extends Model with IRecordsModel with IComponentModel {
   def getEntityType = None
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
-    PROP_VIEW_RECORDS -> records.map(ViewRecord.create)
+    PROP_VIEW_RECORDS -> records.map(ViewRecord.create(_, strategy))
   )
   def toRecord: Record = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
@@ -853,7 +853,7 @@ case class TableCardModel(
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IComponentModel {
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
-    PROP_VIEW_RECORDS -> records.records.map(ViewRecord.create)
+    PROP_VIEW_RECORDS -> records.records.map(ViewRecord.create(_, strategy))
   )
   def toRecord: Record = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(

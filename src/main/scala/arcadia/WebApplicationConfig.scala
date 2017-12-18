@@ -9,13 +9,15 @@ import org.goldenport.record.v2.Record
 import org.goldenport.i18n.I18NElement
 import org.goldenport.xml.XhtmlUtils
 import org.goldenport.json.JsonUtils.Implicits._
+import org.goldenport.value._
 import org.goldenport.util.HoconUtils.Implicits._
 
 /*
  * @since   Aug. 12, 2017
  *  version Sep.  2, 2017
  *  version Oct. 27, 2017
- * @version Nov. 15, 2017
+ *  version Nov. 15, 2017
+ * @version Dec. 18, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationConfig(
@@ -33,6 +35,7 @@ case class WebApplicationConfig(
   info_list: Option[WebApplicationConfig.InfoList], // footer
   //
   singlePageApplication: Option[WebApplicationConfig.SinglePageApplication],
+  http: Option[WebApplicationConfig.HttpConfig],
   //
   lifecycle: Option[WebApplicationConfig.LifecycleConfig],
   extend: Option[List[String]] // related feature: mixin
@@ -57,7 +60,8 @@ case class WebApplicationConfig(
       admin_list orElse rhs.admin_list,
       info_list orElse rhs.info_list,
       singlePageApplication orElse rhs.singlePageApplication,
-      lifecycle orElse lifecycle,
+      http orElse rhs.http,
+      lifecycle orElse rhs.lifecycle,
       extend |+| rhs.extend
     )
   }
@@ -76,6 +80,7 @@ case class WebApplicationConfig(
     admin_list.map(_.toRule),
     info_list.map(_.toRule),
     singlePageApplication.map(_.toRule),
+    http.map(_.toRule),
     Record.empty // TODO
   )
 
@@ -89,6 +94,7 @@ case class WebApplicationConfig(
 
 object WebApplicationConfig {
   val empty = WebApplicationConfig(
+    None,
     None,
     None,
     None,
@@ -166,6 +172,29 @@ object WebApplicationConfig {
     )
   }
 
+  case class HttpConfig(
+    cookieSecureKind: Option[WebApplicationRule.CookieSecureKind],
+    loginMaxAge: Option[FiniteDuration],
+    accessMaxAge: Option[FiniteDuration]
+  ) {
+    def isEmpty = cookieSecureKind.isEmpty
+
+    def complement(rhs: HttpConfig) =
+      copy(cookieSecureKind = cookieSecureKind orElse rhs.cookieSecureKind)
+
+    def toRule = WebApplicationRule.Http(
+      cookieSecureKind getOrElse WebApplicationRule.Http.default.cookieSecureKind,
+      loginMaxAge getOrElse WebApplicationRule.Http.default.loginMaxAge,
+      accessMaxAge getOrElse WebApplicationRule.Http.default.accessMaxAge
+    )
+
+    def toOption: Option[HttpConfig] =
+      if (isEmpty)
+        None
+      else
+        Some(this)
+  }
+
   case class LifecycleConfig(
     expires: Option[ExpiresConfig],
     cdn: Option[CdnConfig]
@@ -226,6 +255,7 @@ object WebApplicationConfig {
     None,
     None,
     None,
+    None,
     None
   )
 
@@ -242,6 +272,21 @@ object WebApplicationConfig {
 
   import org.goldenport.json.JsonUtils._
   import org.goldenport.json.JsonUtils.Implicits._
+  import WebApplicationRule._
+
+  // TODO Migrate to goldenport-scala-lib
+  // See com.everforth.lib.swagger.Specification
+  class ValueInstanceFormat[T <: ValueInstance](klass: ValueClass[T]) extends Format[T] {
+    def reads(json: JsValue): JsResult[T] = json match {
+      case JsString(s) => klass.get(s).
+          map(JsSuccess(_)).
+          getOrElse(JsError(s"ValueInstanceFormat($json)"))
+      case _ => JsError(s"ValueInstanceFormat($json)")
+    }
+    def writes(o: T): JsValue = JsString(o.toString)
+  }
+
+  implicit object CookieSecureKindFormat extends ValueInstanceFormat[CookieSecureKind](CookieSecureKind)
 
   implicit val PageFormat = Json.format[Page]
   implicit val FeatureListFormat = Json.format[FeatureList]
@@ -251,6 +296,7 @@ object WebApplicationConfig {
   implicit val SinglePageApplicationFormat = Json.format[SinglePageApplication]
   implicit val ExpiresConfigFormat = Json.format[ExpiresConfig]
   implicit val CdnConfigFormat = Json.format[CdnConfig]
+  implicit val HttpConfigFormat = Json.format[HttpConfig]
   implicit val LifecycleConfigFormat = Json.format[LifecycleConfig]
   implicit val WebApplicationConfigFormat = Json.format[WebApplicationConfig]
 
@@ -278,6 +324,11 @@ object WebApplicationConfig {
     val spa = SinglePageApplication(
       c.getUriListOption("singlePageApplication.base_uri")
     )
+    val http = HttpConfig(
+      c.getStringOption("http.cookie.secure").map(CookieSecureKind(_)),
+      c.getDurationOption("http.login.maxAge"),
+      c.getDurationOption("http.access.maxAge")
+    )
     val lifecycle = LifecycleConfig(expires.toOption, cdn.toOption)
     WebApplicationConfig(
       c.getStringOption("theme"),
@@ -292,6 +343,7 @@ object WebApplicationConfig {
       None,
       None,
       spa.toOption,
+      http.toOption,
       lifecycle.toOption,
       c.getEagerStringListOption("extend")
     )

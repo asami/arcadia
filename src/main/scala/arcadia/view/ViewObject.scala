@@ -6,15 +6,18 @@ import org.goldenport.record.v2._
 import org.goldenport.xml.XmlUtils
 import org.goldenport.exception.RAISE
 import arcadia.domain._
+import arcadia.model.Picture
 
 /*
  * @since   Jul.  9, 2017
  *  version Aug. 30, 2017
  *  version Sep.  4, 2017
- * @version Oct. 24, 2017
+ *  version Oct. 24, 2017
+ * @version Dec. 17, 2017
  * @author  ASAMI, Tomoharu
  */
-case class ViewObject(v: DomainObject) {
+case class ViewObject(v: DomainObject, strategy: RenderStrategy) {
+  lazy val record = ViewRecord(v.record, strategy)
   def id: DomainObjectId = v.id
 //  def status_id: Int = v.status_id
   def status = RAISE.notImplementedYetDefect
@@ -22,17 +25,12 @@ case class ViewObject(v: DomainObject) {
   def title: String = _normalize(v.title getOrElse "No title") // TODO
   def content: String = _normalize(v.content getOrElse "Under construction") // TODO
   def content__summary: String = _normalize(v.content getOrElse "Under construction") // TODO
-  def image__icon: URI = v.imageIcon getOrElse {
-    id.v match {
-      case "pal-palshop-1377836961310-apparelcloud.blog-742c614e-bedd-4a18-ace3-447433b93f9f" => new URI("http://static.everforth.com/img/post/f9388dcf-c955-4b34-9d47-90b1c46652c9/555f88bd68dc86bb7242dc45ebca69cb.jpg")
-      case "pal-palshop-1410983251862-apparelcloud.blog-1e1b8dcf-d662-4598-bd6d-d5ce72500755" => new URI("http://img2.everforth.com/img/post/a716b139-3103-4139-b811-9989a3f68323/cc70ef0af69016c2102ae2c994954eba.jpg")
-      case "pal-palshop-1378000449352-apparelcloud.blog-37e2f626-2090-4f0f-ba76-535493d1d310" => new URI("http://static.everforth.com/img/post/721be228-200a-442d-87c0-772df0a1099f/28597bc04f81960bf3f0af0285174ccd.jpg")
-      case "pal-palshop-1377947431680-apparelcloud.blog-7a93aa55-e683-4dae-b15a-38a376f7cca2" => new URI("http://static.everforth.com/img/post/ce9075dc-291b-4866-8ccb-983dc1f8ac1a/1bfac9cc725c14d3cb520497886735a1.jpg")
-      case "pal-palshop-1377946471327-apparelcloud.blog-d6cc560e-f0a4-429b-aaaa-245a3614a206" => new URI("http://static.everforth.com/img/post/b94d14f8-b70e-4837-92b9-ad071b5fe411/aef1de088b806580985e4bd726973a30.jpg")
-      case _ => new URI("http://livedoor.blogimg.jp/yurukuyaru/imgs/f/d/fd6a2365.jpg") // TODO
-    }
-  }
-  def image__primary: URI = v.imagePrimary getOrElse ??? // {new URI("http://livedoor.blogimg.jp/yurukuyaru/imgs/f/d/fd6a2365.jpg")} // TODO
+  def imageIcon: Picture = v.imageIcon.getOrElse(strategy.noImageIcon)
+  def imagePrimary: Picture = v.imagePrimary.getOrElse(strategy.noImagePicture)
+  // compatibility
+  def image__icon: URI = imageIcon.extrasmall
+  // compatibility
+  def image__primary: URI = imagePrimary.large
 
   private def _normalize(s: String): String = try {
     XmlUtils.toSummary(s)
@@ -170,12 +168,12 @@ case class ViewObject(v: DomainObject) {
 }
 
 object ViewObject {
-  val empty = {
-    val rec = Record.dataAppS(
-      KEY_DOMAIN_OBJECT_ID -> DomainObjectId.undefined
-    )
-    create(rec)
-  }
+  // val empty = {
+  //   val rec = Record.dataAppS(
+  //     KEY_DOMAIN_OBJECT_ID -> DomainObjectId.undefined
+  //   )
+  //   create(rec)
+  // }
 
-  def create(rec: Record): ViewObject = ViewObject(RecordDomainObject(rec))
+  def create(rec: Record, strategy: RenderStrategy): ViewObject = ViewObject(RecordDomainObject(rec), strategy)
 }

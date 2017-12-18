@@ -1,7 +1,7 @@
 package arcadia.model
 
 import scala.xml.{NodeSeq, Group, Text, Node}
-import java.net.URI
+import java.net.{URI, URL}
 import java.util.Locale
 import play.api.libs.json._
 import org.goldenport.exception.RAISE
@@ -11,6 +11,7 @@ import org.goldenport.value._
 import org.goldenport.record.v2.Record
 import org.goldenport.json.JsonUtils
 import com.asamioffice.goldenport.text.UString
+import com.asamioffice.goldenport.io.UURL
 import arcadia._
 import arcadia.context.Query
 import arcadia.scenario.Event
@@ -19,7 +20,8 @@ import arcadia.domain._
 
 /*
  * @since   Oct. 29, 2017
- * @version Nov. 22, 2017
+ *  version Nov. 22, 2017
+ * @version Dec. 17, 2017
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -86,22 +88,48 @@ case class Picture( // HTML5 picture
   description: Option[I18NElement]
 ) extends Particle {
   // def srcString = src.toString
+  lazy val large = src_l getOrElse src
+  lazy val medium = src_m orElse src_l getOrElse src
+  lazy val small = src_s orElse src_m orElse src_l getOrElse src
+  lazy val extrasmall = src_xs orElse src_s orElse src_m orElse src_l getOrElse src
   lazy val img = src.toString
-  lazy val l = (src_l getOrElse src).toString
-  lazy val m = (src_m orElse src_l getOrElse src).toString
-  lazy val s = (src_s orElse src_m orElse src_l getOrElse src).toString
-  lazy val xs = (src_xs orElse src_s orElse src_m orElse src_l getOrElse src).toString
+  lazy val l = large.toString
+  lazy val m = medium.toString
+  lazy val s = small.toString
+  lazy val xs = extrasmall.toString
   // def altString(locale: Locale): String = alt(locale)
   def alt(locale: Locale): String = alt.map(_.as(locale)).getOrElse("")
 }
 object Picture {
   def create(src: URI): Picture = Picture(src, None, None, None, None, None, None, None, None, None, None, None, None)
 
+  def create(src: URL): Picture = create(src.toURI)
+
+  def create(src: String): Picture =
+    if (src.startsWith("{"))
+      Particle.parseParticle(src) match {
+        case JsSuccess(x, _) => x match {
+          case m: Picture => m
+          case m => RAISE.syntaxErrorFault(m.toString)
+        }
+        case m: JsError => RAISE.syntaxErrorFault(m.toString)
+      }
+    else
+      create(UURL.getURLFromFileOrURLName(src))
+
   def parseList(p: String): List[Picture] = Particle.parseParticleList(p) match {
     case JsSuccess(xs, _) => xs.collect {
       case m: Picture => m
     }
     case m: JsError => RAISE.syntaxErrorFault(m.toString)
+  }
+
+  def get(rec: Record, key: Symbol): Option[Picture] = rec.getOne(key).map {
+    case m: Picture => m
+    case m: URI => create(m)
+    case m: URL => create(m)
+    case m: String => create(m)
+    case m => create(m.toString)
   }
 }
 
