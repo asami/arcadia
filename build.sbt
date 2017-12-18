@@ -2,7 +2,7 @@ organization := "org.goldenport"
 
 name := "arcadia"
 
-version := "0.0.23"
+version := "0.0.24"
 
 scalaVersion := "2.10.3"
 // crossScalaVersions := Seq("2.10.39.2", "2.9.1")
@@ -18,7 +18,7 @@ resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
 resolvers += "Asami Maven Repository" at "http://www.asamioffice.com/maven"
 
 // override goldenport-record
-libraryDependencies += "org.goldenport" %% "goldenport-scala-lib" % "1.2.12"
+libraryDependencies += "org.goldenport" %% "goldenport-scala-lib" % "1.2.13"
 
 libraryDependencies += "org.goldenport" %% "goldenport-record" % "1.2.7"
 
