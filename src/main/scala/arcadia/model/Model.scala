@@ -23,7 +23,7 @@ import arcadia.domain._
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
  *  version Nov. 13, 2017
- * @version Dec. 16, 2017
+ * @version Dec. 19, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -223,6 +223,8 @@ object ErrorModel {
     ErrorModel(500, Some(I18NElement(m)), None, None, backuri, parcel.trace)
   }
   def create(parcel: Parcel, evt: scenario.Event): ErrorModel = RAISE.notImplementedYetDefect
+  def create(code: Int, message: Option[String], exception: Option[Throwable]): ErrorModel =
+    ErrorModel(code, message.map(I18NElement(_)), exception, None, None, None)
   def notFound(parcel: Parcel, m: String): ErrorModel = {
     val backuri = _back_uri(parcel)
     val msg = I18NElement(m)
@@ -913,5 +915,18 @@ case class PropertyConfirmFormModel(
   ) {
     protected def render_Content: NodeSeq =
       property_confirm_form(uri, method, schema, record, hidden, submit)
+  }.apply
+}
+
+case class OperationOutcomeModel(
+  request: Request,
+  response: Response
+) extends Model {
+  val expiresKind = Some(NoCacheExpires)
+  def toRecord: Record = throw new UnsupportedOperationException()
+  def render(strategy: RenderStrategy) = new Renderer(
+    strategy, None, None, None, None
+  ) {
+    protected def render_Content: NodeSeq = operation_outcome(request, response)
   }.apply
 }

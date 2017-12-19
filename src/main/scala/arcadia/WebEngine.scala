@@ -17,7 +17,8 @@ import arcadia.scenario._
  *  version Aug. 29, 2017
  *  version Sep.  2, 2017
  *  version Oct. 27, 2017
- * @version Nov. 16, 2017
+ *  version Nov. 16, 2017
+ * @version Dec. 19, 2017
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -31,6 +32,8 @@ class WebEngine(
   val scenario = new ScenarioEngine(platform, scenariorule)
   val systemcontroller = WebApplication.standardControllerRule.append(
     ScenarioController(scenario).gc
+  ).append(
+    RedirectController.gc
   )
   val controller: ControllerEngine = new ControllerEngine(
     application.controller,
@@ -71,6 +74,7 @@ class WebEngine(
       }
       r match {
         case m: NotFoundContent => view.error(parcel, 404)
+        case m: RedirectContent => m
         case ErrorModelContent(m) => view.error(parcel, m)
         case _ =>
           parcel.trace.fold(r)(x =>

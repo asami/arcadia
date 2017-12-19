@@ -8,6 +8,7 @@ import org.goldenport.record.v2._
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.json.JsonUtils
 import org.goldenport.values.{Urn, PathName}
+import org.goldenport.io.UriBuilder
 import org.goldenport.trace.Result
 import org.goldenport.util.{StringUtils, SeqUtils, MapUtils}
 import arcadia._
@@ -21,7 +22,8 @@ import arcadia.scenario.ScenarioEngine
  *  version Aug. 29, 2017
  *  version Sep. 21, 2017
  *  version Oct. 31, 2017
- * @version Nov. 13, 2017
+ *  version Nov. 13, 2017
+ * @version Dec. 19, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -432,6 +434,40 @@ case class LoginAction(
 case class LogoutAction(
 ) extends Action {
   protected def execute_Apply(parcel: Parcel): Parcel = parcel.withContent(RedirectContent())
+}
+
+case class RedirectAction(
+) extends Action {
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    def uri(p: URI) = parcel.getEffectiveModel.fold(p) {
+      case m: OperationOutcomeModel => 
+        val builder = UriBuilder(p)
+        val a = builder.addPath("index.html").
+          copy(query = addQuery(builder.query, m.request.query))
+        a.build
+      case _ => p
+    }
+    // TODO
+    val a = parcel.render.flatMap(_.application.singlePageApplication.flatMap(_.base_uri.headOption))
+    val b = a.fold(RedirectContent())(x => RedirectContent(uri(x)))
+    parcel.withContent(b)
+  }
+
+  // TODO migrate org.goldenport.io.UriBuilder
+  def addQuery(base: Option[String], q: Record): Option[String] =
+    base.map(b =>
+      if (q.isEmpty)
+        Some(b)
+      else
+        Some(s"${b}&${makeUrlQueryParams(q)}")
+    ).getOrElse(
+      Some(makeUrlQueryParams(q))
+    )
+
+  // See StringUtils.addUrlParams
+  def makeUrlQueryParams(q: Record) = q.toStringVector.map {
+    case (k, v) => s"${k}=${v}"
+  }.mkString("&")
 }
 
 case class BrokenAction(

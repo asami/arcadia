@@ -15,13 +15,14 @@ import org.goldenport.trace.TraceContext
 import org.goldenport.util.{DateTimeUtils, DateUtils, StringUtils, SeqUtils}
 import arcadia.model._
 import arcadia.domain._
+import arcadia.context._
 
 /*
  * @since   Aug.  1, 2017
  *  version Sep. 26, 2017
  *  version Oct. 31, 2017
  *  version Nov. 22, 2017
- * @version Dec. 13, 2017
+ * @version Dec. 19, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -1465,6 +1466,25 @@ abstract class Renderer(
   protected def badge(p: Badge): Elem = {
     val c = s"badge badge-${p.asIndicatorName}"
     <span class={c}>{p.asLabel}</span>
+  }
+
+  protected def operation_outcome(req: Request, res: Response): NodeSeq = {
+    import SchemaBuilder._
+    val schema = SchemaBuilder.create(
+      CL("pathname", "Pathname"),
+      CL("operation", "Operation"),
+      CL("method", "Method"),
+      CL("code", "Code")
+    )
+
+    val rec = Record.dataApp(
+      "pathname" -> req.pathname,
+      "operation" -> req.operationName,
+      "method" -> req.method,
+      "code" -> res.code
+    ) + Record.dataAppOption(
+    )
+    property_sheet(schema, rec)
   }
 
   /*
