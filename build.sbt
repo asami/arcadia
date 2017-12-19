@@ -2,7 +2,7 @@ organization := "org.goldenport"
 
 name := "arcadia"
 
-version := "0.0.24"
+version := "0.0.25"
 
 scalaVersion := "2.10.3"
 // crossScalaVersions := Seq("2.10.39.2", "2.9.1")
