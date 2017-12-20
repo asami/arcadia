@@ -17,7 +17,7 @@ import org.goldenport.util.HoconUtils.Implicits._
  *  version Sep.  2, 2017
  *  version Oct. 27, 2017
  *  version Nov. 15, 2017
- * @version Dec. 18, 2017
+ * @version Dec. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationConfig(
@@ -36,6 +36,7 @@ case class WebApplicationConfig(
   //
   singlePageApplication: Option[WebApplicationConfig.SinglePageApplication],
   http: Option[WebApplicationConfig.HttpConfig],
+  route: Option[WebApplicationConfig.RouteConfig],
   //
   lifecycle: Option[WebApplicationConfig.LifecycleConfig],
   extend: Option[List[String]] // related feature: mixin
@@ -61,6 +62,7 @@ case class WebApplicationConfig(
       info_list orElse rhs.info_list,
       singlePageApplication orElse rhs.singlePageApplication,
       http orElse rhs.http,
+      route orElse route, // TODO
       lifecycle orElse rhs.lifecycle,
       extend |+| rhs.extend
     )
@@ -81,6 +83,7 @@ case class WebApplicationConfig(
     info_list.map(_.toRule),
     singlePageApplication.map(_.toRule),
     http.map(_.toRule),
+    route.map(_.toRule) getOrElse Route.empty,
     Record.empty // TODO
   )
 
@@ -94,6 +97,7 @@ case class WebApplicationConfig(
 
 object WebApplicationConfig {
   val empty = WebApplicationConfig(
+    None,
     None,
     None,
     None,
@@ -195,6 +199,12 @@ object WebApplicationConfig {
         Some(this)
   }
 
+  case class RouteConfig(
+    dummy: String
+  ) {
+    def toRule: Route = Route.empty
+  }
+
   case class LifecycleConfig(
     expires: Option[ExpiresConfig],
     cdn: Option[CdnConfig]
@@ -256,6 +266,7 @@ object WebApplicationConfig {
     None,
     None,
     None,
+    None,
     None
   )
 
@@ -297,6 +308,7 @@ object WebApplicationConfig {
   implicit val ExpiresConfigFormat = Json.format[ExpiresConfig]
   implicit val CdnConfigFormat = Json.format[CdnConfig]
   implicit val HttpConfigFormat = Json.format[HttpConfig]
+  implicit val RouteConfigFormat = Json.format[RouteConfig]
   implicit val LifecycleConfigFormat = Json.format[LifecycleConfig]
   implicit val WebApplicationConfigFormat = Json.format[WebApplicationConfig]
 
@@ -329,6 +341,7 @@ object WebApplicationConfig {
       c.getDurationOption("http.login.maxAge"),
       c.getDurationOption("http.access.maxAge")
     )
+    val route = Some(RouteConfig("???"))
     val lifecycle = LifecycleConfig(expires.toOption, cdn.toOption)
     WebApplicationConfig(
       c.getStringOption("theme"),
@@ -344,6 +357,7 @@ object WebApplicationConfig {
       None,
       spa.toOption,
       http.toOption,
+      route,
       lifecycle.toOption,
       c.getEagerStringListOption("extend")
     )

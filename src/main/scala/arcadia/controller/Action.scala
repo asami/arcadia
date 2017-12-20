@@ -23,7 +23,7 @@ import arcadia.scenario.ScenarioEngine
  *  version Sep. 21, 2017
  *  version Oct. 31, 2017
  *  version Nov. 13, 2017
- * @version Dec. 19, 2017
+ * @version Dec. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -436,21 +436,34 @@ case class LogoutAction(
   protected def execute_Apply(parcel: Parcel): Parcel = parcel.withContent(RedirectContent())
 }
 
+case class RouterAction(
+  route: Route
+) extends Action {
+  protected def execute_Apply(parcel: Parcel): Parcel = route.apply(parcel)
+}
+
 case class RedirectAction(
+  page: String
+) extends Action {
+  protected def execute_Apply(parcel: Parcel): Parcel =
+    parcel.withContent(RedirectContent(page))
+}
+
+case class RedirectSinglePageAction(
+  page: String = "index.html"
 ) extends Action {
   protected def execute_Apply(parcel: Parcel): Parcel = {
     def uri(p: URI) = parcel.getEffectiveModel.fold(p) {
-      case m: OperationOutcomeModel => 
+      case m: OperationOutcomeModel =>
         val builder = UriBuilder(p)
-        val a = builder.addPath("index.html").
+        val a = builder.addPath(page).
           copy(query = addQuery(builder.query, m.request.query))
         a.build
       case _ => p
     }
-    // TODO
     val a = parcel.render.flatMap(_.application.singlePageApplication.flatMap(_.base_uri.headOption))
-    val b = a.fold(RedirectContent())(x => RedirectContent(uri(x)))
-    parcel.withContent(b)
+    a.map(x => parcel.withContent(RedirectContent(uri(x)))).
+      getOrElse(parcel)
   }
 
   // TODO migrate org.goldenport.io.UriBuilder

@@ -8,13 +8,15 @@ import arcadia.view._
 import arcadia.view.ViewEngine._
 import arcadia.model._
 import arcadia.scenario.Scenario
+import arcadia.context.Request
 
 /*
  * @since   Jul. 16, 2017
  *  version Aug. 29, 2017
  *  version Sep. 25, 2017
  *  version Oct. 24, 2017
- * @version Nov. 13, 2017
+ *  version Nov. 13, 2017
+ * @version Dec. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Command {
@@ -23,18 +25,6 @@ trait Command {
   def getModel: Option[Model] = None
   def getUseLayout: Option[Boolean] = None
   def show: String = toString()
-}
-
-case class IndexCommand() extends Command {
-}
-
-case class LoginCommand(
-  access_token: String
-) extends Command {
-}
-
-case class LogoutCommand(
-) extends Command {
 }
 
 case class AssetsCommand(pathname: String) extends Command {
@@ -47,7 +37,31 @@ object MaterialCommand {
   def apply(p: String): MaterialCommand = MaterialCommand(PathName(p))
 }
 
+case class UnauthorizedCommand(request: Request, command: Option[Command]) extends Command {
+  def isGet = request.isGet
+  def isMutation = request.isMutation
+}
+object UnauthorizedCommand {
+  def apply(request: Request, command: Command): UnauthorizedCommand =
+    UnauthorizedCommand(request, Some(command))
+}
+
+case class RerunCommand(parcel: Parcel) extends Command {
+}
+
+case class IndexCommand() extends Command {
+}
+
 case class SetupCommand() extends Command {
+}
+
+case class LoginCommand(
+  access_token: String
+) extends Command {
+}
+
+case class LogoutCommand(
+) extends Command {
 }
 
 case class DashboardCommand() extends Command {

@@ -23,7 +23,7 @@ import arcadia.domain._
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
  *  version Nov. 13, 2017
- * @version Dec. 19, 2017
+ * @version Dec. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -229,6 +229,10 @@ object ErrorModel {
     val backuri = _back_uri(parcel)
     val msg = I18NElement(m)
     ErrorModel(404, Some(msg), None, None, backuri, parcel.trace)
+  }
+  def unauthorized(parcel: Parcel): ErrorModel = {
+    val backuri = _back_uri(parcel)
+    ErrorModel(401, None, None, None, backuri, parcel.trace)
   }
 
   private def _back_uri(parcel: Parcel): Option[URI] = None // TODO

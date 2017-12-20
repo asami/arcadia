@@ -18,7 +18,7 @@ import arcadia.scenario._
  *  version Sep.  2, 2017
  *  version Oct. 27, 2017
  *  version Nov. 16, 2017
- * @version Dec. 19, 2017
+ * @version Dec. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -31,9 +31,9 @@ class WebEngine(
   val scenariorule = ScenarioEngine.Rule.create() // TODO
   val scenario = new ScenarioEngine(platform, scenariorule)
   val systemcontroller = WebApplication.standardControllerRule.append(
-    ScenarioController(scenario).gc
-  ).append(
-    RedirectController.gc
+    ScenarioController(scenario).gc,
+    RouterController(rule.route).gc,
+    RouterController(Route.system).gc
   )
   val controller: ControllerEngine = new ControllerEngine(
     application.controller,
@@ -52,7 +52,7 @@ class WebEngine(
         parcel0
     try {
       val r = parcel.executeWithTrace("WebEngine#apply", p.show) {
-        val a = controller.apply(parcel)
+        val a = controller.applyRerun(parcel, 1)
         val c = a.content getOrElse {
           a.model.flatMap {
             case m: ErrorModel => Some(ErrorModelContent(m))

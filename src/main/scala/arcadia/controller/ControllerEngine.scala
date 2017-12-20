@@ -1,5 +1,6 @@
 package arcadia.controller
 
+import org.goldenport.exception.RAISE
 import org.goldenport.trace.Result
 import arcadia._
 
@@ -8,7 +9,8 @@ import arcadia._
  *  version Aug. 29, 2017
  *  version Sep. 17, 2017
  *  version Oct.  6, 2017
- * @version Nov. 13, 2017
+ *  version Nov. 13, 2017
+ * @version Dec. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 class ControllerEngine(
@@ -16,6 +18,25 @@ class ControllerEngine(
   extend: List[ControllerEngine],
   systemRule: ControllerEngine.Rule
 ) {
+  def applyRerun(parcel: Parcel, count: Int): Parcel = {
+    @annotation.tailrec
+    def go(p: Parcel, count: Int): Parcel = {
+      val r = apply(p)
+      r.command match {
+        case Some(s) => s match {
+          case RerunCommand(x) =>
+            if (count <= 0)
+              RAISE.noReachDefect
+            else
+              go(x, count - 1)
+          case _ => r
+        }
+        case None => r
+      }
+    }
+    go(parcel, 1)
+  }
+
   def apply(parcel: Parcel): Parcel = parcel.executeWithTrace("ControllerEngine#apply", parcel.show) {
     val r = applyOption(parcel) getOrElse parcel
     Result(r, r.show)
@@ -41,7 +62,7 @@ object ControllerEngine {
     def findController(parcel: Parcel): Option[Controller] =
       slots.find(_.isAccept(parcel)).map(_.controller)
 
-    def append(p: (Guard, Controller)): Rule = copy(slots = slots :+ Slot(p))
+    def append(p: (Guard, Controller), ps: (Guard, Controller)*): Rule = copy(slots = (slots :+ Slot(p)) ++ ps.map(Slot(_)))
   }
   object Rule {
     val empty = Rule(Vector.empty)

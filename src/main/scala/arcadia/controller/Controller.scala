@@ -13,7 +13,7 @@ import arcadia.scenario.ScenarioEngine
  *  version Sep. 17, 2017
  *  version Oct. 14, 2017
  *  version Nov. 13, 2017
- * @version Dec. 19, 2017
+ * @version Dec. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 abstract class Controller(rule: Controller.Rule) {
@@ -110,13 +110,21 @@ case object LogoutController extends Controller(
   override val guard = CommandGuard(classOf[LogoutCommand])
 }
 
-object RedirectController extends Controller(
-  Controller.Rule(List(RedirectAction()))
+case class RouterController(route: Route) extends Controller(
+  Controller.Rule(List(RouterAction(route)))
 ) {
   override val guard = new Guard {
-    def isAccept(p: Parcel) = p.getEffectiveModel.fold(false) {
-      case m: arcadia.model.OperationOutcomeModel => true
-      case _ => false
-    }
+    def isAccept(p: Parcel) = route.isAccept(p)
   }
 }
+
+// object RedirectController extends Controller(
+//   Controller.Rule(List(RedirectAction()))
+// ) {
+//   override val guard = new Guard {
+//     def isAccept(p: Parcel) = p.getEffectiveModel.fold(false) {
+//       case m: arcadia.model.OperationOutcomeModel => true
+//       case _ => false
+//     }
+//   }
+// }

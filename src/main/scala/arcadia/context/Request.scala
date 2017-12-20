@@ -4,7 +4,7 @@ import org.goldenport.record.v2.Record
 
 /*
  * @since   Dec. 19, 2017
- * @version Dec. 19, 2017
+ * @version Dec. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 case class Request(
@@ -14,4 +14,6 @@ case class Request(
   query: Record,
   form: Record
 ) {
+  def isGet = method.toUpperCase == "GET"
+  def isMutation = !isGet
 }

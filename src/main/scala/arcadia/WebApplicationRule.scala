@@ -18,7 +18,7 @@ import arcadia.model.SubmitKind
  * @since   Aug. 12, 2017
  *  version Oct. 27, 2017
  *  version Nov. 15, 2017
- * @version Dec. 18, 2017
+ * @version Dec. 20, 2017
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationRule(
@@ -34,6 +34,7 @@ case class WebApplicationRule(
   info_list: Option[WebApplicationRule.InfoList], // footer
   singlePageApplication: Option[WebApplicationRule.SinglePageApplication],
   http: Option[WebApplicationRule.Http],
+  route: Route,
   properties: Record
 ) {
   def applicationTitle(locale: Locale): NodeSeq = application_title.flatMap(_.get(locale)) getOrElse Group(Nil)
@@ -61,6 +62,7 @@ case class WebApplicationRule(
         case (None, Some(r)) => Some(r)
         case (None, None) => None
       },
+      route.complement(rhs.route),
       properties.complements(rhs.properties)
     )
   }
@@ -89,6 +91,7 @@ object WebApplicationRule {
     None,
     None,
     None,
+    Route.empty,
     Record.empty
   )
 

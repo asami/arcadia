@@ -19,7 +19,8 @@ import arcadia.model.ErrorModel
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
  *  version Oct. 27, 2017
- * @version Nov. 17, 2017
+ *  version Nov. 17, 2017
+ * @version Dec. 21, 2017
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
@@ -64,8 +65,13 @@ sealed trait Content {
 
   def show: String
 
-  protected final def to_contenttype(charset: Option[String]) =
-    charset.fold(mimetype.name)(x => s"${mimetype.name}; charset=$x")
+  protected final def to_contenttype(charset: Option[String]): String =
+    charset.fold(mimetype.name)(to_contenttype(_))
+
+  protected final def to_contenttype(charset: String): String = 
+    s"${mimetype.name}; charset=$charset"
+
+  protected final def to_contenttype_utf8 = to_contenttype("UTF-8")
 }
 object Content {
 }
@@ -124,6 +130,7 @@ case class XmlContent(
 ) extends Content {
   override def asXml: NodeSeq = xml
   override def asXmlContent: XmlContent = this
+  override lazy val contenttype = to_contenttype("utf-8")
 
   lazy val toHtmlString: String = XmlPrinter.html(xml)
 
