@@ -16,7 +16,8 @@ import arcadia.domain._
  * @since   Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
- * @version Nov. 13, 2017
+ *  version Nov. 13, 2017
+ * @version Jan.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -36,6 +37,7 @@ case class ExecutionContext(
   def put(uri: String, query: Map[String, Any], form: Map[String, Any]): Response = platformExecutionContext.put(uri, query, form)
   def delete(uri: String, query: Option[Map[String, Any]], form: Option[Map[String, Any]]): Response = platformExecutionContext.delete(uri, query.getOrElse(Map.empty), form.getOrElse(Map.empty))
   def delete(uri: String, query: Map[String, Any], form: Map[String, Any]): Response = platformExecutionContext.delete(uri, query, form)
+  def invoke(op: InvokeCommand): Response = platformExecutionContext.invoke(op)
   def getEntitySchema(name: String): Option[Schema] = {
     // TODO config
     platformExecutionContext.getEntitySchema(name)

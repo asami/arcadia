@@ -15,7 +15,8 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  * @since   Sep. 30, 2017
  *  version Oct. 31, 2017
  *  version Nov. 14, 2017
- * @version Dec. 13, 2017
+ *  version Dec. 13, 2017
+ * @version Jan.  8, 2018
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -91,6 +92,7 @@ object Tags {
     BannerTag,
     CarouselTag,
     BadgeTag,
+    ButtonTag,
     ModelTag,
     ErrorTag,
     WidgetTag
@@ -115,7 +117,7 @@ case class Expression(
   def withTable(p: TableKind): Expression = copy(parcel = parcel.withTableKind(p))
   def withCard(p: Option[String]): Expression = p.fold(this) { x =>
     val card = CardKind.take(x)
-    copy(parcel = parcel.withCardKind(card))
+    copy(parcel = parcel.withCardKindInGrid(card))
   }
 
   lazy val element = elem.copy(child = XmlUtils.seqOfNodeSeqToSeqOfNode(children.map(_.xml)))

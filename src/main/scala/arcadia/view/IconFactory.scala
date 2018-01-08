@@ -1,15 +1,23 @@
 package arcadia.view
 
 import org.goldenport.Strings
+import IconFactory._
 
 /*
  * @since   Aug. 14, 2017
- * @version Aug. 29, 2017
+ * @version Dec. 30, 2017
  * @author  ASAMI, Tomoharu
  */
-object IconFactory {
-  // See https://themify.me/themify-icons
-  val unknownTiIcon = "ti-wand"
+sealed trait IconFactory {
+  def unknownIcon: String
+  def getIcon(p: String): Option[String]
+  def guessIcon(p: String): String = guessIconOption(p) getOrElse unknownIcon
+  def guessIconOption(p: String): Option[String]
+}
+
+// See https://themify.me/themify-icons
+case class ThemifyIconFactory() extends IconFactory {
+  val unknownIcon = "ti-wand"
   val tiIconNames = Set(
     "wand",
     "volume",
@@ -377,40 +385,70 @@ object IconFactory {
     val a = _guess_map.toVector.map {
       case (k, v) => Slot(k, None, v)
     }
-    val b = tiIconNames.toVector.sortBy(_.length * -1).flatMap(Slot.get)
+    val b = tiIconNames.toVector.sortBy(_.length * -1).flatMap(get_slot)
     a ++ b
   }
 
-  case class Slot(main: String, sub: Option[String], icon: String) {
-    def isGuessMatch(p: String) =
-      p.contains(main) && sub.fold(true)(p.contains)
-  }
-  object Slot {
-    def apply(p: String): Slot = Strings.totokens(p, "-") match {
-      case Nil => Slot("", None, unknownTiIcon)
-      case x :: Nil => Slot(x, None, s"ti-$p")
-      case x :: x1 :: xs =>
-        if (x1 == "alt") Slot(x, None, s"ti-$p") else Slot(x, Some(x1), s"ti-$p")
-    }
-    def get(p: String): Option[Slot] = Strings.totokens(p, "-") match {
-      case Nil => None
-      case x :: Nil => Some(Slot(x, None, s"ti-$p"))
-      case x :: x1 :: Nil =>
-        Some(if (x1 == "alt") Slot(x, None, s"ti-$p") else Slot(x, Some(x1), s"ti-$p"))
-      case _ => None
-    }
-  }
-
-  def getTiIcon(p: String): Option[String] =
+  def getIcon(p: String): Option[String] =
     if (tiIconNames.contains(p))
       Some(s"ti-$p")
     else
       None
 
-  def guessTiIcon(p: String): String = guessTiIconOption(p) getOrElse unknownTiIcon
-
-  def guessTiIconOption(p: String): Option[String] = {
+  def guessIconOption(p: String): Option[String] = {
     val s = p.toLowerCase
     _icon_slots.find(_.isGuessMatch(s)).map(_.icon)
   }
+
+  protected def apply_slot(p: String, d: String): Slot = Strings.totokens(p, "-") match {
+    case Nil => Slot("", None, unknownIcon)
+    case x :: Nil => Slot(x, None, s"ti-$p")
+    case x :: x1 :: xs =>
+      if (x1 == "alt") Slot(x, None, s"ti-$p") else Slot(x, Some(x1), s"ti-$p")
+  }
+
+  protected def get_slot(p: String): Option[Slot] = Strings.totokens(p, "-") match {
+    case Nil => None
+    case x :: Nil => Some(Slot(x, None, s"ti-$p"))
+    case x :: x1 :: Nil =>
+      Some(if (x1 == "alt") Slot(x, None, s"ti-$p") else Slot(x, Some(x1), s"ti-$p"))
+    case _ => None
+  }
+}
+
+// http://demos.creative-tim.com/now-ui-kit/nucleo-icons.html
+case class NucleoIconFactory() extends IconFactory {
+  val unknownIcon = "nc-atom"
+  def getIcon(p: String): Option[String] = None
+  def guessIconOption(p: String): Option[String] = None
+}
+
+object IconFactory {
+  val themify = ThemifyIconFactory()
+  val nucleo = NucleoIconFactory()
+
+  case class Slot(main: String, sub: Option[String], icon: String) {
+    def isGuessMatch(p: String) =
+      p.contains(main) && sub.fold(true)(p.contains)
+  }
+  // object Slot {
+  //   def apply(p: String, d: String): Slot = Strings.totokens(p, "-") match {
+  //     case Nil => Slot("", None, unknownTiIcon)
+  //     case x :: Nil => Slot(x, None, s"ti-$p")
+  //     case x :: x1 :: xs =>
+  //       if (x1 == "alt") Slot(x, None, s"ti-$p") else Slot(x, Some(x1), s"ti-$p")
+  //   }
+  //   def get(p: String): Option[Slot] = Strings.totokens(p, "-") match {
+  //     case Nil => None
+  //     case x :: Nil => Some(Slot(x, None, s"ti-$p"))
+  //     case x :: x1 :: Nil =>
+  //       Some(if (x1 == "alt") Slot(x, None, s"ti-$p") else Slot(x, Some(x1), s"ti-$p"))
+  //     case _ => None
+  //   }
+  // }
+
+  def getTiIcon(p: String): Option[String] = themify.getIcon(p)
+  def guessTiIcon(p: String): String = themify.guessIcon(p)
+  def guessTiIconOption(p: String): Option[String] = themify.guessIconOption(p)
+  def guessNcIcon(p: String): String = nucleo.guessIcon(p)
 }

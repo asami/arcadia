@@ -10,7 +10,8 @@ import arcadia._
  *  version Sep. 17, 2017
  *  version Oct.  6, 2017
  *  version Nov. 13, 2017
- * @version Dec. 21, 2017
+ *  version Dec. 21, 2017
+ * @version Jan.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 class ControllerEngine(
@@ -25,10 +26,11 @@ class ControllerEngine(
       r.command match {
         case Some(s) => s match {
           case RerunCommand(x) =>
+            val a = _invoke(x)
             if (count <= 0)
               RAISE.noReachDefect
             else
-              go(x, count - 1)
+              go(a, count - 1)
           case _ => r
         }
         case None => r
@@ -36,6 +38,12 @@ class ControllerEngine(
     }
     go(parcel, 1)
   }
+
+  private def _invoke(p: Parcel): Parcel =
+    if (InvokeController.guard.isAccept(p))
+      InvokeController.apply(p)
+    else
+      p
 
   def apply(parcel: Parcel): Parcel = parcel.executeWithTrace("ControllerEngine#apply", parcel.show) {
     val r = applyOption(parcel) getOrElse parcel

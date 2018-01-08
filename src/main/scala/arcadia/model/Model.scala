@@ -23,7 +23,8 @@ import arcadia.domain._
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
  *  version Nov. 13, 2017
- * @version Dec. 21, 2017
+ *  version Dec. 21, 2017
+ * @version Jan.  6, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -562,7 +563,8 @@ case class PropertyTableModel(
   getSchema: Option[Schema],
   records: List[Record],
   tableKind: Option[TableKind] = None,
-  expiresKind: Option[ExpiresKind] = None
+  expiresKind: Option[ExpiresKind] = None,
+  dataHref: Option[URI] = None
 ) extends ITableModel with IComponentModel {
   def getEntityType = None
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
@@ -595,11 +597,14 @@ case class PropertyTableModel(
     tableKind = get_table_kind(tableKind, kind)
   )
 
+  def withDataHref(p: Option[URI]): PropertyTableModel = copy(dataHref = p)
+
   def toRecord: Record = throw new UnsupportedOperationException()
+
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, caption
   ){
-    protected def render_Content: NodeSeq = property_table(getSchema, records)
+    protected def render_Content: NodeSeq = property_table(getSchema, records, dataHref)
   }.apply
   lazy val effectiveSchema = getSchema.getOrElse(RecordUtils.buildSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
@@ -622,7 +627,8 @@ case class TableModel(
   getSchema: Option[Schema],
   records: List[Record],
   tableKind: Option[TableKind],
-  expiresKind: Option[ExpiresKind] = None
+  expiresKind: Option[ExpiresKind] = None,
+  dataHref: Option[URI] = None
 ) extends ITableModel with IComponentModel {
   def getEntityType = None
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
@@ -654,12 +660,16 @@ case class TableModel(
     tableKind = get_table_kind(tableKind, kind)
   )
 
+  def withDataHref(p: Option[URI]): TableModel = copy(dataHref = p)
+
   def toRecord: Record = throw new UnsupportedOperationException()
+
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, caption
   ){
-    protected def render_Content: NodeSeq = table(strategy.tableKind(tableKind), getSchema, records)
+    protected def render_Content: NodeSeq = table(strategy.tableKind(tableKind), getSchema, records, dataHref)
   }.apply
+
   lazy val effectiveSchema = getSchema.getOrElse(RecordUtils.buildSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
   lazy val tbody: TableBodyModel = TableBodyModel(Some(effectiveSchema), records, tableKind)
@@ -670,6 +680,8 @@ object TableModel {
     TableModel(Some(caption), None, records.toList, None)
   def apply(caption: I18NElement, schema: Schema, records: Seq[Record]): TableModel =
     TableModel(Some(caption), Some(schema), records.toList, None)
+  def apply(schema: Schema, records: Seq[Record], kind: TableKind, expires: ExpiresKind, datahref: String): TableModel =
+    TableModel(None, Some(schema), records.toList, Some(kind), Some(expires), Some(new URI(datahref)))
 }
 
 case class TableHeadModel(
@@ -730,7 +742,7 @@ case class TableBodyRecordsModel(
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ){
-    protected def render_Content: NodeSeq = table(tableKind, getSchema, records)
+    protected def render_Content: NodeSeq = table(tableKind, getSchema, records, None)
   }.apply
   def getEntityType = None
   def record = toRecord
@@ -870,8 +882,12 @@ case class TableCardModel(
   }.apply
 }
 object TableCardModel {
-  def apply(title: I18NElement, schema: Schema, records: Seq[Record]): TableCardModel =
-    TableCardModel(TableModel(None, Some(schema), records.toList, Some(DashboardTable)), None, Some(TitleLine.create(title)))
+  def apply(title: I18NElement, schema: Schema, records: Seq[Record], expires: ExpiresKind, datahref: String): TableCardModel =
+    TableCardModel(
+      TableModel(schema, records, DashboardTable, expires, datahref),
+      None,
+      Some(TitleLine.create(title))
+    )
 }
 
 case class SearchBoxModel(

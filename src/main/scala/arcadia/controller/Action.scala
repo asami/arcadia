@@ -23,7 +23,8 @@ import arcadia.scenario.ScenarioEngine
  *  version Sep. 21, 2017
  *  version Oct. 31, 2017
  *  version Nov. 13, 2017
- * @version Dec. 21, 2017
+ *  version Dec. 21, 2017
+ * @version Jan.  9, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -122,6 +123,7 @@ object Action {
   implicit val OperationActionFormat = Json.format[OperationAction]
   implicit val GetEntityActionFormat = Json.format[GetEntityAction]
   implicit val ReadEntityListActionFormat = Json.format[ReadEntityListAction]
+  implicit val UpdateEntityCommandActionFormat = Json.format[UpdateEntityCommandAction]
   implicit val CarouselActionFormat = Json.format[CarouselAction]
   implicit val BannerActionFormat = Json.format[BannerAction]
   implicit val BadgeActionFormat = Json.format[BadgeAction]
@@ -345,6 +347,28 @@ case class ReadEntityListAction(
   }
 }
 
+case class UpdateEntityCommandAction(
+  source: Option[Source],
+  sink: Option[Sink]
+) extends SourceSinkAction {
+  protected def execute_Apply(parcel: Parcel): Parcel = execute_source_sink(parcel) { src =>
+    val uri = ???
+    val method = ???
+    val schema = ???
+    val record = ???
+    val hidden = ???
+    val submit = ???
+    PropertyConfirmFormModel(
+      uri,
+      method,
+      schema,
+      record,
+      hidden,
+      submit
+    )
+  }
+}
+
 case class CarouselAction(
   source: Option[Source],
   sink: Option[Sink]
@@ -481,6 +505,21 @@ case class RedirectSinglePageAction(
   def makeUrlQueryParams(q: Record) = q.toStringVector.map {
     case (k, v) => s"${k}=${v}"
   }.mkString("&")
+}
+
+case class InvokeAction(
+) extends Action {
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    parcel.command.collect {
+      case m: InvokeCommand => m
+    }.flatMap(cmd =>
+      parcel.context.map { ctx =>
+        val res = ctx.invoke(cmd)
+        val param = ModelParameter(None)
+        Model.get(param, res).map(parcel.withModel).getOrElse(parcel)
+      }
+    ).getOrElse(parcel)
+  }
 }
 
 case class BrokenAction(

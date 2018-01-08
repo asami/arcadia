@@ -18,7 +18,8 @@ import arcadia.scenario._
  *  version Sep.  2, 2017
  *  version Oct. 27, 2017
  *  version Nov. 16, 2017
- * @version Dec. 21, 2017
+ *  version Dec. 21, 2017
+ * @version Jan.  8, 2018
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -94,7 +95,7 @@ class WebEngine(
     apply(p) match {
       case m: StringContent => m.string
       case m: BinaryContent => RAISE.noReachDefect
-      case m: XmlContent => m.xml.toString
+      case m: XmlContent => m.toHtmlString
       case m: RedirectContent => RAISE.noReachDefect
       case m: NotFoundContent => RAISE.noReachDefect // TODO
       case m: ErrorContent => RAISE.noReachDefect // TODO

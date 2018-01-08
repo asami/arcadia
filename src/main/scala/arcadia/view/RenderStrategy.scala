@@ -26,7 +26,8 @@ import arcadia.view.ViewEngine._
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
  *  version Nov. 22, 2017
- * @version Dec. 18, 2017
+ *  version Dec. 30, 2017
+ * @version Jan.  6, 2018
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -44,6 +45,8 @@ case class RenderStrategy(
   def tableKind = renderContext.tableKind getOrElse theme.default.tableKind
   def tableKind(p: Option[TableKind]) = renderContext.tableKind orElse p getOrElse theme.default.tableKind
   def cardKind = renderContext.cardKind getOrElse theme.default.cardKind
+  def cardKind(p: Option[TableKind]) = renderContext.cardKind orElse p getOrElse theme.default.cardKind
+  def cardKindInGrid = renderContext.cardKindInGrid getOrElse theme.default.cardKindInGrid
   def isLogined = executeOption(_.isLogined) getOrElse false
   def getOperationName: Option[String] = executeOption(_.getOperationName).flatten
   def gridContext: GridContext = renderContext.gridContext getOrElse theme.default.gridContext(this)
@@ -71,7 +74,8 @@ case class RenderStrategy(
   def withEntityType(p: DomainEntityType) = copy(renderContext = renderContext.withEntityType(p))
   def withUsageKind(p: UsageKind) = copy(renderContext = renderContext.withUsageKind(p))
   def withTableKind(p: TableKind) = copy(renderContext = renderContext.withTableKind(p))
-  def withCardKind(p: CardKind) = copy(renderContext = renderContext.withCardKind(p))
+//  private def withCardKind(p: CardKind) = copy(renderContext = renderContext.withCardKind(p))
+  def withCardKindInGrid(p: CardKind) = copy(renderContext = renderContext.withCardKindInGrid(p))
   def withFormatter(p: FormatterContext) = copy(renderContext = renderContext.withFormatter(p))
 
   def withViewContext(engine: ViewEngine, parcel: Parcel) = copy(viewContext = Some(ViewContext(engine, parcel)))
@@ -231,6 +235,7 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
     def usageKind: UsageKind = default_UsageKind
     def tableKind: TableKind = default_TableKind
     def cardKind: CardKind = default_CardKind
+    def cardKindInGrid: CardKind = default_CardKind_In_Grid
     def gridContext(strategy: RenderStrategy): GridContext = default_GridContext(strategy)
   }
   object head {
@@ -325,7 +330,8 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
 
   protected def default_UsageKind: UsageKind = ListUsage
   protected def default_TableKind: TableKind = ListTable
-  protected def default_CardKind: CardKind = ImageTitleCard
+  protected def default_CardKind: CardKind = FullCard
+  protected def default_CardKind_In_Grid: CardKind = ImageTitleCard
   protected def default_GridContext(strategy: RenderStrategy): GridContext = GridContext.card
   protected def default_No_Image_Icon: String = "assets/img/no-image-icon.png"
   protected def default_No_Image_Picture: String = "assets/img/no-image-picture.png"
@@ -395,7 +401,8 @@ object RenderTheme extends EnumerationClass[RenderTheme] {
     PaperDashboardTheme,
     MatrialKitTheme,
     NowUiKitTheme,
-    MyColorTheme
+    MyColorTheme,
+    LightBootstrapDashboardTheme
   )
 }
 
@@ -412,7 +419,7 @@ sealed trait BootstrapRenderThemaBase extends RenderTheme {
   }
 
   private def _table_container_standard(body: => Node): Node = // TODO
-    <div class="content table-responsive table-full-width">
+    <div class="table-responsive">
       {body}
     </div>
 
@@ -421,12 +428,12 @@ sealed trait BootstrapRenderThemaBase extends RenderTheme {
   private def _table_container_grid(body: => Node): Node = {body}
 
   private def _table_container_card(body: => Node): Node = 
-    <div class="content table-responsive table-full-width">
+    <div class="table-responsive">
       {body}
     </div>
 
   private def _table_container_dashboard(body: => Node): Node = 
-    <div class="content table-responsive table-full-width arcadia-dashboard">
+    <div class="table-responsive">
       {body}
     </div>
 
@@ -497,6 +504,66 @@ case object MyColorTheme extends Bootstrap4RenderThemaBase {
   override protected def card_CssClass_Div_Content: String = ""
 }
 
+case object LightBootstrapDashboardTheme extends Bootstrap4RenderThemaBase {
+  override protected def sidebar_Feature_Item(
+    view: ViewModel,
+    p: WebApplicationRule.Page
+  ): Node = {
+    val isactive = view.isActiveFeature(p.name)
+    val icon = IconFactory.guessNcIcon(p.name)
+    val href = if (isactive) "#" else s"${p.name}.html"
+    def anchor = <a class="nav-link" href={href}>
+      <i class={s"nc-icon ${icon}"}>&#8203;</i>
+      <p>{p.title(view.locale)}</p>
+    </a>
+    if (isactive)
+      <li class="nav-item active">{anchor}</li>
+    else
+      <li>{anchor}</li>
+  }
+
+  override protected def navigation_Content(view: ViewModel): Node = Group(
+    List(
+      <ul class="nav navbar-nav mr-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="#" data-toggle="dropdown">
+            <i class="nc-icon nc-palette"></i>
+            <span class="d-lg-none">Stats</span>
+          </a>
+        </li>
+      </ul>,
+      <ul class="nav navbar-nav ml-auto">{
+        List(
+          _nav_login_logout(view)
+        )
+      }</ul>
+    )
+  )
+
+  private def _nav_login_logout(view: ViewModel): Node =
+    if (view.isLogined)
+      _nav_logout
+    else
+      _nav_login
+
+
+  private def _nav_login: Node = {
+    <li class="nav-item">
+      <a class="nav-link" href="login.html">
+        <span class="no-icon">Login</span>
+      </a>
+    </li>
+  }
+
+  private def _nav_logout: Node = {
+    <li class="nav-item">
+      <a class="nav-link" href="logout.html">
+        <span class="no-icon">Logout</span>
+      </a>
+    </li>
+  }
+}
+
 sealed trait TableKind extends NamedValueInstance {
 }
 object TableKind extends EnumerationClass[TableKind] {
@@ -550,6 +617,13 @@ object CardKind extends EnumerationClass[CardKind] {
     ImageTitleContentCard
   )
   def take(p: String) = get(p) getOrElse ComponentCard(p)
+}
+case object FullCard extends CardKind {
+  val name = "full"
+  def isImageTop: Boolean = true
+  def isHeader: Boolean = true
+  def isFooter: Boolean = true
+  def isContent: Boolean = true
 }
 case object ImageCard extends CardKind {
   val name = "image"
@@ -868,6 +942,7 @@ case class RenderContext(
   usageKind: Option[UsageKind],
   tableKind: Option[TableKind],
   cardKind: Option[CardKind],
+  cardKindInGrid: Option[CardKind],
   sectionLevel: Option[Int],
   entityType: Option[DomainEntityType],
   schema: Option[Schema],
@@ -888,7 +963,7 @@ case class RenderContext(
   def withEntityType(p: DomainEntityType) = copy(entityType = Some(p))
   def withUsageKind(p: UsageKind) = copy(usageKind = Some(p))
   def withTableKind(p: TableKind) = copy(tableKind = Some(p))
-  def withCardKind(p: CardKind) = copy(cardKind = Some(p))
+  def withCardKindInGrid(p: CardKind) = copy(cardKindInGrid = Some(p))
   def withEpilogue = copy(epilogue = Some(new EpilogueContext()))
   def withFormatter(p: FormatterContext) = copy(formatter = p)
 
@@ -919,6 +994,7 @@ object RenderContext {
     None,
     MediaOperationMode,
     DesktopScreen,
+    None,
     None,
     None,
     None,

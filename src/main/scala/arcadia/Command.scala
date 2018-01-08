@@ -16,19 +16,20 @@ import arcadia.context.Request
  *  version Sep. 25, 2017
  *  version Oct. 24, 2017
  *  version Nov. 13, 2017
- * @version Dec. 21, 2017
+ *  version Dec. 21, 2017
+ * @version Jan.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Command {
 //  def viewBindings(parcel: Parcel): Map[String, AnyRef] = Map.empty
 //  def toRecord: Record = Record.empty // TODO
   def getModel: Option[Model] = None
-  def getUseLayout: Option[Boolean] = None
+  def getLayout: Option[LayoutKind] = None
   def show: String = toString()
 }
 
 case class AssetsCommand(pathname: String) extends Command {
-  override val getUseLayout = Some(false)
+  override val getLayout = Some(NoneLayout)
 }
 
 case class MaterialCommand(pathname: PathName) extends Command {
@@ -140,4 +141,7 @@ case class ScenarioCommand(
 object ScenarioCommand {
   val PROP_SUBMIT_PREFIX = "$submit_"
   val PROP_SCENARIO = "$scenario"
+}
+
+case class InvokeCommand(service: Any) extends Command {
 }

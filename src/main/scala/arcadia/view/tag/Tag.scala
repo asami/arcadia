@@ -15,7 +15,8 @@ import arcadia.model._
 /*
  * @since   Oct. 11, 2017
  *  version Nov. 15, 2017
- * @version Dec. 13, 2017
+ *  version Dec. 13, 2017
+ * @version Jan.  9, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -187,5 +188,27 @@ case object NoticeTag extends Tag with SelectByName {
   protected def eval_Expression(p: Expression): XmlContent = {
     val model = p.effectiveModel
     p.applyModel(model)
+  }
+}
+
+case object ButtonTag extends Tag with SelectByName {
+  val name = "button"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    p.effectiveModel match {
+      case m: PropertyConfirmFormModel => _button(m)
+      case _ => RAISE.noReachDefect
+    }
+  }
+
+  private def _button(p: PropertyConfirmFormModel) = {
+    val action: String = ???
+    val buttonname: String = ???
+    val properties: String = ???
+    val buttonclass = "btn btn-primary btn-round"
+    val a = <form method="POST" action={action}>
+      <input type="submit" value={buttonname} class={buttonclass}/>
+    </form>
+    XmlContent(a)
   }
 }

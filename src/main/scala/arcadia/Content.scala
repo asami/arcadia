@@ -20,7 +20,8 @@ import arcadia.model.ErrorModel
  *  version Sep. 30, 2017
  *  version Oct. 27, 2017
  *  version Nov. 17, 2017
- * @version Dec. 21, 2017
+ *  version Dec. 21, 2017
+ * @version Jan.  8, 2018
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
@@ -313,7 +314,7 @@ case object StablePageExpires extends ExpiresKind { // CDN
   }
 }
 case object AgilePageExpires extends ExpiresKind { // CDN
-  val cacheControlHeader = Vector("public", "no-cache")
+  val cacheControlHeader = Vector("public") // must-revalidate
   val varyHeader = Vector.empty
   val cachePeriod = Some(1.hours)
   val proxyCachePeriod = None
@@ -325,9 +326,9 @@ case object AgilePageExpires extends ExpiresKind { // CDN
   }
 }
 case object FragilePageExpires extends ExpiresKind { // CDN
-  val cacheControlHeader = Vector("public", "no-cache", "must-revalidate")
+  val cacheControlHeader = Vector("public") // "no-cache"
   val varyHeader = Vector.empty
-  val cachePeriod = Some(1.hours)
+  val cachePeriod = Some(30.minutes)
   val proxyCachePeriod = None
   def +(rhs: ExpiresKind) = rhs match {
     case AssetsExpires => this

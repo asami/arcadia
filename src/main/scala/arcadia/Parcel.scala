@@ -5,6 +5,7 @@ import java.net.URI
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2.Record
 import org.goldenport.trace.{TraceContext, Result}
+import org.goldenport.values.PathName
 import org.goldenport.util.{SeqUtils, MapUtils}
 import arcadia.context._
 import arcadia.domain._
@@ -19,7 +20,8 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Aug. 29, 2017
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
- * @version Nov. 16, 2017
+ *  version Nov. 16, 2017
+ * @version Jan.  8, 2018
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -51,8 +53,10 @@ case class Parcel(
     fold(RAISE.noReachDefect)(x => withRenderStrategy(x.withUsageKind(p)))
   def withTableKind(p: TableKind) = render.
     fold(RAISE.noReachDefect)(x => withRenderStrategy(x.withTableKind(p)))
-  def withCardKind(p: CardKind) = render.
-    fold(RAISE.noReachDefect)(x => withRenderStrategy(x.withCardKind(p)))
+  // def withCardKind(p: CardKind) = render.
+  //   fold(RAISE.noReachDefect)(x => withRenderStrategy(x.withCardKind(p)))
+  def withCardKindInGrid(p: CardKind) = render.
+    fold(RAISE.noReachDefect)(x => withRenderStrategy(x.withCardKindInGrid(p)))
 
   def forComponent(model: Model) = withModel(model).copy(command = None).componentScope
   def forView(engine: ViewEngine) =
@@ -113,11 +117,19 @@ case class Parcel(
       case MaterialCommand(pathname) => Some(pathname.body)
       case _ => context.flatMap(_.getOperationName)
     }
-  def isOperationPathName(p: String): Boolean = 
-    command.fold(false) {
-      case MaterialCommand(pathname) => p == pathname.body || pathname.getParent.fold(false)(_.body == p)
-      case _ => context.flatMap(_.getOperationName).map(_ == p).getOrElse(false)
-    }
+  def isOperationPathName(p: String): Boolean = {
+    def ispathname(pathname: PathName) =
+      p == pathname.body || pathname.getParent.fold(false)(_.body == p)
+    command.flatMap {
+      case MaterialCommand(pathname) => Some(ispathname(pathname))
+      case _ => None
+    }.getOrElse(
+      context.
+        flatMap(_.getOperationName.map(PathName(_))).
+        map(ispathname).
+        getOrElse(false)
+    )
+  }
 
   def getEntityType: Option[DomainEntityType] = render.flatMap(_.getEntityType)
   def fetchString(p: UrnSource): Option[String] = context.flatMap(_.fetchString(p))

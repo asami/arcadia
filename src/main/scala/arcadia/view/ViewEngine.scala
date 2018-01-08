@@ -19,7 +19,8 @@ import arcadia.model.{Model, ErrorModel}
  *  version Sep. 30, 2017
  *  version Oct. 31, 2017
  *  version Nov. 15, 2017
- * @version Dec. 18, 2017
+ *  version Dec. 18, 2017
+ * @version Jan.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -40,7 +41,7 @@ class ViewEngine(
     a ++ b
   }
 
-  lazy val layouts: Map[LayoutKind, LayoutView] = MapUtils.complements(rule.layouts, extend.map(_.layouts))
+//  lazy val layouts: Map[LayoutKind, LayoutView] = MapUtils.complements(rule.layouts, extend.map(_.layouts))
 
   lazy val partials: Partials = rule.partials.complements(extend.map(_.partials))
 
@@ -55,11 +56,28 @@ class ViewEngine(
     components.find(_.isAccept(parcel)).map(_.view)
 
   def getLayout(parcel: Parcel): Option[LayoutView] = {
-    val uselayout = is_spa(parcel) || parcel.command.map(_.getUseLayout.getOrElse(true)).getOrElse(true)
-    if (uselayout)
-      layouts.get(DefaultLayout)
-    else
-      None
+    def getlayout(kind: LayoutKind) = rule.getLayout(kind).orElse(
+      extend.toStream.flatMap(_.rule.getLayout(kind)).headOption
+    )
+    val layout =
+      if (is_spa(parcel))
+        Some(DefaultLayout)
+      else
+        parcel.command.flatMap(_.getLayout).orElse(
+          rule.getLayoutKind(parcel).orElse(
+            extend.toStream.flatMap(_.rule.getLayoutKind(parcel)).headOption
+          )
+        )
+    layout match {
+      case Some(NoneLayout) => None
+      case Some(m) => getlayout(m) orElse getlayout(DefaultLayout)
+      case None => getlayout(DefaultLayout)
+    }
+    // val uselayout = is_spa(parcel) || parcel.command.map(_.getUseLayout.getOrElse(true)).getOrElse(true)
+    // if (uselayout)
+    //   layouts.get(DefaultLayout)
+    // else
+    //   None
   }
 
   protected def is_spa(parcel: Parcel): Boolean = parcel.command.map {
@@ -268,16 +286,23 @@ object ViewEngine {
 
     def isSinglePageApplicationRoot(p: String): Boolean =
       singlePageApplication.map(_.isRootPagePathname(p)).getOrElse(false)
-    // def findView(parcel: Parcel): Option[View] =
-    //   slots.find(_.isAccept(parcel)).map(_.view)
 
-    // def getLayout(parcel: Parcel): Option[LayoutView] = {
-    //   val uselayout = parcel.command.flatMap(_.getUseLayout).getOrElse(true)
-    //   if (uselayout)
-    //     layouts.get(DefaultLayout)
-    //   else
-    //     None
-    // }
+    // TODO config
+    private val _operation_kind = Map(
+      "login" -> PlainLayout,
+      "logout" -> PlainLayout
+    )
+
+    def getLayoutKind(parcel: Parcel): Option[LayoutKind] = {
+      def bymodel = parcel.model.flatMap {
+        case m: ErrorModel => Some(ErrorLayout)
+        case _ => None
+      }
+      def byoperation = parcel.getOperationName.flatMap(_operation_kind.get)
+      bymodel orElse byoperation
+    }
+
+    def getLayout(kind: LayoutKind): Option[LayoutView] = layouts.get(kind)
   }
   object Rule {
     def create(
@@ -312,9 +337,25 @@ object ViewEngine {
 
   sealed trait LayoutKind extends NamedValueInstance
   object LayoutKind extends EnumerationClass[LayoutKind] {
-    val elements = Vector(DefaultLayout)
+    val elements = Vector(
+      DefaultLayout,
+      NoneLayout,
+      ErrorLayout,
+      PlainLayout
+    )
   }
   case object DefaultLayout extends LayoutKind {
     val name = "default"
+  }
+  case object NoneLayout extends LayoutKind {
+    val name = "none"
+  }
+  case object ErrorLayout extends LayoutKind {
+    val name = "error"
+  }
+  case object PlainLayout extends LayoutKind {
+    val name = "plain"
+  }
+  case class PageLayout(name: String) extends LayoutKind {
   }
 }

@@ -21,7 +21,8 @@ import arcadia.domain._
 /*
  * @since   Oct. 29, 2017
  *  version Nov. 22, 2017
- * @version Dec. 17, 2017
+ *  version Dec. 17, 2017
+ * @version Jan.  6, 2018
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -30,6 +31,7 @@ sealed trait Particle {
 sealed trait Link extends Particle {
   def id: DomainObjectId
   def getDataHref(ctx: RenderContext): Option[URI]
+  def dataHref(ctx: RenderContext): URI
 }
 
 case class DomainEntityLink(
@@ -53,6 +55,9 @@ case class DomainObjectLink(
       ctx.dataHref.map(d => ctx.uri(d, id)) orElse
       id.getEntityType.map(d => ctx.uri(d, id))
   )
+  def dataHref(ctx: RenderContext): URI = getDataHref(ctx) getOrElse {
+    RAISE.noReachDefect
+  }
 }
 
 case class TitleLine(

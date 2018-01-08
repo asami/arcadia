@@ -22,7 +22,8 @@ import arcadia.context._
  *  version Sep. 26, 2017
  *  version Oct. 31, 2017
  *  version Nov. 22, 2017
- * @version Dec. 19, 2017
+ *  version Dec. 19, 2017
+ * @version Jan.  6, 2018
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -197,12 +198,14 @@ abstract class Renderer(
     }
   }
 
-  protected def table_data_url(p: Table, record: Record): Option[DomainEntityLink] = {
+  protected def table_data_url(p: Table, record: Record): Option[Link] = {
     def base = (p.dataHref.map(x => StringUtils.toPathnameBody(x.toString)) orElse p.entityType.map(_.v)).map(make_html_uri) orElse {
       _get_href_base(record)
     }
-    DomainEntityId.get(record, p.entityType).map(id =>
-      DomainEntityLink(id, base))
+    DomainObjectId.get(record, p.entityType) flatMap {
+      case m: DomainEntityId => Some(DomainEntityLink(m, base))
+      case m: DomainObjectId => base.map(x => DomainObjectLink(m, Some(x)))
+    }
   }
 
   protected final def table_data_url_string(p: Table, record: Record): Option[String] =
@@ -238,11 +241,8 @@ abstract class Renderer(
     table(t)
   }
 
-  protected def table(kind: TableKind, schema: Option[Schema], records: Seq[Record]): NodeSeq =
-    schema.fold(table(records))(table(kind, _, records))
-
   protected def table(schema: Option[Schema], records: Seq[Record]): NodeSeq =
-    schema.fold(table(records))(table(_, records))
+    table(strategy.tableKind, schema, records, None)
 
   protected def table(records: Seq[Record]): NodeSeq = {
     val schema = build_schema(records)
@@ -250,10 +250,13 @@ abstract class Renderer(
   }
 
   protected def table(schema: Schema, records: Seq[Record]): NodeSeq =
-    table(strategy.tableKind, schema, records)
-  
-  protected def table(kind: TableKind, schema: Schema, records: Seq[Record]): NodeSeq =
-    table(TableOrder(Some(kind), None, Some(schema), None, None, Some(records)))
+    table(strategy.tableKind, schema, records, None)
+
+  protected def table(kind: TableKind, schema: Option[Schema], records: Seq[Record], datahref: Option[URI]): NodeSeq =
+    table(TableOrder(Some(kind), None, schema, None, datahref, Some(records)))
+
+  protected def table(kind: TableKind, schema: Schema, records: Seq[Record], datahref: Option[URI]): NodeSeq =
+    table(TableOrder(Some(kind), None, Some(schema), None, datahref, Some(records)))
 
   protected def table(p: TableWithRecords): NodeSeq =
     p.kind match {
@@ -608,11 +611,11 @@ abstract class Renderer(
 
   protected def table_value_string(x: Any): Node = Text(x.toString)
 
-  protected def property_table(schema: Option[Schema], records: Seq[Record]): NodeSeq =
-    table(PropertyTable, schema, records)
+  protected def property_table(schema: Option[Schema], records: Seq[Record], datahref: Option[URI]): NodeSeq =
+    table(PropertyTable, schema, records, datahref)
 
-  protected def property_table(schema: Schema, records: Seq[Record]): NodeSeq =
-    table(PropertyTable, schema, records)
+  protected def property_table(schema: Schema, records: Seq[Record], datahref: Option[URI]): NodeSeq =
+    table(PropertyTable, schema, records, datahref)
 
   protected def entity_property_sheet(
     entitytype: DomainEntityType,
@@ -1002,7 +1005,7 @@ abstract class Renderer(
     if (ps.length == 0)
       empty_block
     else
-      grid_with_content(ps)(card(_))
+      grid_with_content(ps)(card_in_grid(_))
 
   protected def grid_with_content[T](ps: List[T])(f: T => NodeSeq): Elem =
     strategy.theme match {
@@ -1166,43 +1169,14 @@ abstract class Renderer(
     content: NodeSeq
   ): NodeSeq = card(Card.create(imagetop, header, footer, content))
 
-  protected def card(p: Card): NodeSeq = {
-    val card = {
-      val imagetop: Option[Picture] =
-        if (strategy.cardKind.isImageTop)
-          p.image_top // TODO default
-        else
-          None
-      val header: Option[TitleLine] =
-        if (strategy.cardKind.isHeader)
-          p.header orElse Some(TitleLine.blank)
-        else
-          None
-      val footer: Option[TitleLine] =
-        if (strategy.cardKind.isFooter)
-          p.footer orElse Some(TitleLine.blank)
-        else
-          None
-      val content: Option[I18NElement] =
-        if (strategy.cardKind.isContent)
-          p.content orElse Some(I18NElement(""))
-        else
-          None
-      Card(imagetop, header, footer, content, p.link, p.record)
-    }
-    card_component(card) getOrElse {
-      strategy.theme match {
-        case m if m.isCardDiv => card_div(card)
-        case m if m.isCardTable => card_table(card)
-        case m: Bootstrap4RenderThemaBase => card_bootstrap(card)
-        case m: Bootstrap3RenderThemaBase => card_paperdashboard(card)
-        case m => card_table(card)
-      }
-    }
-  }
+  protected def card(card: Card): NodeSeq =
+    card_component(card) getOrElse card_full(card)
 
   protected def card_component(card: Card): Option[NodeSeq] =
-    strategy.renderContext.cardKind flatMap {
+    _card_component(strategy.cardKind, card)
+
+  private def _card_component(kind: CardKind, card: Card): Option[NodeSeq] =
+    kind match {
       case m: ComponentCard =>
         strategy.viewContext.flatMap { x =>
           val a = x.parcel.withModel(CardModel(card, s"card__${m.name}"))
@@ -1210,6 +1184,47 @@ abstract class Renderer(
         }
       case _ => None
     }
+    
+
+  protected def card_in_grid(p: Card): NodeSeq = {
+    val card = {
+      val imagetop: Option[Picture] =
+        if (strategy.cardKindInGrid.isImageTop)
+          p.image_top // TODO default
+        else
+          None
+      val header: Option[TitleLine] =
+        if (strategy.cardKindInGrid.isHeader)
+          p.header orElse Some(TitleLine.blank)
+        else
+          None
+      val footer: Option[TitleLine] =
+        if (strategy.cardKindInGrid.isFooter)
+          p.footer orElse Some(TitleLine.blank)
+        else
+          None
+      val content: Option[I18NElement] =
+        if (strategy.cardKindInGrid.isContent)
+          p.content orElse Some(I18NElement(""))
+        else
+          None
+      Card(imagetop, header, footer, content, p.link, p.record)
+    }
+    card_component_in_grid(card) getOrElse card_full(card)
+  }
+
+  protected def card_component_in_grid(card: Card): Option[NodeSeq] =
+    _card_component(strategy.cardKindInGrid, card)
+
+  protected def card_full(card: Card): NodeSeq = {
+    strategy.theme match {
+      case m if m.isCardDiv => card_div(card)
+      case m if m.isCardTable => card_table(card)
+      case m: Bootstrap4RenderThemaBase => card_bootstrap(card)
+      case m: Bootstrap3RenderThemaBase => card_paperdashboard(card)
+      case m => card_table(card)
+    }
+  }
 
   // Bootstrap 4
   protected def card_bootstrap(card: Card): Elem = {
@@ -1236,8 +1251,8 @@ abstract class Renderer(
         <div class="card-header">{
           card_title_bootstrap(h)
         }</div>
-      ).toVector ++ card.content.map(c => <div class="card-block">{
-        <div class="card-text">{c}</div>
+      ).toVector ++ card.content.map(c => <div class="card-body">{
+        <div class="card-text">{c(locale)}</div>
       }</div>).toVector ++ card.footer.map(f =>
         <div class="card-footer">{
           card_title_bootstrap(f)
@@ -1439,7 +1454,7 @@ abstract class Renderer(
 
   private def _banner(ps: List[Picture]): Elem = {
     val g = GridContext.banner.withTabletColumns(ps.length)
-    val s: RenderStrategy = strategy.withCardKind(ImageCard).withGridContext(g)
+    val s: RenderStrategy = strategy.withCardKindInGrid(ImageCard).withGridContext(g)
     execute(s)(_.grid_with_content_bootstrap(ps)(picture(_)))
   }
 

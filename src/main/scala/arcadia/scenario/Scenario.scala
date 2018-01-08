@@ -17,7 +17,8 @@ import arcadia.domain._
 /*
  * @since   Sep. 16, 2017
  *  version Oct. 25, 2017
- * @version Nov. 16, 2017
+ *  version Nov. 16, 2017
+ * @version Jan.  8, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Scenario {
@@ -187,8 +188,8 @@ object UpdateEntityScenario extends ScenarioClass {
         Transition(CancelEventGuard, CancelAction),
         Transition(BackEventGuard, CancelAction),
         Transition(InputEventGuard, ValidationAction),
-        Transition(OkEventGuard, EntityCreateAction),
-        Transition(CreateEventGuard, EntityCreateAction)
+        Transition(OkEventGuard, EntityUpdateAction),
+        Transition(UpdateEventGuard, EntityUpdateAction)
       )),
       Slot(ConfirmState, Transitions(
         Transition(CancelEventGuard, CancelAction),

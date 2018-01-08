@@ -13,7 +13,8 @@ import arcadia.scenario.ScenarioEngine
  *  version Sep. 17, 2017
  *  version Oct. 14, 2017
  *  version Nov. 13, 2017
- * @version Dec. 21, 2017
+ *  version Dec. 21, 2017
+ * @version Jan.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 abstract class Controller(rule: Controller.Rule) {
@@ -100,13 +101,13 @@ object OperationController {
 
 case object LoginController extends Controller(
   Controller.Rule(List(LoginAction()))
-){
+) {
   override val guard = CommandGuard(classOf[LoginCommand])
 }
 
 case object LogoutController extends Controller(
   Controller.Rule(List(LogoutAction()))
-){
+) {
   override val guard = CommandGuard(classOf[LogoutCommand])
 }
 
@@ -128,3 +129,9 @@ case class RouterController(route: Route) extends Controller(
 //     }
 //   }
 // }
+
+case object InvokeController extends Controller(
+  Controller.Rule(List(InvokeAction()))
+) {
+  override val guard = CommandGuard(classOf[InvokeCommand])
+}

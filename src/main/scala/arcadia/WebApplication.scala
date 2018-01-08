@@ -25,7 +25,8 @@ import arcadia.scenario._
  *  version Aug. 29, 2017
  *  version Sep. 30, 2017
  *  version Oct. 27, 2017
- * @version Nov.  6, 2017
+ *  version Nov.  6, 2017
+ * @version Jan.  6, 2018
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -231,7 +232,14 @@ object WebApplication {
       case class Z(r: Map[LayoutKind, LayoutView] = Map.empty) {
         def +(rhs: T) = {
           LayoutKind.elements.find(x => _is_view(x.name, rhs)).
-            fold(this)(x => Z(r + (x -> LayoutView(to_template_source(rhs)))))
+            map(x =>
+              Z(r + (x -> LayoutView(to_template_source(rhs))))
+            ).getOrElse(
+              if (_is_view(rhs))
+                Z(r + (PageLayout(namebody(rhs)) -> LayoutView(to_template_source(rhs))))
+              else
+                this
+            )
         }
       }
       get_pathnode(PathName("WEB-INF/layouts")).
