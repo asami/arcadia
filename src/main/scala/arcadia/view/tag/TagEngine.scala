@@ -2,10 +2,13 @@ package arcadia.view.tag
 
 import scalaz.{Node => _, _}, Scalaz._
 import scala.xml._
+import java.net.URI
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
 import org.goldenport.xml.XmlUtils
+import org.goldenport.i18n.I18NString
 import org.goldenport.trace.Result
+import org.goldenport.values.PathName
 import arcadia._
 import arcadia.context._
 import arcadia.view._
@@ -16,7 +19,7 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  *  version Oct. 31, 2017
  *  version Nov. 14, 2017
  *  version Dec. 13, 2017
- * @version Jan.  8, 2018
+ * @version Jan. 12, 2018
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -106,6 +109,7 @@ case class Expression(
 ) {
   def prefix = elem.prefix
   def label = elem.label
+  def tagName = Option(prefix).fold(label)(x => s"$x:$label")
 
   def get(key: String): Option[String] = XmlUtils.getAttribute(elem, key)
   def getStringList(key: String): Option[List[String]] = get(key).map(Strings.totokens)
@@ -131,6 +135,8 @@ case class Expression(
   lazy val engine: ViewEngine = strategy.viewContext.map(_.engine) getOrElse {
     RAISE.noReachDefect
   }
+
+  def show: String = XmlUtils.show(elem)
 
   // def model(key: Option[String]): Model = getModel(key) getOrElse {
   //   ErrorModel.create(parcel, s"No model for key '$key'.")
@@ -170,4 +176,22 @@ case class Expression(
   }
 
   def isLabel(p: String): Boolean = prefix === "c" && label === p
+
+  def format(p: I18NString): String = p(strategy.locale)
+
+  def resolveActionPathName(p: URI): PathName = {
+    val pn = PathName(p.toString)
+    if (pn.isAbsolute) {
+      parcel.context.fold(pn)(ctx =>
+        ctx.getPathName.fold(pn)(reqpath =>
+          if (reqpath.components.length >= 2)
+            List.fill(reqpath.components.length - 1)("..").mkString("/") +: pn
+          else
+            pn
+        )
+      )
+    } else {
+      pn
+    }
+  }
 }

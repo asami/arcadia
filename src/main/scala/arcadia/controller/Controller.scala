@@ -14,13 +14,13 @@ import arcadia.scenario.ScenarioEngine
  *  version Oct. 14, 2017
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
- * @version Jan.  7, 2018
+ * @version Jan. 12, 2018
  * @author  ASAMI, Tomoharu
  */
 abstract class Controller(rule: Controller.Rule) {
   def apply(parcel: Parcel): Parcel = parcel.executeWithTrace(s"${getClass.getSimpleName}#apply", parcel.show) {
     val a = prologue_Apply(parcel)
-    val b = rule.apply(parcel)
+    val b = rule.apply(a)
     val r = epilogue_Apply(b)
     Result(r, r.show)
   }

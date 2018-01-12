@@ -6,6 +6,7 @@ import play.api.libs.json.JsValue
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2.{Record, Schema, Column}
 import org.goldenport.record.v2.util.SchemaBuilder
+import org.goldenport.values.PathName
 import arcadia._
 import arcadia.model._
 import arcadia.view._
@@ -17,7 +18,7 @@ import arcadia.domain._
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
  *  version Nov. 13, 2017
- * @version Jan.  7, 2018
+ * @version Jan. 12, 2018
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -27,6 +28,7 @@ case class ExecutionContext(
   def config = webapp.config
   def isLogined: Boolean = platformExecutionContext.isLogined
   def getOperationName: Option[String] = platformExecutionContext.getOperationName
+  def getPathName: Option[PathName] = platformExecutionContext.getPathName
   def getMimetypeBySuffix(p: Option[String]): Option[MimeType] = platformExecutionContext.getMimetypeBySuffix(p)
   def getMimetypeBySuffix(p: String): Option[MimeType] = platformExecutionContext.getMimetypeBySuffix(p)
   def get(uri: String, query: Option[Map[String, Any]], form: Option[Map[String, Any]]): Response = platformExecutionContext.get(uri, query.getOrElse(Map.empty), form.getOrElse(Map.empty))

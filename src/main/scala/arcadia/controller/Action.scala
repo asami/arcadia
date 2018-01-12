@@ -24,7 +24,7 @@ import arcadia.scenario.ScenarioEngine
  *  version Oct. 31, 2017
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
- * @version Jan.  9, 2018
+ * @version Jan. 12, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -104,7 +104,17 @@ trait Action {
 object Action {
   import org.goldenport.json.JsonUtils.Implicits._
   import Schema.json._
+  import Record.json._
 
+  implicit val MethoFormat = new JsonUtils.ValueFormat[Method](
+    _.toLowerCase match {
+      case "get" => Get
+      case "post" => Post
+      case "put" => Put
+      case "delete" => Delete
+    },
+    _.name
+  )
   implicit val SinkFormat = new Format[Sink] {
     def reads(json: JsValue): JsResult[Sink] = json match {
       case JsString(s) => JsSuccess(Sink(s))
@@ -123,7 +133,8 @@ object Action {
   implicit val OperationActionFormat = Json.format[OperationAction]
   implicit val GetEntityActionFormat = Json.format[GetEntityAction]
   implicit val ReadEntityListActionFormat = Json.format[ReadEntityListAction]
-  implicit val UpdateEntityCommandActionFormat = Json.format[UpdateEntityCommandAction]
+  implicit val UpdateEntityDirectiveActionFormat = Json.format[UpdateEntityDirectiveAction]
+  implicit val InvokeWithIdDirectiveActionFormat = Json.format[InvokeWithIdDirectiveAction]
   implicit val CarouselActionFormat = Json.format[CarouselAction]
   implicit val BannerActionFormat = Json.format[BannerAction]
   implicit val BadgeActionFormat = Json.format[BadgeAction]
@@ -149,6 +160,8 @@ object Action {
         case "operation" => Json.fromJson[OperationAction](json)
         case "get-entity" => Json.fromJson[GetEntityAction](json)
         case "read-entity-list" => Json.fromJson[ReadEntityListAction](json)
+        case "update-entity-directive" => Json.fromJson[UpdateEntityDirectiveAction](json)
+        case "invoke-with-id-directive" => Json.fromJson[InvokeWithIdDirectiveAction](json)
         case "carousel" => Json.fromJson[CarouselAction](json)
         case "banner" => Json.fromJson[BannerAction](json)
         case "badge" => Json.fromJson[BadgeAction](json)
@@ -347,25 +360,89 @@ case class ReadEntityListAction(
   }
 }
 
-case class UpdateEntityCommandAction(
+case class UpdateEntityDirectiveAction(
+  uri: URI,
+  label: I18NString,
+  condition: Option[Record],
+  properties: Option[Record],
   source: Option[Source],
   sink: Option[Sink]
 ) extends SourceSinkAction {
-  protected def execute_Apply(parcel: Parcel): Parcel = execute_source_sink(parcel) { src =>
-    val uri = ???
-    val method = ???
-    val schema = ???
-    val record = ???
-    val hidden = ???
-    val submit = ???
-    PropertyConfirmFormModel(
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    val active = parcel.getEffectiveModel.map {
+      case m: IRecordModel => _is_valid(condition, m.record)
+    }.getOrElse(false)
+    val model = UpdateEntityDirectiveFormModel(
       uri,
-      method,
-      schema,
-      record,
-      hidden,
-      submit
+      label,
+      properties getOrElse Record.empty,
+      active
     )
+    set_sink(parcel)(model)
+  }
+
+  private def _is_valid(cond: Option[Record], target: Record): Boolean =
+    cond.fold(true)(_is_valid(_, target))
+
+  private def _is_valid(cond: Record, target: Record): Boolean =
+    UpdateEntityDirectiveAction.isValid(cond, target)
+}
+object UpdateEntityDirectiveAction {
+  def isValid(cond: Record, target: Record): Boolean = {
+    // TODO sexpr for json
+    cond.fields.map { field =>
+      lazy val targetv = target.getConcreteString(field.key)
+      field.getConcreteStringList match {
+        case Nil => !target.isDefined(field.key)
+        case x :: Nil => x == targetv
+        case xs => xs.exists(_ == targetv) // OR
+      }
+    }.forall(identity) // AND
+  }
+}
+
+case class InvokeWithIdDirectiveAction(
+  uri: URI,
+  method: Option[Method],
+  label: I18NString,
+  condition: Option[Record],
+  properties: Option[Record],
+  idPropertyName: Option[String],
+  source: Option[Source],
+  sink: Option[Sink]
+) extends SourceSinkAction {
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    val active = parcel.getEffectiveModel.map {
+      case m: IRecordModel => _is_valid(condition, m.record)
+    }.getOrElse(false)
+    val model = InvokeWithIdDirectiveFormModel(
+      uri,
+      method getOrElse Post,
+      label,
+      properties getOrElse Record.empty,
+      active,
+      idPropertyName
+    )
+    set_sink(parcel)(model)
+  }
+
+  private def _is_valid(cond: Option[Record], target: Record): Boolean =
+    cond.fold(true)(_is_valid(_, target))
+
+  private def _is_valid(cond: Record, target: Record): Boolean =
+    InvokeWithIdDirectiveAction.isValid(cond, target)
+}
+object InvokeWithIdDirectiveAction {
+  def isValid(cond: Record, target: Record): Boolean = {
+    // TODO sexpr for json
+    cond.fields.map { field =>
+      lazy val targetv = target.getConcreteString(field.key)
+      field.getConcreteStringList match {
+        case Nil => !target.isDefined(field.key)
+        case x :: Nil => x == targetv
+        case xs => xs.exists(_ == targetv) // OR
+      }
+    }.forall(identity) // AND
   }
 }
 

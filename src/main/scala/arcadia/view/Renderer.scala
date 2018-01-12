@@ -23,7 +23,7 @@ import arcadia.context._
  *  version Oct. 31, 2017
  *  version Nov. 22, 2017
  *  version Dec. 19, 2017
- * @version Jan.  6, 2018
+ * @version Jan. 12, 2018
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -870,6 +870,26 @@ abstract class Renderer(
         }</tr>
       </table>
       {hidden.render}
+    </form>
+  }
+
+  protected def update_entity_directive_form(
+    action: URI,
+    record: Record
+  ): NodeSeq = {
+    // TODO see ButtonTag
+    <form action={action.toString} method="PUT"> {
+    }
+    </form>
+  }
+
+  protected def invoke_with_id_directive_form(
+    action: URI,
+    record: Record
+  ): NodeSeq = {
+    // TODO see ButtonTag
+    <form action={action.toString} method="PUT"> {
+    }
     </form>
   }
 

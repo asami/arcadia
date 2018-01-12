@@ -2,11 +2,13 @@ package arcadia.view.tag
 
 import scalaz.{Node => _, _}, Scalaz._
 import scala.xml._
+import java.net.URI
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
 import org.goldenport.xml.XmlUtils
-import org.goldenport.record.v2.{Schema, Column}
+import org.goldenport.record.v2.{Schema, Column, Record}
 import org.goldenport.trace.Result
+import org.goldenport.values.PathName
 import arcadia._
 import arcadia.context._
 import arcadia.view._
@@ -16,7 +18,7 @@ import arcadia.model._
  * @since   Oct. 11, 2017
  *  version Nov. 15, 2017
  *  version Dec. 13, 2017
- * @version Jan.  9, 2018
+ * @version Jan. 12, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -35,6 +37,9 @@ trait Tag {
     //   r.map(x => Result(x, x.show))
     // }
   protected def execute_Eval(p: Expression): Option[XmlContent]
+
+  protected final def resolve_action(expr: Expression, p: URI): String =
+    expr.resolveActionPathName(p).v
 }
 
 trait SelectByName { self: Tag =>
@@ -196,19 +201,50 @@ case object ButtonTag extends Tag with SelectByName {
 
   protected def eval_Expression(p: Expression): XmlContent = {
     p.effectiveModel match {
-      case m: PropertyConfirmFormModel => _button(m)
-      case _ => RAISE.noReachDefect
+//      case m: PropertyConfirmFormModel => _button(m)
+      case m: UpdateEntityDirectiveFormModel => _button(p, m)
+      case m: InvokeWithIdDirectiveFormModel => _button(p, m)
+      case EmptyModel => RAISE.illegalConfigurationDefect(s"Empty model in Button(${p.show})")
+      case m => RAISE.illegalConfigurationDefect(s"Unavailabel model in Button(${p.show}}: $m")
     }
   }
 
-  private def _button(p: PropertyConfirmFormModel) = {
-    val action: String = ???
-    val buttonname: String = ???
-    val properties: String = ???
+  // private def _button(p: PropertyConfirmFormModel) = {
+  //   val action: String = ???
+  //   val buttonname: String = ???
+  //   val properties: String = ???
+  //   val buttonclass = "btn btn-primary btn-round"
+  //   val a = <form method="POST" action={action}>
+  //     <input type="submit" value={buttonname} class={buttonclass}/>
+  //   </form>
+  //   XmlContent(a)
+  // }
+
+  private def _button(expr: Expression, p: UpdateEntityDirectiveFormModel) = {
+    val action: String = resolve_action(expr, p.uri)
+    val buttonname: String = expr.format(p.label)
+    val properties: Record = p.properties
     val buttonclass = "btn btn-primary btn-round"
-    val a = <form method="POST" action={action}>
-      <input type="submit" value={buttonname} class={buttonclass}/>
-    </form>
+    val a = <form method="POST" action={action}> {
+      if (p.isActive)
+        <input type="submit" value={buttonname} class={buttonclass}/>
+      else
+        <input type="submit" value={buttonname} class={buttonclass} disabled="true"/>
+    } </form>
+    XmlContent(a)
+  }
+
+  private def _button(expr: Expression, p: InvokeWithIdDirectiveFormModel) = {
+    val action: String = resolve_action(expr, p.uri)
+    val buttonname: String = expr.format(p.label)
+    val properties: Record = p.properties
+    val buttonclass = "btn btn-primary btn-round"
+    val a = <form method="POST" action={action}> {
+      if (p.isActive)
+        <input type="submit" value={buttonname} class={buttonclass}/>
+      else
+        <input type="submit" value={buttonname} class={buttonclass} disabled="true"/>
+    } </form>
     XmlContent(a)
   }
 }
