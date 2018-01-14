@@ -14,7 +14,7 @@ import arcadia.scenario.ScenarioEngine
  *  version Oct. 14, 2017
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
- * @version Jan. 12, 2018
+ * @version Jan. 14, 2018
  * @author  ASAMI, Tomoharu
  */
 abstract class Controller(rule: Controller.Rule) {
@@ -33,6 +33,8 @@ abstract class Controller(rule: Controller.Rule) {
   protected def epilogue_Apply(parcel: Parcel): Parcel = parcel
 }
 object Controller {
+  val PROP_REDIRECT = "web.redirect"
+
   case class Rule(actions: List[Action]) {
     def apply(parcel: Parcel): Parcel = actions./:(parcel)((z, x) => x apply z)
   }

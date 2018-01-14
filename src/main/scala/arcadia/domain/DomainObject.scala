@@ -11,7 +11,8 @@ import arcadia.model.Picture
  *  version Sep. 20, 2017
  *  version Oct. 24, 2017
  *  version Nov.  5, 2017
- * @version Dec. 17, 2017
+ *  version Dec. 17, 2017
+ * @version Jan. 14, 2018
  * @author  ASAMI, Tomoharu
  */
 trait DomainObject {
@@ -74,7 +75,7 @@ object DomainEntityType {
 case class DomainEntityId(
   id: DomainObjectId,
   entityType: DomainEntityType,
-  getPresentationId: Option[String]
+  getPresentationId: Option[String] = None
 ) extends DomainObjectId {
   def getEntityType = Some(entityType)
   def v = id.v

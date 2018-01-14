@@ -24,7 +24,7 @@ import arcadia.domain._
  *  version Oct. 31, 2017
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
- * @version Jan. 12, 2018
+ * @version Jan. 14, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -151,6 +151,10 @@ trait IRecordModel extends Model {
   def getEntityType: Option[DomainEntityType]
   def getSchema: Option[Schema]
   def record: Record
+  def getDomainObjectId: Option[DomainObjectId] = DomainObjectId.get(record, getEntityType)
+  def getDomainEntityId: Option[DomainEntityId] = getDomainObjectId.collect {
+    case m: DomainEntityId => m
+  }
 }
 
 trait IRecordsModel extends Model {
@@ -941,6 +945,7 @@ case class PropertyConfirmFormModel(
 case class UpdateEntityDirectiveFormModel(
   uri: URI,
   label: I18NString,
+  id: DomainEntityId,
   properties: Record,
   isActive: Boolean
 ) extends Model with IFormModel with IComponentModel {
@@ -957,6 +962,7 @@ case class InvokeWithIdDirectiveFormModel(
   uri: URI,
   method: Method,
   label: I18NString,
+  id: DomainObjectId,
   properties: Record,
   isActive: Boolean,
   idPropertyName: Option[String]
@@ -973,7 +979,8 @@ case class InvokeWithIdDirectiveFormModel(
 case class OperationOutcomeModel(
   request: Request,
   response: Response
-) extends Model {
+) extends Model with ISectionModel {
+  def title = Some(I18NElement(request.operationName))
   val expiresKind = Some(NoCacheExpires)
   def toRecord: Record = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy) = new Renderer(

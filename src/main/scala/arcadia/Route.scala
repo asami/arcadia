@@ -3,10 +3,12 @@ package arcadia
 import arcadia._
 import controller._
 import model._
+import Controller.PROP_REDIRECT
 
 /*
  * @since   Dec. 20, 2017
- * @version Dec. 21, 2017
+ *  version Dec. 21, 2017
+ * @version Jan. 14, 2018
  * @author  ASAMI, Tomoharu
  */
 case class Route(
@@ -25,7 +27,8 @@ object Route {
   val system = Route(Vector(
     Slot(UnauthorizedGetGuard, UnauthorizedAccessAction),
     Slot(UnauthorizedMutationGuard, UnauthorizedUserAction),
-    Slot(OperationOutcomeGuard, RedirectSinglePageAction())
+    Slot(RedirectGuard, RedirectAction),
+    Slot(OperationOutcomeGuard, RedirectSinglePageAction()) // XXX if required
   ))
 
   case class Slot(guard: Guard, action: Action) {
@@ -51,6 +54,11 @@ object Route {
     def isAccept(p: Parcel) = p.getEffectiveModel.map(_.isInstanceOf[OperationOutcomeModel]).getOrElse(false)
   }
 
+  case object RedirectGuard extends Guard {
+    def isAccept(p: Parcel) =
+      p.inputFormParameters.getConcreteString(PROP_REDIRECT).isDefined
+  }
+
   case object UnauthorizedAccessAction extends Action {
     protected def execute_Apply(p: Parcel) = p.command.map {
       case m: UnauthorizedCommand => m.command.
@@ -58,6 +66,13 @@ object Route {
           getOrElse(p)
       case _ => p
     }.getOrElse(p)
+  }
+
+  case object RedirectAction extends Action {
+    protected def execute_Apply(p: Parcel) =
+      p.inputFormParameters.getConcreteString(PROP_REDIRECT).map(x =>
+        p.withContent(RedirectContent(x))
+      ).getOrElse(p)
   }
 
   /*

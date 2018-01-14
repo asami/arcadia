@@ -1,5 +1,6 @@
 package arcadia.controller
 
+import scalaz._, Scalaz._
 import java.net.{URL, URI}
 import play.api.libs.json._
 import org.goldenport.Strings
@@ -24,7 +25,7 @@ import arcadia.scenario.ScenarioEngine
  *  version Oct. 31, 2017
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
- * @version Jan. 12, 2018
+ * @version Jan. 14, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -100,6 +101,43 @@ trait Action {
       case MaterialCommand(pathname) => body(pathname)
       case _ => parcel
     } getOrElse(parcel)
+
+  protected final def is_valid(cond: Option[Record], target: Record): Boolean =
+    cond.fold(true)(is_valid(_, target))
+
+  protected final def is_valid(cond: Record, target: Record): Boolean = {
+    // TODO sexpr for json
+    cond.fields.map { field =>
+      lazy val targetv = target.getConcreteString(field.key)
+      field.getConcreteStringList match {
+        case Nil => !target.isDefined(field.key)
+        case x :: Nil => targetv.fold(false)(_ === x)
+        case xs => targetv.fold(false)(x => xs.exists(_ === x)) // OR
+      }
+    }.forall(identity) // AND
+  }
+
+  protected final def get_domain_object_id(parcel: Parcel): Option[DomainObjectId] =
+    parcel.getEffectiveModel.flatMap {
+      case m: IRecordModel => m.getDomainObjectId
+      case _ => None
+    }
+
+  protected final def take_domain_object_id(parcel: Parcel): DomainObjectId =
+    get_domain_object_id(parcel) getOrElse {
+      RAISE.illegalConfigurationDefect(s"${getClass.getSimpleName}: Missing id")
+    }
+
+  protected final def get_domain_entity_id(parcel: Parcel): Option[DomainEntityId] =
+    parcel.getEffectiveModel.flatMap {
+      case m: IRecordModel => m.getDomainEntityId
+      case _ => None
+    }
+
+  protected final def take_domain_entity_id(parcel: Parcel): DomainEntityId =
+    get_domain_entity_id(parcel) getOrElse {
+      RAISE.illegalConfigurationDefect(s"${getClass.getSimpleName}: Missing id")
+    }
 }
 object Action {
   import org.goldenport.json.JsonUtils.Implicits._
@@ -369,36 +407,21 @@ case class UpdateEntityDirectiveAction(
   sink: Option[Sink]
 ) extends SourceSinkAction {
   protected def execute_Apply(parcel: Parcel): Parcel = {
+    val id = take_domain_entity_id(parcel)
     val active = parcel.getEffectiveModel.map {
-      case m: IRecordModel => _is_valid(condition, m.record)
+      case m: IRecordModel => is_valid(condition, m.record)
     }.getOrElse(false)
     val model = UpdateEntityDirectiveFormModel(
       uri,
       label,
+      id,
       properties getOrElse Record.empty,
       active
     )
     set_sink(parcel)(model)
   }
-
-  private def _is_valid(cond: Option[Record], target: Record): Boolean =
-    cond.fold(true)(_is_valid(_, target))
-
-  private def _is_valid(cond: Record, target: Record): Boolean =
-    UpdateEntityDirectiveAction.isValid(cond, target)
 }
 object UpdateEntityDirectiveAction {
-  def isValid(cond: Record, target: Record): Boolean = {
-    // TODO sexpr for json
-    cond.fields.map { field =>
-      lazy val targetv = target.getConcreteString(field.key)
-      field.getConcreteStringList match {
-        case Nil => !target.isDefined(field.key)
-        case x :: Nil => x == targetv
-        case xs => xs.exists(_ == targetv) // OR
-      }
-    }.forall(identity) // AND
-  }
 }
 
 case class InvokeWithIdDirectiveAction(
@@ -412,38 +435,23 @@ case class InvokeWithIdDirectiveAction(
   sink: Option[Sink]
 ) extends SourceSinkAction {
   protected def execute_Apply(parcel: Parcel): Parcel = {
+    val id = take_domain_object_id(parcel)
     val active = parcel.getEffectiveModel.map {
-      case m: IRecordModel => _is_valid(condition, m.record)
+      case m: IRecordModel => is_valid(condition, m.record)
     }.getOrElse(false)
     val model = InvokeWithIdDirectiveFormModel(
       uri,
       method getOrElse Post,
       label,
+      id,
       properties getOrElse Record.empty,
       active,
       idPropertyName
     )
     set_sink(parcel)(model)
   }
-
-  private def _is_valid(cond: Option[Record], target: Record): Boolean =
-    cond.fold(true)(_is_valid(_, target))
-
-  private def _is_valid(cond: Record, target: Record): Boolean =
-    InvokeWithIdDirectiveAction.isValid(cond, target)
 }
 object InvokeWithIdDirectiveAction {
-  def isValid(cond: Record, target: Record): Boolean = {
-    // TODO sexpr for json
-    cond.fields.map { field =>
-      lazy val targetv = target.getConcreteString(field.key)
-      field.getConcreteStringList match {
-        case Nil => !target.isDefined(field.key)
-        case x :: Nil => x == targetv
-        case xs => xs.exists(_ == targetv) // OR
-      }
-    }.forall(identity) // AND
-  }
 }
 
 case class CarouselAction(
@@ -557,8 +565,7 @@ case class RedirectSinglePageAction(
     def uri(p: URI) = parcel.getEffectiveModel.fold(p) {
       case m: OperationOutcomeModel =>
         val builder = UriBuilder(p)
-        val a = builder.addPath(page).
-          copy(query = addQuery(builder.query, m.request.query))
+        val a = builder.addPath(page).addQuery(m.request.query.toStringVector)
         a.build
       case _ => p
     }
@@ -567,21 +574,21 @@ case class RedirectSinglePageAction(
       getOrElse(parcel)
   }
 
-  // TODO migrate org.goldenport.io.UriBuilder
-  def addQuery(base: Option[String], q: Record): Option[String] =
-    base.map(b =>
-      if (q.isEmpty)
-        Some(b)
-      else
-        Some(s"${b}&${makeUrlQueryParams(q)}")
-    ).getOrElse(
-      Some(makeUrlQueryParams(q))
-    )
+  // // TODO migrate org.goldenport.io.UriBuilder
+  // def addQuery(base: Option[String], q: Record): Option[String] =
+  //   base.map(b =>
+  //     if (q.isEmpty)
+  //       Some(b)
+  //     else
+  //       Some(s"${b}&${makeUrlQueryParams(q)}")
+  //   ).getOrElse(
+  //     Some(makeUrlQueryParams(q))
+  //   )
 
-  // See StringUtils.addUrlParams
-  def makeUrlQueryParams(q: Record) = q.toStringVector.map {
-    case (k, v) => s"${k}=${v}"
-  }.mkString("&")
+  // // See StringUtils.addUrlParams
+  // def makeUrlQueryParams(q: Record) = q.toStringVector.map {
+  //   case (k, v) => s"${k}=${v}"
+  // }.mkString("&")
 }
 
 case class InvokeAction(

@@ -18,7 +18,7 @@ import arcadia.domain._
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
  *  version Nov. 13, 2017
- * @version Jan. 12, 2018
+ * @version Jan. 15, 2018
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -29,6 +29,13 @@ case class ExecutionContext(
   def isLogined: Boolean = platformExecutionContext.isLogined
   def getOperationName: Option[String] = platformExecutionContext.getOperationName
   def getPathName: Option[PathName] = platformExecutionContext.getPathName
+  def getLogicalUri: Option[URI] = platformExecutionContext.getLogicalUri
+  def resolvePathName(pn: PathName): PathName = getPathName.fold(pn)(reqpath =>
+    if (reqpath.components.length >= 2)
+      List.fill(reqpath.components.length - 1)("..").mkString("/") +: pn
+    else
+      pn
+  )
   def getMimetypeBySuffix(p: Option[String]): Option[MimeType] = platformExecutionContext.getMimetypeBySuffix(p)
   def getMimetypeBySuffix(p: String): Option[MimeType] = platformExecutionContext.getMimetypeBySuffix(p)
   def get(uri: String, query: Option[Map[String, Any]], form: Option[Map[String, Any]]): Response = platformExecutionContext.get(uri, query.getOrElse(Map.empty), form.getOrElse(Map.empty))

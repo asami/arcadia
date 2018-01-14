@@ -19,7 +19,7 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  *  version Oct. 31, 2017
  *  version Nov. 14, 2017
  *  version Dec. 13, 2017
- * @version Jan. 12, 2018
+ * @version Jan. 15, 2018
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -181,17 +181,9 @@ case class Expression(
 
   def resolveActionPathName(p: URI): PathName = {
     val pn = PathName(p.toString)
-    if (pn.isAbsolute) {
-      parcel.context.fold(pn)(ctx =>
-        ctx.getPathName.fold(pn)(reqpath =>
-          if (reqpath.components.length >= 2)
-            List.fill(reqpath.components.length - 1)("..").mkString("/") +: pn
-          else
-            pn
-        )
-      )
-    } else {
+    if (pn.isAbsolute)
+      parcel.context.fold(pn)(_.resolvePathName(pn))
+    else
       pn
-    }
   }
 }

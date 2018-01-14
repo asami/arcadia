@@ -21,7 +21,7 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
  *  version Nov. 16, 2017
- * @version Jan.  8, 2018
+ * @version Jan. 15, 2018
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -112,6 +112,10 @@ case class Parcel(
   def takeCommand[T <: Command]: T = command.map(_.asInstanceOf[T]) getOrElse {
     RAISE.noReachDefect
   }
+  def getPathName: Option[PathName] = command.flatMap {
+    case MaterialCommand(pathname) => Some(pathname)
+    case _ => None
+  }.orElse(context.flatMap(_.getPathName))
   def getOperationName: Option[String] =
     command flatMap {
       case MaterialCommand(pathname) => Some(pathname.body)
@@ -130,6 +134,11 @@ case class Parcel(
         getOrElse(false)
     )
   }
+
+  def getLogicalUri: Option[URI] = context.flatMap(_.getLogicalUri)
+
+  def resolvePathName(p: String): PathName = resolvePathName(PathName(p))
+  def resolvePathName(p: PathName): PathName = context.fold(p)(_.resolvePathName(p))
 
   def getEntityType: Option[DomainEntityType] = render.flatMap(_.getEntityType)
   def fetchString(p: UrnSource): Option[String] = context.flatMap(_.fetchString(p))

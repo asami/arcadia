@@ -17,13 +17,14 @@ import arcadia.domain._
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
  *  version Nov. 13, 2017
- * @version Jan. 12, 2018
+ * @version Jan. 14, 2018
  * @author  ASAMI, Tomoharu
  */
 trait PlatformExecutionContext {
   def isLogined: Boolean
   def getOperationName: Option[String]
   def getPathName: Option[PathName]
+  def getLogicalUri: Option[URI]
   def getMimetypeBySuffix(p: Option[String]): Option[MimeType] = p.flatMap(getMimetypeBySuffix)
   def getMimetypeBySuffix(p: String): Option[MimeType]
   def get(uri: String, query: Map[String, Any], form: Map[String, Any]): Response

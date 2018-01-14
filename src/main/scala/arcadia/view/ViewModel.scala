@@ -2,15 +2,17 @@ package arcadia.view
 
 import scala.xml._
 import org.goldenport.exception.RAISE
+import org.goldenport.values.PathName
 import arcadia._
-import arcadia.context.{Query => CQuery}
+import arcadia.context.{Query => CQuery, ExecutionContext}
 import arcadia.domain._
 import arcadia.model._
 
 /*
  * @since   Aug.  2, 2017
  *  version Sep. 30, 2017
- * @version Oct. 21, 2017
+ *  version Oct. 21, 2017
+ * @version Jan. 15, 2018
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -92,7 +94,7 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
     case m: ISectionModel => render_view_section(m)
     case m: IComponentModel => render_view_component(m)
     case m: IAtomicModel => render_view_atomic(m)
-    case _ => <div>No content</div>
+    case EmptyModel => <div>No content</div>
   }
   def partial(p: PartialKind): NodeSeq = _render_partial(strategy.partials.get(p))
 
@@ -132,6 +134,10 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   def applicationTitle: NodeSeq = strategy.application.applicationTitle(locale)
   def applicationLogo: NodeSeq = strategy.application.applicationLogo(locale)
   def isActiveFeature(p: String): Boolean = model.isActiveFeature(p)
+
+  lazy val getExecutionContext: Option[ExecutionContext] = strategy.viewContext.flatMap(_.parcel.context)
+  def resolvePathName(p: String): PathName = resolvePathName(PathName(p))
+  def resolvePathName(pn: PathName): PathName = getExecutionContext.fold(pn)(_.resolvePathName(pn))
 
   /*
    * View

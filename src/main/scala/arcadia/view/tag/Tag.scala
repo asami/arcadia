@@ -13,12 +13,13 @@ import arcadia._
 import arcadia.context._
 import arcadia.view._
 import arcadia.model._
+import arcadia.controller.Controller.PROP_REDIRECT
 
 /*
  * @since   Oct. 11, 2017
  *  version Nov. 15, 2017
  *  version Dec. 13, 2017
- * @version Jan. 12, 2018
+ * @version Jan. 15, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -220,31 +221,54 @@ case object ButtonTag extends Tag with SelectByName {
   //   XmlContent(a)
   // }
 
-  private def _button(expr: Expression, p: UpdateEntityDirectiveFormModel) = {
-    val action: String = resolve_action(expr, p.uri)
+  private def _button(expr: Expression, p: UpdateEntityDirectiveFormModel): XmlContent = {
+    val op = resolve_action(expr, p.uri)
+    val id = p.id.v
+    val action: String = s"$op/$id"
     val buttonname: String = expr.format(p.label)
     val properties: Record = p.properties
-    val buttonclass = "btn btn-primary btn-round"
-    val a = <form method="POST" action={action}> {
-      if (p.isActive)
-        <input type="submit" value={buttonname} class={buttonclass}/>
-      else
-        <input type="submit" value={buttonname} class={buttonclass} disabled="true"/>
-    } </form>
-    XmlContent(a)
+    _button(expr, Put, action, buttonname, properties, p.isActive, true)
   }
 
-  private def _button(expr: Expression, p: InvokeWithIdDirectiveFormModel) = {
-    val action: String = resolve_action(expr, p.uri)
+  private def _button(expr: Expression, p: InvokeWithIdDirectiveFormModel): XmlContent = {
+    val op = resolve_action(expr, p.uri)
+    val id = p.id.v
+    val idname = p.idPropertyName getOrElse "id"
+    val action: String = s"$op?$idname=$id"
     val buttonname: String = expr.format(p.label)
     val properties: Record = p.properties
-    val buttonclass = "btn btn-primary btn-round"
-    val a = <form method="POST" action={action}> {
-      if (p.isActive)
-        <input type="submit" value={buttonname} class={buttonclass}/>
+    _button(expr, p.method, action, buttonname, properties, p.isActive, true)
+  }
+
+  private def _button(
+    expr: Expression,
+    method: Method,
+    action: String,
+    buttonname: String,
+    properties: Record,
+    isactive: Boolean,
+    isreturnback: Boolean
+  ): XmlContent = {
+    def returnback: Record =
+      if (isreturnback)
+        expr.parcel.getLogicalUri.map(x =>
+          Record.dataApp(PROP_REDIRECT -> x.toString)
+        ).getOrElse(Record.empty)
       else
-        <input type="submit" value={buttonname} class={buttonclass} disabled="true"/>
+        Record.empty
+    val xs = properties + returnback
+    // TODO renderer
+    val buttonclass = "btn btn-primary btn-block"
+    val r = <form method={method.name} action={action}> {
+      xs.toStringVector.map {
+        case (k, v) => <input type="hidden" name={k} value={v}></input>
+      } :+ (
+        if (isactive)
+          <input type="submit" value={buttonname} class={buttonclass}/>
+        else
+          <input type="submit" value={buttonname} class={buttonclass} disabled="true"/>
+      )
     } </form>
-    XmlContent(a)
+    XmlContent(r)
   }
 }

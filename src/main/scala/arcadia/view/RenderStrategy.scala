@@ -27,7 +27,7 @@ import arcadia.view.ViewEngine._
  *  version Oct. 30, 2017
  *  version Nov. 22, 2017
  *  version Dec. 30, 2017
- * @version Jan.  6, 2018
+ * @version Jan. 15, 2018
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -511,7 +511,8 @@ case object LightBootstrapDashboardTheme extends Bootstrap4RenderThemaBase {
   ): Node = {
     val isactive = view.isActiveFeature(p.name)
     val icon = IconFactory.guessNcIcon(p.name)
-    val href = if (isactive) "#" else s"${p.name}.html"
+    val pathname = view.resolvePathName(p.name)
+    val href = if (isactive) "#" else s"${pathname.v}.html"
     def anchor = <a class="nav-link" href={href}>
       <i class={s"nc-icon ${icon}"}>&#8203;</i>
       <p>{p.title(view.locale)}</p>
