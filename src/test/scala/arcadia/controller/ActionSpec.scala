@@ -3,17 +3,22 @@ package arcadia.controller
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest._
+import java.net.URI
+import org.goldenport.i18n.I18NString
+import org.goldenport.record.v2.Column
+import arcadia.context._
 
 /*
  * @since   Oct. 28, 2017
  *  version Oct. 31, 2017
- * @version Nov.  6, 2017
+ *  version Nov.  6, 2017
+ * @version Jan. 22, 2018
  * @author  ASAMI, Tomoharu
  */
 @RunWith(classOf[JUnitRunner])
 class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
-  "a" should {
-    "a" which {
+  "action" should {
+    "typical" which {
       "carousel" in {
         val rule = """{
   "action": "carousel",
@@ -196,90 +201,28 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
           )
         ))
       }
-//       "list-x" in {
-//         val rule = """[{
-//   "action": "carousel",
-//   "source": "urn:prefer:free:/web/carousel",
-//   "sink": "carousel"
-// },{
-//   "action": "banner",
-//   "source": "urn:prefer:free:/web/banner_brands",
-//   "sink": "banner_brands"
-// },{
-//   "action": "read-entity-list",
-//   "entity": "productclass",
-//   "source": "urn:prefer:free:/web/recommended_products",
-//   "sink": "recommended_products"
-// },{
-//   "action": "read-entity-list",
-//   "entity": "productclass",
-//   "query": {
-//     "limit": "20"
-//   },
-//   "sink": "ranking"
-// },{
-//   "action": "read-entity-list",
-//   "entity": "article",
-//   "query": {
-//     "limit": "20"
-//   },
-//   "sink": "news_column"
-// },{
-//   "action": "banner",
-//   "source": "urn:prefer:free:/web/banner1",
-//   "sink": "banner1"
-// },{
-//   "action": "read-entity-list",
-//   "entity": "campaign",
-//   "query": {
-//     "limit": "20"
-//   },
-//   "sink": "event"
-// }]
-// """
-//         Action.parseActionList(rule) should be(List(
-//           CarouselAction(
-//             Some(UrnSource("urn:prefer:free:/web/carousel")),
-//             Some(ModelHangerSink("carousel"))
-//           ),
-//           BannerAction(
-//             Some(UrnSource("urn:prefer:free:/web/banner_brands")),
-//             Some(ModelHangerSink("banner_brands"))
-//           ),
-//           ReadEntityListAction(
-//             "productclass",
-//             None,
-//             None,
-//             Some(UrnSource("urn:prefer:free:/web/recommended_products")),
-//             Some(ModelHangerSink("recommended_products"))
-//           ),
-//           ReadEntityListAction(
-//             "productclass",
-//             Some(Map("limit" -> "20")),
-//             None,
-//             None,
-//             Some(ModelHangerSink("ranking"))
-//           ),
-//           ReadEntityListAction(
-//             "article",
-//             Some(Map("limit" -> "20")),
-//             None,
-//             None,
-//             Some(ModelHangerSink("news_column"))
-//           ),
-//           BannerAction(
-//             Some(UrnSource("urn:prefer:free:/web/banner1")),
-//             Some(ModelHangerSink("banner1"))
-//           ),
-//           ReadEntityListAction(
-//             "campaign",
-//             Some(Map("limit" -> "20")),
-//             None,
-//             None,
-//             Some(ModelHangerSink("event"))
-//           )
-//         ))
-//       }
+      "directive" in {
+        val rule = """{
+  "action": "invoke-directive",
+  "sink": "rcauser",
+  "uri": "/rca/user",
+  "label": "ユーザー",
+  "parameters": [{
+    "name": "id",
+    "placeholder": "User ID/Access Token"
+  }]
+}"""
+        Action.parseActionList(rule) should be(List(
+          InvokeDirectiveAction(
+            new URI("/rca/user"),
+            None,
+            I18NString("ユーザー"),
+            List(Parameter("id", placeholder = Some(I18NString("User ID/Access Token")))),
+            None,
+            Some(Sink("rcauser"))
+          )
+        ))
+      }
      }
   }
 }

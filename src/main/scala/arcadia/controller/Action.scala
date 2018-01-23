@@ -25,7 +25,7 @@ import arcadia.scenario.ScenarioEngine
  *  version Oct. 31, 2017
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
- * @version Jan. 14, 2018
+ * @version Jan. 22, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -143,6 +143,7 @@ object Action {
   import org.goldenport.json.JsonUtils.Implicits._
   import Schema.json._
   import Record.json._
+  import Parameter.json._
 
   implicit val MethoFormat = new JsonUtils.ValueFormat[Method](
     _.toLowerCase match {
@@ -172,6 +173,7 @@ object Action {
   implicit val GetEntityActionFormat = Json.format[GetEntityAction]
   implicit val ReadEntityListActionFormat = Json.format[ReadEntityListAction]
   implicit val UpdateEntityDirectiveActionFormat = Json.format[UpdateEntityDirectiveAction]
+  implicit val InvokeDirectiveActionFormat = Json.format[InvokeDirectiveAction]
   implicit val InvokeWithIdDirectiveActionFormat = Json.format[InvokeWithIdDirectiveAction]
   implicit val CarouselActionFormat = Json.format[CarouselAction]
   implicit val BannerActionFormat = Json.format[BannerAction]
@@ -199,6 +201,7 @@ object Action {
         case "get-entity" => Json.fromJson[GetEntityAction](json)
         case "read-entity-list" => Json.fromJson[ReadEntityListAction](json)
         case "update-entity-directive" => Json.fromJson[UpdateEntityDirectiveAction](json)
+        case "invoke-directive" => Json.fromJson[InvokeDirectiveAction](json)
         case "invoke-with-id-directive" => Json.fromJson[InvokeWithIdDirectiveAction](json)
         case "carousel" => Json.fromJson[CarouselAction](json)
         case "banner" => Json.fromJson[BannerAction](json)
@@ -424,6 +427,27 @@ case class UpdateEntityDirectiveAction(
 object UpdateEntityDirectiveAction {
 }
 
+case class InvokeDirectiveAction(
+  uri: URI,
+  method: Option[Method],
+  label: I18NString,
+  parameters: List[Parameter],
+  source: Option[Source],
+  sink: Option[Sink]
+) extends SourceSinkAction {
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    val active = true
+    val model = InvokeDirectiveFormModel(
+      uri,
+      method getOrElse Get,
+      label,
+      parameters,
+      active
+    )
+    set_sink(parcel)(model)
+  }
+}
+
 case class InvokeWithIdDirectiveAction(
   uri: URI,
   method: Option[Method],
@@ -441,7 +465,7 @@ case class InvokeWithIdDirectiveAction(
     }.getOrElse(false)
     val model = InvokeWithIdDirectiveFormModel(
       uri,
-      method getOrElse Post,
+      method getOrElse Post, // XXX Get
       label,
       id,
       properties getOrElse Record.empty,

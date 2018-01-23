@@ -19,7 +19,7 @@ import arcadia.controller.Controller.PROP_REDIRECT
  * @since   Oct. 11, 2017
  *  version Nov. 15, 2017
  *  version Dec. 13, 2017
- * @version Jan. 15, 2018
+ * @version Jan. 22, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -261,6 +261,60 @@ case object ButtonTag extends Tag with SelectByName {
     val buttonclass = "btn btn-primary btn-block"
     val r = <form method={method.name} action={action}> {
       xs.toStringVector.map {
+        case (k, v) => <input type="hidden" name={k} value={v}></input>
+      } :+ (
+        if (isactive)
+          <input type="submit" value={buttonname} class={buttonclass}/>
+        else
+          <input type="submit" value={buttonname} class={buttonclass} disabled="true"/>
+      )
+    } </form>
+    XmlContent(r)
+  }
+}
+
+case object CommandTag extends Tag with SelectByName {
+  val name = "command"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    p.effectiveModel match {
+      case m: InvokeDirectiveFormModel => _command(p, m)
+      case EmptyModel => RAISE.illegalConfigurationDefect(s"Empty model in Command(${p.show})")
+      case m => RAISE.illegalConfigurationDefect(s"Unavailabel model in Command(${p.show}}: $m")
+    }
+  }
+
+  private def _command(expr: Expression, p: InvokeDirectiveFormModel): XmlContent = {
+    val op = resolve_action(expr, p.uri)
+    val action: String = s"$op"
+    val method = p.method
+    val buttonname: String = expr.format(p.label)
+    val parameters = p.parameters
+    _command(expr, method, action, buttonname, parameters, p.isActive, false)
+  }
+
+  private def _command(
+    expr: Expression,
+    method: Method,
+    action: String,
+    buttonname: String,
+    parameters: List[Parameter],
+    isactive: Boolean,
+    isreturnback: Boolean
+  ): XmlContent = {
+    def returnback: Record =
+      if (isreturnback)
+        expr.parcel.getLogicalUri.map(x =>
+          Record.dataApp(PROP_REDIRECT -> x.toString)
+        ).getOrElse(Record.empty)
+      else
+        Record.empty
+    val xs = returnback
+    // TODO renderer
+    val buttonclass = "btn btn-primary btn-block"
+    def toinput(p: Parameter) = p.toInput(buttonclass)
+    val r = <form method={method.name} action={action}> {
+      parameters.map(toinput) ++ xs.toStringVector.map {
         case (k, v) => <input type="hidden" name={k} value={v}></input>
       } :+ (
         if (isactive)

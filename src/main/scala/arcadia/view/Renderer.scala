@@ -23,7 +23,7 @@ import arcadia.context._
  *  version Oct. 31, 2017
  *  version Nov. 22, 2017
  *  version Dec. 19, 2017
- * @version Jan. 12, 2018
+ * @version Jan. 21, 2018
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -401,7 +401,7 @@ abstract class Renderer(
   protected def table_data(p: TableColumn, v: ValueModel): Elem =
     <td class={theme_table.css.tbodyTd(p)}>{table_value(v)}</td>
 
-  protected def table_value(column: TableColumn, record: Record): Node =
+  protected def table_value(column: TableColumn, record: Record): NodeSeq =
     get_table_value(column, record).getOrElse(Text(""))
 
   protected def table_value(v: ValueModel): Node = v match {
@@ -424,7 +424,7 @@ abstract class Renderer(
       case _ => table_value_string(v)
     }
 
-  protected def get_table_value(column: TableColumn, record: Record): Option[Node] = {
+  protected def get_table_value(column: TableColumn, record: Record): Option[NodeSeq] = {
     // TODO datetime formatting
     val c = column.column
     c.datatype match {
@@ -436,6 +436,7 @@ abstract class Renderer(
       case XImageLink => table_get_value_img(column, record)
       case XHtml => table_get_value_html(c, record)
       case XText => table_get_value_text(c, record)
+      case XRecordInstance => table_get_value_record(c, record)
       case _ => table_get_value_string(c, record)
     }
   }
@@ -472,6 +473,13 @@ abstract class Renderer(
 
   protected def table_get_value_text(column: Column, record: Record): Option[Node] =
     record.getFormString(column.name).map(table_value_text)
+
+  protected def table_get_value_record(column: Column, record: Record): Option[NodeSeq] =
+    record.getRecordList(column.name) match {
+      case Nil => None
+      case x :: Nil => Some(property_sheet(x))
+      case xs => RAISE.notImplementedYetDefect
+    }
 
   protected def table_get_value_string(column: Column, record: Record): Option[Node] =
     record.getString(column.name).map(Text(_))

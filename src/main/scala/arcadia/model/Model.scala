@@ -24,7 +24,7 @@ import arcadia.domain._
  *  version Oct. 31, 2017
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
- * @version Jan. 14, 2018
+ * @version Jan. 22, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -955,6 +955,22 @@ case class UpdateEntityDirectiveFormModel(
     strategy, None, None, None, None
   ) {
     protected def render_Content: NodeSeq = update_entity_directive_form(uri, properties)
+  }.apply
+}
+
+case class InvokeDirectiveFormModel(
+  uri: URI,
+  method: Method,
+  label: I18NString,
+  parameters: List[Parameter],
+  isActive: Boolean
+) extends Model with IFormModel with IComponentModel {
+  val expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
+  def toRecord: Record = throw new UnsupportedOperationException()
+  def render(strategy: RenderStrategy): NodeSeq = new Renderer(
+    strategy, None, None, None, None
+  ) {
+    protected def render_Content: NodeSeq = RAISE.notImplementedYetDefect
   }.apply
 }
 
