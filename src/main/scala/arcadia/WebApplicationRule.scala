@@ -18,7 +18,8 @@ import arcadia.model.SubmitKind
  * @since   Aug. 12, 2017
  *  version Oct. 27, 2017
  *  version Nov. 15, 2017
- * @version Dec. 20, 2017
+ *  version Dec. 20, 2017
+ * @version Mar. 13, 2018
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationRule(
@@ -98,11 +99,13 @@ object WebApplicationRule {
   case class Page(
     name: String,
     title: Option[I18NElement] = None,
-    icon: Option[I18NElement] = None
+    icon: Option[String] = None
   ) {
     def title(locale: Locale): NodeSeq = title.flatMap(_.get(locale)) getOrElse {
       XhtmlUtils.title(name)
     }
+
+    def pathname: String = name // TODO
   }
 
   case class FeatureList(

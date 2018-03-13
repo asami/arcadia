@@ -19,7 +19,8 @@ import arcadia.scenario._
  *  version Oct. 27, 2017
  *  version Nov. 16, 2017
  *  version Dec. 21, 2017
- * @version Jan.  8, 2018
+ *  version Jan.  8, 2018
+ * @version Mar. 13, 2018
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -31,12 +32,16 @@ class WebEngine(
   val view: ViewEngine = new ViewEngine(platform, application.view, extend.map(_.view))
   val scenariorule = ScenarioEngine.Rule.create() // TODO
   val scenario = new ScenarioEngine(platform, scenariorule)
+  val prologuecontroller = ControllerEngine.Rule.create(
+    RouterController(Route.prologue).gc
+  )
   val systemcontroller = WebApplication.standardControllerRule.append(
     ScenarioController(scenario).gc,
     RouterController(rule.route).gc,
     RouterController(Route.system).gc
   )
   val controller: ControllerEngine = new ControllerEngine(
+    prologuecontroller,
     application.controller,
     extend.map(_.controller),
     systemcontroller

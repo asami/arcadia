@@ -11,10 +11,12 @@ import arcadia._
  *  version Oct.  6, 2017
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
- * @version Jan.  7, 2018
+ *  version Jan.  7, 2018
+ * @version Mar. 13, 2018
  * @author  ASAMI, Tomoharu
  */
 class ControllerEngine(
+  prologueRule: ControllerEngine.Rule,
   applicationRule: ControllerEngine.Rule,
   extend: List[ControllerEngine],
   systemRule: ControllerEngine.Rule
@@ -51,9 +53,12 @@ class ControllerEngine(
   }
 
   def applyOption(parcel: Parcel): Option[Parcel] = parcel.executeWithTrace("ControllerEngine#applyOption", parcel.show) {
-    val r = applyApplicationOption(parcel) orElse {
-      systemRule.findController(parcel).map(_.apply(parcel))
-    }
+    val r = prologueRule.findController(parcel).map(_.apply(parcel)).
+      orElse(
+        applyApplicationOption(parcel)
+      ).orElse(
+        systemRule.findController(parcel).map(_.apply(parcel))
+      )
     Result(r, r.map(_.show).getOrElse(""))
   }
 

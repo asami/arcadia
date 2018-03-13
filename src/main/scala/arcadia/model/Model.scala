@@ -24,7 +24,8 @@ import arcadia.domain._
  *  version Oct. 31, 2017
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
- * @version Jan. 22, 2018
+ *  version Jan. 22, 2018
+ * @version Feb. 17, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -961,7 +962,9 @@ case class UpdateEntityDirectiveFormModel(
 case class InvokeDirectiveFormModel(
   uri: URI,
   method: Method,
-  label: I18NString,
+  title: Option[I18NElement],
+  description: Option[I18NElement],
+  submitLabel: Option[I18NElement],
   parameters: List[Parameter],
   isActive: Boolean
 ) extends Model with IFormModel with IComponentModel {

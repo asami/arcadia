@@ -25,7 +25,9 @@ import arcadia.scenario.ScenarioEngine
  *  version Oct. 31, 2017
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
- * @version Jan. 22, 2018
+ *  version Jan. 22, 2018
+ *  version Feb. 17, 2018
+ * @version Mar. 13, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -118,10 +120,7 @@ trait Action {
   }
 
   protected final def get_domain_object_id(parcel: Parcel): Option[DomainObjectId] =
-    parcel.getEffectiveModel.flatMap {
-      case m: IRecordModel => m.getDomainObjectId
-      case _ => None
-    }
+    parcel.getDomainObjectId
 
   protected final def take_domain_object_id(parcel: Parcel): DomainObjectId =
     get_domain_object_id(parcel) getOrElse {
@@ -430,7 +429,9 @@ object UpdateEntityDirectiveAction {
 case class InvokeDirectiveAction(
   uri: URI,
   method: Option[Method],
-  label: I18NString,
+  title: Option[I18NElement],
+  description: Option[I18NElement],
+  submitLabel: Option[I18NElement],
   parameters: List[Parameter],
   source: Option[Source],
   sink: Option[Sink]
@@ -440,7 +441,9 @@ case class InvokeDirectiveAction(
     val model = InvokeDirectiveFormModel(
       uri,
       method getOrElse Get,
-      label,
+      title,
+      description,
+      submitLabel,
       parameters,
       active
     )

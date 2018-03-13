@@ -4,7 +4,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest._
 import java.net.URI
-import org.goldenport.i18n.I18NString
+import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.record.v2.Column
 import arcadia.context._
 
@@ -12,7 +12,8 @@ import arcadia.context._
  * @since   Oct. 28, 2017
  *  version Oct. 31, 2017
  *  version Nov.  6, 2017
- * @version Jan. 22, 2018
+ *  version Jan. 22, 2018
+ * @version Mar. 14, 2018
  * @author  ASAMI, Tomoharu
  */
 @RunWith(classOf[JUnitRunner])
@@ -206,7 +207,7 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
   "action": "invoke-directive",
   "sink": "rcauser",
   "uri": "/rca/user",
-  "label": "ユーザー",
+  "title": "ユーザー",
   "parameters": [{
     "name": "id",
     "placeholder": "User ID/Access Token"
@@ -216,7 +217,9 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
           InvokeDirectiveAction(
             new URI("/rca/user"),
             None,
-            I18NString("ユーザー"),
+            Some(I18NElement("ユーザー")),
+            None,
+            None,
             List(Parameter("id", placeholder = Some(I18NString("User ID/Access Token")))),
             None,
             Some(Sink("rcauser"))

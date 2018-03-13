@@ -6,7 +6,7 @@ import java.net.URI
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
 import org.goldenport.xml.XmlUtils
-import org.goldenport.i18n.I18NString
+import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.trace.Result
 import org.goldenport.values.PathName
 import arcadia._
@@ -19,7 +19,8 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  *  version Oct. 31, 2017
  *  version Nov. 14, 2017
  *  version Dec. 13, 2017
- * @version Jan. 21, 2018
+ *  version Jan. 21, 2018
+ * @version Feb. 17, 2018
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -179,6 +180,8 @@ case class Expression(
   def isLabel(p: String): Boolean = prefix === "c" && label === p
 
   def format(p: I18NString): String = p(strategy.locale)
+
+  def format(p: I18NElement): String = p(strategy.locale).text
 
   def resolveActionPathName(p: URI): PathName = {
     val pn = PathName(p.toString)

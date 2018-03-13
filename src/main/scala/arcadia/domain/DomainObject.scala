@@ -12,7 +12,8 @@ import arcadia.model.Picture
  *  version Oct. 24, 2017
  *  version Nov.  5, 2017
  *  version Dec. 17, 2017
- * @version Jan. 14, 2018
+ *  version Jan. 14, 2018
+ * @version Mar. 13, 2018
  * @author  ASAMI, Tomoharu
  */
 trait DomainObject {
@@ -44,6 +45,8 @@ trait DomainObjectId {
 }
 object DomainObjectId {
   val undefined = StringDomainObjectId("*id undefined*")
+
+  def apply(id: String): DomainObjectId = StringDomainObjectId(id)
 
   def get(
     p: Record,

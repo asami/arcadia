@@ -9,7 +9,7 @@ import org.goldenport.values.PathName
 import org.goldenport.util.{SeqUtils, MapUtils}
 import arcadia.context._
 import arcadia.domain._
-import arcadia.model.{Model, ErrorModel, Badge}
+import arcadia.model.{Model, ErrorModel, Badge, IRecordModel}
 import arcadia.view.{ViewEngine, RenderStrategy, Partials, View,
   UsageKind, TableKind, CardKind
 }
@@ -21,7 +21,8 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Sep. 27, 2017
  *  version Oct. 31, 2017
  *  version Nov. 16, 2017
- * @version Jan. 15, 2018
+ *  version Jan. 15, 2018
+ * @version Mar. 13, 2018
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -133,6 +134,15 @@ case class Parcel(
         map(ispathname).
         getOrElse(false)
     )
+  }
+
+  def getDomainObjectId: Option[DomainObjectId] = {
+    val a = getEffectiveModel.flatMap {
+      case m: IRecordModel => m.getDomainObjectId
+      case _ => None
+    }
+    val b = command.flatMap(_.getDomainObjectId)
+    a orElse b
   }
 
   def getLogicalUri: Option[URI] = context.flatMap(_.getLogicalUri)

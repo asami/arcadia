@@ -10,6 +10,7 @@ import org.goldenport.Strings.blankopt
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2._
 import org.goldenport.record.v2.util.{SchemaBuilder, RecordUtils}
+import org.goldenport.i18n.I18NElement
 import org.goldenport.xml.XhtmlUtils
 import org.goldenport.value._
 import org.goldenport.values.PathName
@@ -27,7 +28,9 @@ import arcadia.view.ViewEngine._
  *  version Oct. 30, 2017
  *  version Nov. 22, 2017
  *  version Dec. 30, 2017
- * @version Jan. 15, 2018
+ *  version Jan. 15, 2018
+ *  version Feb. 17, 2018
+ * @version Mar. 13, 2018
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -131,6 +134,10 @@ case class RenderStrategy(
 
   def formatXml(p: Any): NodeSeq =
     XhtmlUtils.parseNode(p.toString)
+
+  object default {
+    def commandSubmitLabel: I18NElement = renderContext.default.commandSubmitLabel
+  }
 }
 
 sealed trait RenderScope {
@@ -401,12 +408,13 @@ object RenderTheme extends EnumerationClass[RenderTheme] {
     PaperDashboardTheme,
     MatrialKitTheme,
     NowUiKitTheme,
+    NowUiDashboardProTheme,
     MyColorTheme,
     LightBootstrapDashboardTheme
   )
 }
 
-sealed trait BootstrapRenderThemaBase extends RenderTheme {
+sealed trait BootstrapRenderThemeBase extends RenderTheme {
   override protected def table_Container(p: Renderer.Table, body: => Node): Node = p.kind match {
     case StandardTable => _table_container_standard(body)
     case ListTable => _table_container_list(body)
@@ -451,22 +459,22 @@ sealed trait BootstrapRenderThemaBase extends RenderTheme {
   )
 }
 
-trait Bootstrap3RenderThemaBase extends BootstrapRenderThemaBase {
+trait Bootstrap3RenderThemeBase extends BootstrapRenderThemeBase {
 }
 
-trait Bootstrap4RenderThemaBase extends BootstrapRenderThemaBase {
+trait Bootstrap4RenderThemeBase extends BootstrapRenderThemeBase {
 }
 
 case object PlainTheme extends RenderTheme {
 }
-case object PaperDashboardTheme extends Bootstrap3RenderThemaBase {
+case object PaperDashboardTheme extends Bootstrap3RenderThemeBase {
   override protected def default_TableKind: TableKind = StandardTable
   override protected def table_CssClass_TheadTh(p: Renderer.TableColumn): String =
     p.size.cssClass
 }
-case object MatrialKitTheme extends Bootstrap3RenderThemaBase {
+case object MatrialKitTheme extends Bootstrap3RenderThemeBase {
 }
-case object NowUiKitTheme extends Bootstrap4RenderThemaBase {
+case object NowUiKitTheme extends Bootstrap4RenderThemeBase {
   override def body_CssClass(strategy: RenderStrategy): String = {
     def default = "landing-page sidebar-collapse"
     strategy.getOperationName.map {
@@ -478,7 +486,7 @@ case object NowUiKitTheme extends Bootstrap4RenderThemaBase {
   }
 }
 
-case object MyColorTheme extends Bootstrap4RenderThemaBase {
+case object MyColorTheme extends Bootstrap4RenderThemeBase {
   override val isCardDiv = true
 
   override protected def default_GridContext(strategy: RenderStrategy) =
@@ -504,7 +512,7 @@ case object MyColorTheme extends Bootstrap4RenderThemaBase {
   override protected def card_CssClass_Div_Content: String = ""
 }
 
-case object LightBootstrapDashboardTheme extends Bootstrap4RenderThemaBase {
+case object LightBootstrapDashboardTheme extends Bootstrap4RenderThemeBase {
   override protected def sidebar_Feature_Item(
     view: ViewModel,
     p: WebApplicationRule.Page
@@ -534,6 +542,79 @@ case object LightBootstrapDashboardTheme extends Bootstrap4RenderThemaBase {
         </li>
       </ul>,
       <ul class="nav navbar-nav ml-auto">{
+        List(
+          _nav_login_logout(view)
+        )
+      }</ul>
+    )
+  )
+
+  private def _nav_login_logout(view: ViewModel): Node =
+    if (view.isLogined)
+      _nav_logout
+    else
+      _nav_login
+
+
+  private def _nav_login: Node = {
+    <li class="nav-item">
+      <a class="nav-link" href="login.html">
+        <span class="no-icon">Login</span>
+      </a>
+    </li>
+  }
+
+  private def _nav_logout: Node = {
+    <li class="nav-item">
+      <a class="nav-link" href="logout.html">
+        <span class="no-icon">Logout</span>
+      </a>
+    </li>
+  }
+}
+
+case object NowUiDashboardProTheme extends Bootstrap4RenderThemeBase {
+  override def body_CssClass(strategy: RenderStrategy): String = {
+    def default = "sidebar-mini"
+    strategy.getOperationName.map {
+      case "index" => default
+      case "login" => default
+      case "logout" => default
+      case _ => default
+    }.getOrElse(default)
+  }
+
+  override protected def sidebar_Feature_Item(
+    view: ViewModel,
+    p: WebApplicationRule.Page
+  ): Node = {
+    val isactive = view.isActiveFeature(p.name)
+    val icon = IconFactory.guessNowUiIcon(p.icon getOrElse p.name)
+    val pathname = view.resolvePathName(p.pathname)
+    val href = if (isactive) "#" else s"${pathname.v}.html"
+    def anchor = <a href={href}>
+      <i class={s"now-ui-icons ${icon}"}></i>
+      <p>{p.title(view.locale)}</p>
+    </a>
+    if (isactive)
+      <li class="active">{anchor}</li>
+    else
+      <li>{anchor}</li>
+  }
+
+  override protected def navigation_Content(view: ViewModel): Node = Group(
+    List(
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <a class="nav-link" href="#" data-toggle="dropdown">
+            <i class="now-ui-icons media-2_sound-wave"></i>
+            <p>
+              <span class="d-lg-none d-md-block">Stats</span>
+            </p>
+          </a>
+        </li>
+      </ul>,
+      <ul class="navbar-nav">{
         List(
           _nav_login_logout(view)
         )
@@ -984,6 +1065,10 @@ case class RenderContext(
   def uri(base: DomainEntityType, id: DomainObjectId): URI = new URI("${base.v}/${id.presentationId}${suffix}")
 
   def suffix: String = ".html" // TODO
+
+  object default {
+    def commandSubmitLabel: I18NElement = I18NElement("Execute", "実行")
+  }
 
   // protected def domain_entity_id(entitytype: DomainEntityType, id: Any): DomainEntityId =
   //   DomainEntityId(entitytype, StringDomainObjectId(id.toString, None, None)) // TODO

@@ -13,9 +13,11 @@ import org.goldenport.xml.XmlUtils
 import org.goldenport.xml.dom.DomUtils
 import org.goldenport.trace.TraceContext
 import org.goldenport.util.{DateTimeUtils, DateUtils, StringUtils, SeqUtils}
+import arcadia.Parcel
 import arcadia.model._
 import arcadia.domain._
 import arcadia.context._
+import arcadia.controller.Controller.PROP_REDIRECT
 
 /*
  * @since   Aug.  1, 2017
@@ -23,7 +25,8 @@ import arcadia.context._
  *  version Oct. 31, 2017
  *  version Nov. 22, 2017
  *  version Dec. 19, 2017
- * @version Jan. 21, 2018
+ *  version Jan. 21, 2018
+ * @version Feb. 26, 2018
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -478,7 +481,7 @@ abstract class Renderer(
     record.getRecordList(column.name) match {
       case Nil => None
       case x :: Nil => Some(property_sheet(x))
-      case xs => RAISE.notImplementedYetDefect
+      case xs => Some(property_sheet_list(xs))
     }
 
   protected def table_get_value_string(column: Column, record: Record): Option[Node] =
@@ -638,6 +641,25 @@ abstract class Renderer(
     )
   )
 
+  protected def property_sheet_list(records: Seq[Record]): NodeSeq = {
+    import SchemaBuilder._
+    val schema = SchemaBuilder.create(
+      CT("no", XInt),
+      CT("data", XRecordInstance)
+    )
+    val t = Table(PropertyTable, strategy.size, schema)
+    <table class={theme_table.css.table(t)}>
+      <tbody>{
+        for ((x, i) <- records.zipWithIndex) yield {
+          <tr class={theme_table.css.tbodyTr(t)}>
+            <td>{i + 1}</td>
+            <td>{property_sheet(x)}</td>
+          </tr>
+        }
+      }</tbody>
+    </table>
+  }
+
   protected def property_sheet(schema: Option[Schema], record: Record): NodeSeq =
     schema.fold(property_sheet(record))(property_sheet(_, record))
 
@@ -674,7 +696,7 @@ abstract class Renderer(
     submits: Submits
   ): NodeSeq =
     strategy.theme match {
-      case m: Bootstrap4RenderThemaBase => 
+      case m: Bootstrap4RenderThemeBase => 
         property_input_form_bootstrap(
           InputForm(action, method, schema, record, hidden, submits))
       case m =>
@@ -1010,6 +1032,123 @@ abstract class Renderer(
   private def _form_type(p: DataType): String =
     p.getHtmlInputTypeName getOrElse "text"
 
+  protected def command_form(
+    parcel: Parcel,
+    method: Method,
+    action: String,
+    title: Option[I18NElement],
+    description: Option[I18NElement],
+    submitname: String,
+    parameters: List[Parameter],
+    isactive: Boolean,
+    isreturnback: Boolean
+  ): Elem = {
+    val buttonclass = "btn btn-primary btn-block"
+    def returnback: Record =
+      if (isreturnback)
+        parcel.getLogicalUri.map(x =>
+          Record.dataApp(PROP_REDIRECT -> x.toString)
+        ).getOrElse(Record.empty)
+      else
+        Record.empty
+    def submitbutton: Elem = 
+      if (isactive)
+        <input type="submit" value={submitname} class={buttonclass}/>
+      else
+        <input type="submit" value={submitname} class={buttonclass} disabled="true"/>
+    def singleline: Elem = {
+      def toinput(p: Parameter, ncol: Int, nvalue: Int): Seq[Elem] = {
+        val id = generate_id()
+        Vector(
+          <div class={s"col-$ncol"}>
+            <label class="col-form-label" for={id}>{p.takeLabel(locale)}</label>
+          </div>,
+          <div class={s"col-$nvalue"}>{
+            p.toInput(locale, id, "form-control")
+          }</div>
+        )
+      }
+      <div class="form-group">
+        <div class="form-row"> {
+          val (nl, nv) = parameters.length match {
+            case 0 => RAISE.noReachDefect
+            case 1 => (2, 8)
+            case 2 => (2, 3)
+            case 3 => (1, 2)
+          }
+          parameters.flatMap(toinput(_, nl, nv)) :+ (
+            <div class="col-2">
+              {submitbutton}
+            </div>
+          )
+        } </div>
+      </div>
+    }
+    def multiline: Elem = {
+      def toinput(p: Parameter): Elem = {
+        val id = generate_id()
+        <div class="form-row">
+          <div class={s"col-4"}>
+            <label class="col-form-label" for={id}>{p.label}</label>,
+          </div>
+          <div class={s"col-8"}>{
+            p.toInput(locale, id, "form-control")
+          }</div>
+        </div>
+      }
+      <div class="form-group"> {
+        List(
+          parameters.flatMap(toinput),
+          <div class="form-row">
+            <div class="col-2">{
+              submitbutton
+            }</div>
+          </div>
+        )
+      } </div>
+    }
+    val xs = returnback
+    val form = <form method={method.name} action={action}>{
+      val descs: Seq[Elem] = description.flatMap(_.get(locale)).map(x =>
+        <div class="form-row">
+          <div class="col">{_complement_p(x)}</div>
+        </div>
+      ).toList
+      val hiddens: Seq[Elem] = xs.toStringVector.map {
+        case (k, v) => <input type="hidden" name={k} value={v}></input>
+      }
+      val params: Seq[Elem] = if (parameters.length > 2)
+        List(multiline)
+      else
+        List(singleline)
+      descs ++ hiddens ++ params
+    }</form>
+    val card = <div class="card">{
+      val headers = title.flatMap(_.get(locale)).map(x =>
+        <div class="card-header">
+          <div class="card-title">
+            <h5>{x}</h5>
+          </div>
+        </div>
+      ).toList
+      val bodys = List(
+        <div class="card-body">
+          <div class="container">
+            {form}
+          </div>
+        </div>
+      )
+      headers ++ bodys
+    }</div>
+    card
+  }
+
+  private def _complement_p(p: NodeSeq): Node =
+    p match {
+      case m: Elem => m
+      case _ => <p>{p}</p>
+    }
+
   protected def grid(p: TableWithRecords): Elem = {
     val cards = p.records.map(to_card(p.table, _)).toList
     grid(cards)
@@ -1039,15 +1178,15 @@ abstract class Renderer(
     strategy.theme match {
       case m if (m.isGridDiv) => grid_div(ps)(f)
       case m if (m.isGridTable) => grid_table(ps)(f)
-      case m: Bootstrap4RenderThemaBase => grid_bootstrap4(ps)(f)
-      case m: Bootstrap3RenderThemaBase => grid_bootstrap3(ps)(f)
+      case m: Bootstrap4RenderThemeBase => grid_bootstrap4(ps)(f)
+      case m: Bootstrap3RenderThemeBase => grid_bootstrap3(ps)(f)
       case m => grid_table(ps)(f)
     }
 
   protected def grid_with_content_bootstrap[T](ps: List[T])(f: T => NodeSeq): Elem =
     strategy.theme match {
-      case m: Bootstrap4RenderThemaBase => grid_bootstrap4(ps)(f)
-      case m: Bootstrap3RenderThemaBase => grid_bootstrap3(ps)(f)
+      case m: Bootstrap4RenderThemeBase => grid_bootstrap4(ps)(f)
+      case m: Bootstrap3RenderThemeBase => grid_bootstrap3(ps)(f)
       case m => grid_table(ps)(f)
     }
 
@@ -1248,8 +1387,8 @@ abstract class Renderer(
     strategy.theme match {
       case m if m.isCardDiv => card_div(card)
       case m if m.isCardTable => card_table(card)
-      case m: Bootstrap4RenderThemaBase => card_bootstrap(card)
-      case m: Bootstrap3RenderThemaBase => card_paperdashboard(card)
+      case m: Bootstrap4RenderThemeBase => card_bootstrap(card)
+      case m: Bootstrap3RenderThemeBase => card_paperdashboard(card)
       case m => card_table(card)
     }
   }

@@ -17,7 +17,8 @@ import arcadia.context.Request
  *  version Oct. 24, 2017
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
- * @version Jan.  7, 2018
+ *  version Jan.  7, 2018
+ * @version Mar. 13, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Command {
@@ -25,6 +26,7 @@ trait Command {
 //  def toRecord: Record = Record.empty // TODO
   def getModel: Option[Model] = None
   def getLayout: Option[LayoutKind] = None
+  def getDomainObjectId: Option[DomainObjectId] = None
   def show: String = toString()
 }
 
@@ -38,9 +40,13 @@ object MaterialCommand {
   def apply(p: String): MaterialCommand = MaterialCommand(PathName(p))
 }
 
-case class UnauthorizedCommand(request: Request, command: Option[Command]) extends Command {
+case class UnauthorizedCommand(
+  request: Request,
+  command: Option[Command]
+) extends Command {
   def isGet = request.isGet
   def isMutation = request.isMutation
+  override def getDomainObjectId = command.flatMap(_.getDomainObjectId) orElse request.getDomainObjectId
 }
 object UnauthorizedCommand {
   def apply(request: Request, command: Command): UnauthorizedCommand =

@@ -1,16 +1,19 @@
 package arcadia.context
 
 import scala.xml._
+import java.util.Locale
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import org.goldenport.json.JsonUtils.Implicits._
 import org.goldenport.i18n.I18NString
 import org.goldenport.record.v2._
+import org.goldenport.util.StringUtils
 import Column.Form
+import org.goldenport.xml.XmlUtils
 
 /*
  * @since   Jan. 22, 2018
- * @version Jan. 22, 2018
+ * @version Feb. 18, 2018
  * @author  ASAMI, Tomoharu
  */
 case class Parameter(
@@ -23,7 +26,21 @@ case class Parameter(
   readonly: Option[Boolean] = None,
   hidden: Option[Boolean] = None
 ) {
-  def toInput(cssclass: String): NodeSeq = <input type={take_datatype} name={name} value={take_value} class={cssclass}></input>
+  def toInput(locale: Locale, id: String, cssclass: String): NodeSeq =
+    XmlUtils.elementWithAttributesFixOption(
+      "input",
+      List(
+        "type" -> take_datatype,
+        "name" -> name,
+        "value" -> take_value,
+        "class" -> cssclass
+      ),
+      List(
+        "placeholder" -> placeholder.map(_.as(locale))
+      )
+    )
+
+  def takeLabel(locale: Locale) = StringUtils.label(label.map(_.as(locale)), name)
 
   protected def take_datatype: String =
     if (hidden.getOrElse(false))

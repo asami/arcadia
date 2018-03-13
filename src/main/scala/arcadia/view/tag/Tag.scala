@@ -7,6 +7,7 @@ import org.goldenport.Strings
 import org.goldenport.exception.RAISE
 import org.goldenport.xml.XmlUtils
 import org.goldenport.record.v2.{Schema, Column, Record}
+import org.goldenport.i18n.I18NElement
 import org.goldenport.trace.Result
 import org.goldenport.values.PathName
 import arcadia._
@@ -19,7 +20,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  * @since   Oct. 11, 2017
  *  version Nov. 15, 2017
  *  version Dec. 13, 2017
- * @version Jan. 22, 2018
+ *  version Jan. 22, 2018
+ * @version Feb. 17, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -41,6 +43,13 @@ trait Tag {
 
   protected final def resolve_action(expr: Expression, p: URI): String =
     expr.resolveActionPathName(p).v
+
+  protected final def command_submit_label(expr: Expression, p: Option[I18NElement]): String = {
+    val a = expr.get("submitLabel").map(I18NElement.apply).getOrElse(
+      expr.parcel.render.fold(I18NElement("Execute"))(_.default.commandSubmitLabel)
+    )
+    expr.format(a)
+  }
 }
 
 trait SelectByName { self: Tag =>
@@ -288,41 +297,38 @@ case object CommandTag extends Tag with SelectByName {
     val op = resolve_action(expr, p.uri)
     val action: String = s"$op"
     val method = p.method
-    val buttonname: String = expr.format(p.label)
+    val title = p.title
+    val description = p.description
+    val submitlabel: String = command_submit_label(expr, p.submitLabel)
     val parameters = p.parameters
-    _command(expr, method, action, buttonname, parameters, p.isActive, false)
+    _command(expr, method, action, title, description, submitlabel, parameters, p.isActive, false)
   }
 
   private def _command(
     expr: Expression,
     method: Method,
     action: String,
-    buttonname: String,
+    title: Option[I18NElement],
+    description: Option[I18NElement],
+    submitlabel: String,
     parameters: List[Parameter],
     isactive: Boolean,
     isreturnback: Boolean
   ): XmlContent = {
-    def returnback: Record =
-      if (isreturnback)
-        expr.parcel.getLogicalUri.map(x =>
-          Record.dataApp(PROP_REDIRECT -> x.toString)
-        ).getOrElse(Record.empty)
-      else
-        Record.empty
-    val xs = returnback
-    // TODO renderer
-    val buttonclass = "btn btn-primary btn-block"
-    def toinput(p: Parameter) = p.toInput(buttonclass)
-    val r = <form method={method.name} action={action}> {
-      parameters.map(toinput) ++ xs.toStringVector.map {
-        case (k, v) => <input type="hidden" name={k} value={v}></input>
-      } :+ (
-        if (isactive)
-          <input type="submit" value={buttonname} class={buttonclass}/>
-        else
-          <input type="submit" value={buttonname} class={buttonclass} disabled="true"/>
+    val strategy = expr.strategy
+    val r = new Renderer(strategy) {
+      protected def render_Content: NodeSeq = command_form(
+        expr.parcel,
+        method,
+        action,
+        title,
+        description,
+        submitlabel,
+        parameters,
+        isactive,
+        isreturnback
       )
-    } </form>
+    }.apply
     XmlContent(r)
   }
 }

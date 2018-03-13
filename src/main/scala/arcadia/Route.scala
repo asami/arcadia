@@ -8,7 +8,8 @@ import Controller.PROP_REDIRECT
 /*
  * @since   Dec. 20, 2017
  *  version Dec. 21, 2017
- * @version Jan. 14, 2018
+ *  version Jan. 14, 2018
+ * @version Mar. 13, 2018
  * @author  ASAMI, Tomoharu
  */
 case class Route(
@@ -24,9 +25,11 @@ case class Route(
 
 object Route {
   val empty = Route(Vector.empty)
-  val system = Route(Vector(
+  val prologue = Route(Vector(
     Slot(UnauthorizedGetGuard, UnauthorizedAccessAction),
-    Slot(UnauthorizedMutationGuard, UnauthorizedUserAction),
+    Slot(UnauthorizedMutationGuard, UnauthorizedUserAction)
+  ))
+  val system = Route(Vector(
     Slot(RedirectGuard, RedirectAction),
     Slot(OperationOutcomeGuard, RedirectSinglePageAction()) // XXX if required
   ))
