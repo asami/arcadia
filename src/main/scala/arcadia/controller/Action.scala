@@ -27,7 +27,7 @@ import arcadia.scenario.ScenarioEngine
  *  version Dec. 21, 2017
  *  version Jan. 22, 2018
  *  version Feb. 17, 2018
- * @version Mar. 13, 2018
+ * @version Mar. 18, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -278,10 +278,13 @@ object IndexAction {
     override val isDemo = false
 
     def apply: List[(String, EntityListModel)] = {
-      List(
-        _read_entity_list_news,
-        _read_entity_list_blog
-      )
+      if (isDemo)
+        List(
+          _read_entity_list_news,
+          _read_entity_list_blog
+        )
+      else
+        Nil
     }
 
     private def _read_entity_list_news() = {
