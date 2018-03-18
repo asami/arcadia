@@ -21,7 +21,8 @@ import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL}
  *  version Aug. 30, 2017
  *  version Sep. 30, 2017
  *  version Oct. 27, 2017
- * @version Nov. 14, 2017
+ *  version Nov. 14, 2017
+ * @version Mar. 18, 2018
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -156,7 +157,7 @@ case class MaterialView(baseUrl: URL) extends View() {
       } yield mime
       a.getOrElse(MimeType.application_octet_stream)
     }
-    _get_control_content(c.pathname.v) getOrElse {
+    _get_control_content(parcel, c.pathname.v) getOrElse {
       val url = new URL(baseUrl, c.pathname.v)
       BinaryContent(mime, new UrlBag(url), AssetsExpires)
     }
@@ -164,14 +165,17 @@ case class MaterialView(baseUrl: URL) extends View() {
 
   def getControlContent(parcel: Parcel): Option[Content] = {
     val c = parcel.takeCommand[MaterialCommand]
-    _get_control_content(c.pathname.v)
+    _get_control_content(parcel, c.pathname.v)
   }
 
-  private def _get_control_content(pathname: String): Option[Content] = {
+  private def _get_control_content(
+    parcel: Parcel,
+    pathname: String
+  ): Option[Content] = {
     val url = new URL(baseUrl, pathname)
     if (UrlUtils.isExist(url)) {
       if (StringUtils.getSuffix(pathname).isEmpty)
-        Some(RedirectContent(StringUtils.concatPath(pathname, "index.html")))
+        Some(RedirectContent(_redirect_pathname(parcel, pathname, "index.html")))
       else
         None
     } else {
@@ -179,9 +183,18 @@ case class MaterialView(baseUrl: URL) extends View() {
     }
   }
 
-  private def _is_redirect(pathname: String): Boolean =
-    StringUtils.getSuffix(pathname).isEmpty
+  private def _redirect_pathname(
+    parcel: Parcel,
+    pathname: String,
+    filename: String
+  ) =
+    parcel.context.flatMap(_.platformExecutionContext.getImplicitIndexBase).
+      map(base =>
+        StringUtils.concatPath(StringUtils.concatPath(base, pathname), filename)
+      ).getOrElse(StringUtils.concatPath(pathname, filename))
 
+  // private def _is_redirect(pathname: String): Boolean =
+  //   StringUtils.getSuffix(pathname).isEmpty
 }
 // case class MaterialView(url: URL, pathname: Option[String] = None) extends View() {
 //   private val _pathname = pathname getOrElse UrlUtils.takeLeafName(url)
