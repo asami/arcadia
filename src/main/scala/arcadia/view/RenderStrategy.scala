@@ -30,7 +30,7 @@ import arcadia.view.ViewEngine._
  *  version Dec. 30, 2017
  *  version Jan. 15, 2018
  *  version Feb. 17, 2018
- * @version Mar. 13, 2018
+ * @version Mar. 21, 2018
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -445,7 +445,18 @@ sealed trait BootstrapRenderThemeBase extends RenderTheme {
       {body}
     </div>
 
-  override protected def table_CssClass_Table(p: Renderer.Table): String = "table table-hover" // table, table-striped, table-bordered, table-hover, table-condensed
+  override protected def table_CssClass_Table(p: Renderer.Table): String =
+    p.kind match {
+      case StandardTable => "table"
+      case ListTable => "table table-hover table-responsive"
+      case GridTable => "table table-hover table-responsive"
+      case TabularTable => ""
+      case PropertyTable => "table table-bordered table-sm"
+      case EntityTable => "table table-bordered table-sm"
+      case FormTable => ""
+      case DashboardTable => "table table-hover table-responsive table-sm"
+    }
+  // table, table-striped, table-bordered, table-hover, table-sm, table-responsive
 
   // tr/td: active, success, info, warning, danger
 

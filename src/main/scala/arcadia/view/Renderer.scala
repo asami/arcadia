@@ -26,7 +26,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Nov. 22, 2017
  *  version Dec. 19, 2017
  *  version Jan. 21, 2018
- * @version Feb. 26, 2018
+ *  version Feb. 26, 2018
+ * @version Mar. 21, 2018
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -295,7 +296,7 @@ abstract class Renderer(
 
   protected def table_head_record(p: Table): Elem =
     <tr class={theme_table.css.theadTr(p)}>{
-      for (c <- p.schema.columns) yield <th class={theme_table.css.theadTh(p.tableColumn(c))}>{c.label(locale)}</th>
+      for (c <- p.schema.columns) yield <th scope="col" class={theme_table.css.theadTh(p.tableColumn(c))}>{c.label(locale)}</th>
     }</tr>
 
   protected def table_body(kind: TableKind, schema: Schema, records: Seq[Record]): Elem =
@@ -676,7 +677,7 @@ abstract class Renderer(
           <tr class={theme_table.css.tbodyTr(t)}>{
             val tc = t.tableColumn(c)
             List(
-              <th class={theme_table.css.theadTh(tc)}>{c.label(locale)}</th>,
+              <th scope="row" class={theme_table.css.theadTh(tc)}>{c.label(locale)}</th>,
               table_data(tc, record)
             )
           }</tr>
@@ -827,7 +828,7 @@ abstract class Renderer(
           val tc = t.tableColumn(c)
           <tr class={theme_table.css.tbodyTr(t)}>{
             List(
-              <th class={theme_table.css.theadTh(tc)}>{c.label(locale)}</th>,
+              <th scope="row" class={theme_table.css.theadTh(tc)}>{c.label(locale)}</th>,
               input_field(tc, record)
             )
           }</tr>
@@ -882,7 +883,7 @@ abstract class Renderer(
           val tc = t.tableColumn(c)
           <tr class={theme_table.css.tbodyTr(t)}>{
             List(
-              <th class={theme_table.css.theadTh(tc)}>{c.label(locale)}</th>,
+              <th scope="row" class={theme_table.css.theadTh(tc)}>{c.label(locale)}</th>,
               table_data(tc, record)
             )
           }</tr>

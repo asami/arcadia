@@ -25,7 +25,8 @@ import arcadia.domain._
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
  *  version Jan. 22, 2018
- * @version Feb. 17, 2018
+ *  version Feb. 17, 2018
+ * @version Mar. 21, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -76,7 +77,7 @@ trait Model {
 }
 
 object Model {
-  val candidates: Vector[ModelClass] = Vector(EntityDetailModel, EntityListModel, PropertySheetModel, PropertyTableModel, AutoModel)
+  val candidates: Vector[ModelClass] = Vector(EntityDetailModel, EntityListModel, PropertySheetModel, PropertyTableModel, AutoModel, ErrorModel)
   val candidatesStream = candidates.toStream
 
   def get(param: ModelParameter, response: Response): Option[Model] = candidatesStream.flatMap(_.get(param, response)).headOption
@@ -206,7 +207,7 @@ case class ErrorModel(
     protected def render_Content: NodeSeq = error(code, message, exception, topUri, backUri, trace)
   }.apply
 }
-object ErrorModel {
+object ErrorModel extends ModelClass {
   def create(parcel: Parcel, code: Int): ErrorModel = {
     val backuri = _back_uri(parcel)
     ErrorModel(code, None, None, None, backuri, parcel.trace)
@@ -242,6 +243,12 @@ object ErrorModel {
   }
 
   private def _back_uri(parcel: Parcel): Option[URI] = None // TODO
+
+  def get(param: ModelParameter, response: Response): Option[Model] =
+    if (response.code > 300)
+      Some(create(response.code, None, None))
+    else
+      None
 }
 
 sealed trait ValueModel extends Model with IAtomicModel {

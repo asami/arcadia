@@ -27,7 +27,7 @@ import arcadia.scenario.ScenarioEngine
  *  version Dec. 21, 2017
  *  version Jan. 22, 2018
  *  version Feb. 17, 2018
- * @version Mar. 18, 2018
+ * @version Mar. 21, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -337,11 +337,11 @@ case class OperationAction(
   model: Option[String],
   source: Option[Source],
   sink: Option[Sink]
-) extends Action {
+) extends SourceSinkAction {
   protected def execute_Apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
     def param = ModelParameter(model)
     val r = context.get(operation, query, form)
-    Model.get(param, r).map(parcel.withModel(_)).getOrElse {
+    Model.get(param, r).map(set_sink(parcel)).getOrElse {
       RAISE.noReachDefect
     }
   }
