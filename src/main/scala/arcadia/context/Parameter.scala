@@ -13,7 +13,8 @@ import org.goldenport.xml.XmlUtils
 
 /*
  * @since   Jan. 22, 2018
- * @version Feb. 18, 2018
+ *  version Feb. 18, 2018
+ * @version Apr. 10, 2018
  * @author  ASAMI, Tomoharu
  */
 case class Parameter(
@@ -26,29 +27,42 @@ case class Parameter(
   readonly: Option[Boolean] = None,
   hidden: Option[Boolean] = None
 ) {
-  def toInput(locale: Locale, id: String, cssclass: String): NodeSeq =
-    XmlUtils.elementWithAttributesFixOption(
-      "input",
-      List(
-        "type" -> take_datatype,
-        "name" -> name,
-        "value" -> take_value,
-        "class" -> cssclass
-      ),
-      List(
-        "placeholder" -> placeholder.map(_.as(locale))
-      )
-    )
+  // def toInput(locale: Locale, id: String, cssclass: String): NodeSeq =
+  //   XmlUtils.elementWithAttributesFixOption(
+  //     "input",
+  //     List(
+  //       "type" -> take_datatype,
+  //       "name" -> name,
+  //       "value" -> take_value,
+  //       "class" -> cssclass
+  //     ),
+  //     List(
+  //       "placeholder" -> placeholder.map(_.as(locale))
+  //     )
+  //   )
 
   def takeLabel(locale: Locale) = StringUtils.label(label.map(_.as(locale)), name)
 
-  protected def take_datatype: String =
-    if (hidden.getOrElse(false))
-      "hidden"
-    else
-      "text" // TODO
+  def toColumn: Column = Column(
+    name,
+    datatype getOrElse XToken,
+    multiplicity getOrElse MOne,
+    i18nLabel = label,
+    form = Column.Form(
+      placeholder,
+      value,
+      hidden getOrElse false,
+      readonly getOrElse false
+    )
+  )
 
-  protected def take_value: String = value getOrElse ""
+  // protected def take_datatype: String =
+  //   if (hidden.getOrElse(false))
+  //     "hidden"
+  //   else
+  //     "text" // TODO
+
+  // protected def take_value: String = value getOrElse ""
 }
 
 object Parameter {

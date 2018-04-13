@@ -22,7 +22,8 @@ import arcadia.domain._
  * @since   Oct. 29, 2017
  *  version Nov. 22, 2017
  *  version Dec. 17, 2017
- * @version Jan.  6, 2018
+ *  version Jan.  6, 2018
+ * @version Apr.  8, 2018
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -297,6 +298,9 @@ case object DELETESubmitKind extends SubmitKind {
 case object BackSubmitKind extends SubmitKind {
   def name: String = Event.EVENT_BACK
 }
+case object SearchSubmitKind extends SubmitKind {
+  def name: String = Event.EVENT_SEARCH
+}
 
 case class Hidden(
 //  event: Option[String],
@@ -305,6 +309,9 @@ case class Hidden(
   def render: NodeSeq = <div>{
     scenario.map(x => <input type="hidden" name={ScenarioCommand.PROP_SCENARIO} value={x}></input>).toList
   }</div>
+}
+object Hidden {
+  val empty = Hidden(None)
 }
 
 sealed trait Method {

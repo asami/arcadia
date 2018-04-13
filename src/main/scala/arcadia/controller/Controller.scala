@@ -14,14 +14,35 @@ import arcadia.scenario.ScenarioEngine
  *  version Oct. 14, 2017
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
- * @version Jan. 14, 2018
+ *  version Jan. 14, 2018
+ * @version Mar. 26, 2018
  * @author  ASAMI, Tomoharu
  */
 abstract class Controller(rule: Controller.Rule) {
   def apply(parcel: Parcel): Parcel = parcel.executeWithTrace(s"${getClass.getSimpleName}#apply", parcel.show) {
+    def ajaxp = {
+      parcel.command.map {
+        case MaterialCommand(pathname) => pathname.components.exists(_.endsWith(Controller.DOT_AJAX_SUFFIX))
+        case _ => false
+      }.getOrElse(false)
+    }
+    if (ajaxp)
+      _apply_ajax(parcel)
+    else
+      _apply_plain(parcel)
+  }
+
+  private def _apply_plain(parcel: Parcel) = {
     val a = prologue_Apply(parcel)
     val b = rule.apply(a)
     val r = epilogue_Apply(b)
+    Result(r, r.show)
+  }
+
+  private def _apply_ajax(parcel: Parcel) = {
+    val a = prologue_Apply_Ajax(parcel)
+    val b = rule.applyAjax(a)
+    val r = epilogue_Apply_Ajax(b)
     Result(r, r.show)
   }
 
@@ -31,12 +52,16 @@ abstract class Controller(rule: Controller.Rule) {
 
   protected def prologue_Apply(parcel: Parcel): Parcel = parcel
   protected def epilogue_Apply(parcel: Parcel): Parcel = parcel
+  protected def prologue_Apply_Ajax(parcel: Parcel): Parcel = parcel
+  protected def epilogue_Apply_Ajax(parcel: Parcel): Parcel = parcel
 }
 object Controller {
   val PROP_REDIRECT = "web.redirect"
+  val DOT_AJAX_SUFFIX = ".ajax"
 
   case class Rule(actions: List[Action]) {
     def apply(parcel: Parcel): Parcel = actions./:(parcel)((z, x) => x apply z)
+    def applyAjax(parcel: Parcel): Parcel = actions./:(parcel)((z, x) => x applyAjax z)
   }
 }
 

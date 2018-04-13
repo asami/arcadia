@@ -21,7 +21,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Nov. 15, 2017
  *  version Dec. 13, 2017
  *  version Jan. 22, 2018
- * @version Feb. 17, 2018
+ *  version Feb. 17, 2018
+ * @version Apr.  8, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -147,14 +148,20 @@ case object SearchBoxTag extends Tag with SelectByName {
     }
     val model = p.effectiveModel match {
       case m: SearchBoxModel => m
+      case m: EntityListModel => p.parcel.execute { context =>
+        val action = ???
+        val schema = ???
+        SearchBoxModel(action, schema)
+      }
       case m => p.parcel.execute { context =>
+        val action = ???
         val a = columns.map(x =>
           context.
             getDefaultPropertyColumn(x).
             getOrElse(Column(x))
         )
         val schema = Schema(a)
-        SearchBoxModel(schema)
+        SearchBoxModel(action, schema)
       }
     }
     p.applyModel(model)

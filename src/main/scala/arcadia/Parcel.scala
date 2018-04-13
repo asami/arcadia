@@ -6,7 +6,7 @@ import org.goldenport.exception.RAISE
 import org.goldenport.record.v2.Record
 import org.goldenport.trace.{TraceContext, Result}
 import org.goldenport.values.PathName
-import org.goldenport.util.{SeqUtils, MapUtils}
+import org.goldenport.util.{SeqUtils, MapUtils, StringUtils}
 import arcadia.context._
 import arcadia.domain._
 import arcadia.model.{Model, ErrorModel, Badge, IRecordModel}
@@ -22,7 +22,7 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Oct. 31, 2017
  *  version Nov. 16, 2017
  *  version Jan. 15, 2018
- * @version Mar. 13, 2018
+ * @version Mar. 26, 2018
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -123,17 +123,38 @@ case class Parcel(
       case _ => context.flatMap(_.getOperationName)
     }
   def isOperationPathName(p: String): Boolean = {
-    def ispathname(pathname: PathName) =
-      p == pathname.body || pathname.getParent.fold(false)(_.body == p)
+    val basename = PathName(p)
+    // def ispathname(pathname: PathName) =
+    //   p == pathname.body || pathname.getParent.fold(false)(_.body == p)
     command.flatMap {
-      case MaterialCommand(pathname) => Some(ispathname(pathname))
+      case MaterialCommand(pathname) => Some(_is_operation_pathname(basename, pathname))
       case _ => None
     }.getOrElse(
       context.
         flatMap(_.getOperationName.map(PathName(_))).
-        map(ispathname).
+        map(_is_operation_pathname(basename, _)).
         getOrElse(false)
     )
+  }
+
+  private def _is_operation_pathname(basename: PathName, pn: PathName) = {
+    case class Z(bs: List[String], matchp: Boolean = true) {
+      def r = matchp && bs.isEmpty
+      def +(rhs: String) =
+        if (matchp) {
+          bs match {
+            case x :: xs =>
+              if (StringUtils.toPathnameBody(x) == StringUtils.toPathnameBody(rhs))
+                Z(xs, true)
+              else
+                Z(xs, false)
+            case Nil => this
+          }
+        } else {
+          this
+        }
+    }
+    pn.components./:(Z(basename.components))(_+_).r
   }
 
   def getDomainObjectId: Option[DomainObjectId] = {

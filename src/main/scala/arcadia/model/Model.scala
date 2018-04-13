@@ -26,7 +26,8 @@ import arcadia.domain._
  *  version Dec. 21, 2017
  *  version Jan. 22, 2018
  *  version Feb. 17, 2018
- * @version Mar. 21, 2018
+ *  version Mar. 21, 2018
+ * @version Apr.  8, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -903,15 +904,17 @@ object TableCardModel {
 }
 
 case class SearchBoxModel(
-  schema: Schema
+  searchbox: Renderer.SearchBox
 ) extends Model with IFormModel with IComponentModel {
   val expiresKind: Option[ExpiresKind] = None
   def toRecord: Record = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(strategy) {
-    protected def render_Content: NodeSeq = searchbox_form(
-      Renderer.SearchBox(schema)
-    )
+    protected def render_Content: NodeSeq = searchbox_form(searchbox)
   }.apply
+}
+object SearchBoxModel {
+  def apply(action: URI, schema: Schema): SearchBoxModel =
+    SearchBoxModel(Renderer.SearchBox(action, schema))
 }
 
 case class PropertyInputFormModel(

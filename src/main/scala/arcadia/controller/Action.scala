@@ -27,7 +27,8 @@ import arcadia.scenario.ScenarioEngine
  *  version Dec. 21, 2017
  *  version Jan. 22, 2018
  *  version Feb. 17, 2018
- * @version Mar. 21, 2018
+ *  version Mar. 26, 2018
+ * @version Apr. 10, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -50,6 +51,13 @@ trait Action {
   }
 
   protected def execute_Apply(parcel: Parcel): Parcel
+
+  def applyAjax(parcel: Parcel): Parcel = parcel.executeWithTrace(s"${show}#applyAjax", parcel.show) {
+    val r = execute_Apply_Ajax(parcel)
+    Result(r, r.show)
+  }
+
+  protected def execute_Apply_Ajax(parcel: Parcel): Parcel = parcel
 
   protected final def fetch_source_via_string[T](f: String => T)(parcel: Parcel, s: Source): Option[T] = {
     s match {
@@ -401,6 +409,9 @@ case class ReadEntityListAction(
     val r = r0.withDataHref(data_href)
     set_sink(parcel)(r)
   }
+
+  override protected def execute_Apply_Ajax(parcel: Parcel): Parcel =
+    RAISE.notImplementedYetDefect
 }
 
 case class UpdateEntityDirectiveAction(
@@ -551,10 +562,13 @@ case class SearchBoxAction(
         c.datatype.map(_datatype) getOrElse _datatype_by_property(parcel, c.name),
         c.multiplicity.map(_multiplicity) getOrElse MZeroOne,
         label = c.label,
-        form = Column.Form(false, c.placeholder.map(I18NString(_)))
+        form = Column.Form(c.placeholder.map(I18NString(_)))
       )
     }
-    SearchBoxModel(Schema(a))
+    val action = ???
+    val schema = ???
+    val searchbox = arcadia.view.Renderer.SearchBox(action, schema)
+    SearchBoxModel(searchbox)
   }
 
   private def _datatype(name: String): DataType =

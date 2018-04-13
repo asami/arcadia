@@ -18,7 +18,8 @@ import arcadia.domain._
  * @since   Sep. 16, 2017
  *  version Oct. 25, 2017
  *  version Nov. 16, 2017
- * @version Jan.  8, 2018
+ *  version Jan.  8, 2018
+ * @version Apr.  8, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Scenario {
@@ -449,6 +450,7 @@ object Event {
   val EVENT_UPDATE = "update"
   val EVENT_DELETE = "delete"
   val EVENT_BACK = "back"
+  val EVENT_SEARCH = "search"
   val EVENT_EXCEPTION = "exception"
   val EVENT_END = "end"
 

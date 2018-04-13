@@ -27,7 +27,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Dec. 19, 2017
  *  version Jan. 21, 2018
  *  version Feb. 26, 2018
- * @version Mar. 21, 2018
+ *  version Mar. 21, 2018
+ * @version Apr. 10, 2018
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -695,19 +696,23 @@ abstract class Renderer(
     record: Record,
     hidden: Hidden,
     submits: Submits
-  ): NodeSeq =
-    strategy.theme match {
-      case m: Bootstrap4RenderThemeBase => 
-        property_input_form_bootstrap(
-          InputForm(action, method, schema, record, hidden, submits))
-      case m =>
-        property_input_form_table(action, method, schema, record, hidden, submits)
-    }
+  ): NodeSeq = strategy.theme match {
+    case m: Bootstrap4RenderThemeBase =>
+      property_input_form(
+        InputForm(action, method, schema, record, hidden, submits))
+    case m =>
+      property_input_form_table(action, method, schema, record, hidden, submits)
+  }
+
+  protected def property_input_form(p: InputForm) = strategy.theme match {
+    case m: Bootstrap4RenderThemeBase => property_input_form_bootstrap(p)
+    case m => RAISE.notImplementedYetDefect
+  }
 
   protected def property_input_form_bootstrap(p: InputForm): NodeSeq = {
     <div class="container">
     <form method="GET" action="">{
-      val a = for (c <- p.schema.columns) yield property_input_form_item_bootstrap(p, c)
+      val a = for (c <- p.schema.columns) yield property_input_form_item_bootstrap(c)
       a ++ List(
         <div class="form-group row justify-content-center">{
           for (s <- p.submits.submits) yield {
@@ -721,16 +726,16 @@ abstract class Renderer(
     </div>
   }
 
-  protected def property_input_form_item_bootstrap(p: InputForm, c: Column): Elem =
+  protected def property_input_form_item_bootstrap(c: Column): Elem =
     c.datatype match {
-      case XDateTime => _property_input_form_item_datetime_bootstrap(p, c)
-      case m: XPowertype => _property_input_form_item_powertype_bootstrap(p, c, m)
-      case XImageLink => _property_input_form_item_imagelink_bootstrap(p, c)
-      case XFile => _property_input_form_item_file_bootstrap(p, c)
-      case _ => _property_input_form_item_bootstrap(p, c)
+      case XDateTime => _property_input_form_item_datetime_bootstrap(c)
+      case m: XPowertype => _property_input_form_item_powertype_bootstrap(c, m)
+      case XImageLink => _property_input_form_item_imagelink_bootstrap(c)
+      case XFile => _property_input_form_item_file_bootstrap(c)
+      case _ => _property_input_form_item_bootstrap(c)
     }
 
-  private def _property_input_form_item_datetime_bootstrap(p: InputForm, c: Column): Elem = {
+  private def _property_input_form_item_datetime_bootstrap(c: Column): Elem = {
     val id = generate_id()
     val idproperty = generate_id()
     val property = c.name
@@ -759,7 +764,7 @@ abstract class Renderer(
     </div>
   }
 
-  private def _property_input_form_item_powertype_bootstrap(p: InputForm, c: Column, pt: XPowertype): Elem = {
+  private def _property_input_form_item_powertype_bootstrap(c: Column, pt: XPowertype): Elem = {
     val id = generate_id()
     <div class="form-group row">
     <label class="control-label col-sm-2" for={id}>{c.label(locale)}:</label>
@@ -779,7 +784,7 @@ abstract class Renderer(
     </div>
   }
 
-  private def _property_input_form_item_imagelink_bootstrap(p: InputForm, c: Column): Elem = {
+  private def _property_input_form_item_imagelink_bootstrap(c: Column): Elem = {
     val id = generate_id()
     <div class="form-group row">
     <label class="control-label col-sm-2" for={id}>{c.label(locale)}:</label>
@@ -789,7 +794,7 @@ abstract class Renderer(
     </div>
   }
 
-  private def _property_input_form_item_file_bootstrap(p: InputForm, c: Column): Elem = {
+  private def _property_input_form_item_file_bootstrap(c: Column): Elem = {
     val id = generate_id()
     <div class="form-group row">
     <label class="control-label col-sm-2" for={id}>{c.label(locale)}:</label>
@@ -799,7 +804,7 @@ abstract class Renderer(
     </div>
   }
 
-  private def _property_input_form_item_bootstrap(p: InputForm, c: Column): Elem = {
+  private def _property_input_form_item_bootstrap(c: Column): Elem = {
     val id = generate_id()
     <div class="form-group row">
     <label class="control-label col-sm-2" for={id}>{c.label(locale)}:</label>
@@ -924,8 +929,11 @@ abstract class Renderer(
     </form>
   }
 
+  protected def searchbox_form(p: SearchBox): NodeSeq =
+    property_input_form(p.input)
+
   // Bootstrap4
-  protected def searchbox_form(p: SearchBox): Elem = {
+  private def searchbox_form_old(p: SearchBox): Elem = {
     <div class="container">
     <form method="GET">{
       val a = for (c <- p.schema.columns) yield searchbox_form_item(p, c)
@@ -1065,7 +1073,8 @@ abstract class Renderer(
             <label class="col-form-label" for={id}>{p.takeLabel(locale)}</label>
           </div>,
           <div class={s"col-$nvalue"}>{
-            p.toInput(locale, id, "form-control")
+            // p.toInput(locale, id, "form-control")
+            to_input(p.toColumn)
           }</div>
         )
       }
@@ -1093,7 +1102,8 @@ abstract class Renderer(
             <label class="col-form-label" for={id}>{p.label}</label>,
           </div>
           <div class={s"col-8"}>{
-            p.toInput(locale, id, "form-control")
+            // p.toInput(locale, id, "form-control")
+            to_input(p.toColumn)
           }</div>
         </div>
       }
@@ -1143,6 +1153,8 @@ abstract class Renderer(
     }</div>
     card
   }
+
+  protected def to_input(c: Column): Elem = property_input_form_item_bootstrap(c)
 
   private def _complement_p(p: NodeSeq): Node =
     p match {
@@ -1805,6 +1817,26 @@ object Renderer {
   )
 
   case class SearchBox(
-    schema: Schema
-  )
+    input: InputForm
+  ) {
+    def schema = input.schema
+  }
+  object SearchBox {
+    def apply(action: URI, schema: Schema): SearchBox = {
+      val record = Record.empty
+      val hidden = Hidden.empty
+      val button = Submit(SearchSubmitKind)
+      val values = Record.empty
+      val submits = Submits(button)
+      val input = InputForm(
+        action,
+        Get,
+        schema,
+        values,
+        hidden,
+        submits
+      )
+      SearchBox(input)
+    }
+  }
 }
