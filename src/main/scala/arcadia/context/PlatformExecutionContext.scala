@@ -18,7 +18,8 @@ import arcadia.domain._
  *  version Oct. 30, 2017
  *  version Nov. 13, 2017
  *  version Jan. 14, 2018
- * @version Mar. 18, 2018
+ *  version Mar. 18, 2018
+ * @version Jul. 17, 2018
  * @author  ASAMI, Tomoharu
  */
 trait PlatformExecutionContext {
@@ -43,6 +44,20 @@ trait PlatformExecutionContext {
   def deleteEntity(klass: DomainEntityType, id: DomainObjectId): Unit
   def fetchString(urn: UrnSource): Option[String]
   def fetchBadge(urn: UrnSource): Option[Badge]
+  def fetchCandidates(name: String): Option[CandidatesModel] = name match {
+    case "appid" => Some(CandidatesModel(
+      PowertypeClassCandidates(
+        PowertypeClassInstance(
+          Vector(
+            PowertypeInstance("firstAppid"),
+            PowertypeInstance("sedondAppid"),
+            PowertypeInstance("thirdAppid")
+          )
+        )
+      )
+    ))
+    case _ => None
+  }
   def controllerUri: URI
   def getIdInRequest: Option[DomainObjectId]
   def inputQueryParameters: Record

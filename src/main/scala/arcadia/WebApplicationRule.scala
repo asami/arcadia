@@ -13,13 +13,15 @@ import org.goldenport.value._
 import org.goldenport.util.StringUtils
 import org.goldenport.util.HoconUtils.Implicits._
 import arcadia.model.SubmitKind
+import arcadia.view._
 
 /*
  * @since   Aug. 12, 2017
  *  version Oct. 27, 2017
  *  version Nov. 15, 2017
  *  version Dec. 20, 2017
- * @version Mar. 13, 2018
+ *  version Mar. 13, 2018
+ * @version Aug.  6, 2018
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationRule(
@@ -36,8 +38,11 @@ case class WebApplicationRule(
   singlePageApplication: Option[WebApplicationRule.SinglePageApplication],
   http: Option[WebApplicationRule.Http],
   route: Route,
+  extraPages: WebApplicationRule.Pages,
   properties: Record
 ) {
+  import WebApplicationRule.{Pages, Page}
+
   def applicationTitle(locale: Locale): NodeSeq = application_title.flatMap(_.get(locale)) getOrElse Group(Nil)
 
   def applicationLogo(locale: Locale): NodeSeq =
@@ -64,6 +69,7 @@ case class WebApplicationRule(
         case (None, None) => None
       },
       route.complement(rhs.route),
+      pages.complement(rhs.pages),
       properties.complements(rhs.properties)
     )
   }
@@ -73,6 +79,16 @@ case class WebApplicationRule(
   def submitLabel(kind: SubmitKind): I18NString = kind.label
 
   def getString(key: String): Option[String] = properties.getString(key)
+
+  lazy val pages: Pages = (
+    Pages.create(feature_list.map(_.page)).
+      complement(Pages.create(usecase_list.map(_.page))).
+      complement(Pages.create(admin_list.map(_.page))).
+      complement(Pages.create(info_list.map(_.page))).
+      complement(extraPages)
+  )
+
+  def getPage(view: View): Option[Page] = pages.get(view)
 }
 
 object WebApplicationRule {
@@ -93,36 +109,72 @@ object WebApplicationRule {
     None,
     None,
     Route.empty,
+    Pages.empty,
     Record.empty
   )
+
+  case class Pages(pages: List[Page]) {
+    def get(view: View) = pages.find(_.isAccept(view))
+
+    def complement(rhs: Pages): Pages = {
+      case class Z(ms: Map[String, Page] = pages.map(x => (x.name, x)).toMap) {
+        def r = Pages(ms.values.toList)
+        def +(rhs: Page) = ms.get(rhs.name).
+          map(x => copy(ms = ms + (x.name -> x.complement(rhs)))).
+          getOrElse(copy(ms = ms + (rhs.name -> rhs)))
+      }
+      pages./:(Z())(_+_).r
+    }
+  }
+  object Pages {
+    val empty = Pages(Nil)
+
+    def create(p: Option[List[Page]]) = p.fold(empty)(Pages(_))
+  }
 
   case class Page(
     name: String,
     title: Option[I18NElement] = None,
-    icon: Option[String] = None
+    icon: Option[String] = None,
+    contentHeaderStyle: Option[String] = None
   ) {
     def title(locale: Locale): NodeSeq = title.flatMap(_.get(locale)) getOrElse {
       XhtmlUtils.title(name)
     }
 
     def pathname: String = name // TODO
+
+    def isAccept(p: View) = p match {
+      case m: PageView => m.name == name
+      case _ => false
+    }
+
+    def complement(rhs: Page): Page = Page(
+      name,
+      title orElse rhs.title,
+      icon orElse rhs.contentHeaderStyle
+    )
   }
 
+  // TopMenu, SideBar
   case class FeatureList(
     page: List[Page],
     feature_list: Option[FeatureList]
   )
 
+  // navigator
   case class UsecaseList(
     page: List[Page],
     usecase_list: Option[UsecaseList]
   )
 
+  // navigator
   case class AdminList(
     page: List[Page],
     admin_list: Option[AdminList]
   )
 
+  // footer
   case class InfoList(
     page: List[Page],
     info_list: Option[InfoList]

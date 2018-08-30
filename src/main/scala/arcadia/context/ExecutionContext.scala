@@ -18,7 +18,8 @@ import arcadia.domain._
  *  version Sep. 27, 2017
  *  version Oct. 30, 2017
  *  version Nov. 13, 2017
- * @version Jan. 15, 2018
+ *  version Jan. 15, 2018
+ * @version Jul. 17, 2018
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -62,6 +63,7 @@ case class ExecutionContext(
   def deleteEntity(klass: DomainEntityType, id: DomainObjectId): Unit = platformExecutionContext.deleteEntity(klass, id)
   def fetchString(urn: UrnSource): Option[String] = platformExecutionContext.fetchString(urn)
   def fetchBadge(urn: UrnSource): Option[Badge] = platformExecutionContext.fetchBadge(urn)
+  def fetchCandidates(name: String): Option[CandidatesModel] = platformExecutionContext.fetchCandidates(name)
   def controllerUri: URI = platformExecutionContext.controllerUri
   def getIdInRequest: Option[DomainObjectId] = platformExecutionContext.getIdInRequest
   def inputQueryParameters: Record = platformExecutionContext.inputQueryParameters

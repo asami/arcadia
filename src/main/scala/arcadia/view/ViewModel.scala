@@ -12,7 +12,8 @@ import arcadia.model._
  * @since   Aug.  2, 2017
  *  version Sep. 30, 2017
  *  version Oct. 21, 2017
- * @version Jan. 21, 2018
+ *  version Jan. 21, 2018
+ * @version Aug.  5, 2018
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -81,6 +82,7 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   def sidebarContent: NodeSeq = strategy.theme.sidebar.content(this)
   def navigation: NodeSeq = _render_partial(strategy.partials.navigation)
   def navigationContent: NodeSeq = strategy.theme.navigation.content(this)
+  def contentHeader: NodeSeq = _render_partial(strategy.partials.contentHeader)
   def content: NodeSeq = _render_partial(strategy.partials.content)
 
   def contentContent: NodeSeq =
@@ -139,6 +141,8 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   lazy val getExecutionContext: Option[ExecutionContext] = strategy.viewContext.flatMap(_.parcel.context)
   def resolvePathName(p: String): PathName = resolvePathName(PathName(p))
   def resolvePathName(pn: PathName): PathName = getExecutionContext.fold(pn)(_.resolvePathName(pn))
+  def pageTitle: NodeSeq = strategy.getPage.map(_.title(locale)).getOrElse(Text("No title"))
+  def pageContentHeaderStyle: String = strategy.getPage.flatMap(_.contentHeaderStyle).getOrElse("background-image: url('assets/img/bg37.jpg') ;") // TODO
 
   /*
    * View

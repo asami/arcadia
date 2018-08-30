@@ -30,7 +30,9 @@ import arcadia.view.ViewEngine._
  *  version Dec. 30, 2017
  *  version Jan. 15, 2018
  *  version Feb. 17, 2018
- * @version Mar. 21, 2018
+ *  version Mar. 21, 2018
+ *  version May.  6, 2018
+ * @version Aug.  5, 2018
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -56,6 +58,14 @@ case class RenderStrategy(
   lazy val noImageIcon: Picture = Picture.create(theme.default.noImageIcon)
   lazy val noImagePicture: Picture = Picture.create(theme.default.noImagePicture)
   lazy val formatter = renderContext.formatter.withLocale(locale)
+
+  lazy val getWebApplicationRule: Option[WebApplicationRule] = viewContext.flatMap(_.parcel.render.map(_.application))
+  lazy val getView: Option[View] = viewContext.flatMap(_.parcel.view)
+  lazy val getPage: Option[WebApplicationRule.Page] = for {
+    rule <- getWebApplicationRule
+    view <- getView
+    page <- rule.getPage(view)
+  } yield page
 
   def show: String = s"RenderStrategy"
 
@@ -135,8 +145,13 @@ case class RenderStrategy(
   def formatXml(p: Any): NodeSeq =
     XhtmlUtils.parseNode(p.toString)
 
-  object default {
-    def commandSubmitLabel: I18NElement = renderContext.default.commandSubmitLabel
+  def generateId(): String = renderContext.generateId()
+
+  object label {
+    def commandSubmit: I18NElement = renderContext.label.commandSubmit
+    def buttonSearch: I18NElement = renderContext.label.buttonSearch
+    def placeholderStart: I18NElement = renderContext.label.placeholderStart
+    def placeholderEnd: I18NElement = renderContext.label.placeholderEnd
   }
 }
 
@@ -243,6 +258,7 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
     def tableKind: TableKind = default_TableKind
     def cardKind: CardKind = default_CardKind
     def cardKindInGrid: CardKind = default_CardKind_In_Grid
+    def cardKindInList: CardKind = default_CardKind_In_List
     def gridContext(strategy: RenderStrategy): GridContext = default_GridContext(strategy)
   }
   object head {
@@ -336,9 +352,10 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
   }
 
   protected def default_UsageKind: UsageKind = ListUsage
-  protected def default_TableKind: TableKind = ListTable
+  protected def default_TableKind: TableKind = StandardTable
   protected def default_CardKind: CardKind = FullCard
   protected def default_CardKind_In_Grid: CardKind = ImageTitleCard
+  protected def default_CardKind_In_List: CardKind = MediaObjectCard
   protected def default_GridContext(strategy: RenderStrategy): GridContext = GridContext.card
   protected def default_No_Image_Icon: String = "assets/img/no-image-icon.png"
   protected def default_No_Image_Picture: String = "assets/img/no-image-picture.png"
@@ -746,6 +763,13 @@ case object ImageTitleContentCard extends CardKind {
   def isFooter: Boolean = false
   def isContent: Boolean = true
 }
+case object MediaObjectCard extends CardKind {
+  val name = "mediaobject"
+  def isImageTop: Boolean = true
+  def isHeader: Boolean = true
+  def isFooter: Boolean = false
+  def isContent: Boolean = true
+}
 case class ComponentCard(name: String) extends CardKind {
   def isImageTop: Boolean = true
   def isHeader: Boolean = true
@@ -955,6 +979,7 @@ object PartialKind extends EnumerationClass[PartialKind] {
     FooterPartial,
     NavigationPartial,
     SidebarPartial,
+    ContentHeaderPartial,
     ContentPartial
   )
 }
@@ -976,6 +1001,9 @@ case object NavigationPartial extends PartialKind {
 case object SidebarPartial extends PartialKind {
   val name = "sidebar"
 }
+case object ContentHeaderPartial extends PartialKind {
+  val name = "contentHeader"
+}
 case object ContentPartial extends PartialKind {
   val name = "content"
 }
@@ -990,6 +1018,7 @@ case class Partials(
   def footer: Option[PartialView] = get(FooterPartial)
   def navigation: Option[PartialView] = get(NavigationPartial)
   def sidebar: Option[PartialView] = get(SidebarPartial)
+  def contentHeader: Option[PartialView] = get(ContentHeaderPartial)
   def content: Option[PartialView] = get(ContentPartial)
 
   def complement(rhs: Partials): Partials = Partials(
@@ -1077,8 +1106,14 @@ case class RenderContext(
 
   def suffix: String = ".html" // TODO
 
-  object default {
-    def commandSubmitLabel: I18NElement = I18NElement("Execute", "実行")
+  // effect
+  def generateId() = java.util.UUID.randomUUID().toString
+
+  object label {
+    def commandSubmit: I18NElement = I18NElement("Execute", "実行")
+    def buttonSearch = I18NElement("Search", "検索")
+    def placeholderStart = I18NElement("Start", "開始")
+    def placeholderEnd = I18NElement("End", "終了")
   }
 
   // protected def domain_entity_id(entitytype: DomainEntityType, id: Any): DomainEntityId =

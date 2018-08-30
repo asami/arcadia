@@ -18,7 +18,8 @@ import org.goldenport.util.HoconUtils.Implicits._
  *  version Oct. 27, 2017
  *  version Nov. 15, 2017
  *  version Dec. 21, 2017
- * @version Mar. 13, 2018
+ *  version Mar. 13, 2018
+ * @version Aug.  6, 2018
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationConfig(
@@ -38,6 +39,7 @@ case class WebApplicationConfig(
   singlePageApplication: Option[WebApplicationConfig.SinglePageApplication],
   http: Option[WebApplicationConfig.HttpConfig],
   route: Option[WebApplicationConfig.RouteConfig],
+  page: Option[WebApplicationConfig.Pages],
   //
   lifecycle: Option[WebApplicationConfig.LifecycleConfig],
   extend: Option[List[String]] // related feature: mixin
@@ -63,7 +65,8 @@ case class WebApplicationConfig(
       info_list orElse rhs.info_list,
       singlePageApplication orElse rhs.singlePageApplication,
       http orElse rhs.http,
-      route orElse route, // TODO
+      route orElse rhs.route, // TODO
+      page orElse rhs.page, // ? complement
       lifecycle orElse rhs.lifecycle,
       extend |+| rhs.extend
     )
@@ -85,6 +88,7 @@ case class WebApplicationConfig(
     singlePageApplication.map(_.toRule),
     http.map(_.toRule),
     route.map(_.toRule) getOrElse Route.empty,
+    page.map(_.toRule) getOrElse WebApplicationRule.Pages.empty,
     Record.empty // TODO
   )
 
@@ -113,19 +117,27 @@ object WebApplicationConfig {
     None,
     None,
     None,
+    None,
     None
   )
+
+  case class Pages(pages: List[Page]) {
+    def toRule: WebApplicationRule.Pages = WebApplicationRule.Pages(
+      pages.map(_.toRule)
+    )
+  }
 
   case class Page(
     name: String,
     title: Option[I18NElement] = None,
-    icon: Option[String] = None
+    icon: Option[String] = None,
+    contentHeaderStyle: Option[String] = None
   ) {
     def title(locale: Locale): NodeSeq = title.flatMap(_.get(locale)) getOrElse {
       XhtmlUtils.title(name)
     }
 
-    lazy val toRule = WebApplicationRule.Page(name, title, icon)
+    lazy val toRule = WebApplicationRule.Page(name, title, icon, contentHeaderStyle)
   }
 
   case class FeatureList(
@@ -268,6 +280,7 @@ object WebApplicationConfig {
     None,
     None,
     None,
+    None,
     None
   )
 
@@ -310,6 +323,7 @@ object WebApplicationConfig {
   implicit val CdnConfigFormat = Json.format[CdnConfig]
   implicit val HttpConfigFormat = Json.format[HttpConfig]
   implicit val RouteConfigFormat = Json.format[RouteConfig]
+  implicit val PagesFormat = Json.format[Pages]
   implicit val LifecycleConfigFormat = Json.format[LifecycleConfig]
   implicit val WebApplicationConfigFormat = Json.format[WebApplicationConfig]
 
@@ -343,6 +357,7 @@ object WebApplicationConfig {
       c.getDurationOption("http.access.maxAge")
     )
     val route = Some(RouteConfig("???"))
+    val pages = None
     val lifecycle = LifecycleConfig(expires.toOption, cdn.toOption)
     WebApplicationConfig(
       c.getStringOption("theme"),
@@ -359,6 +374,7 @@ object WebApplicationConfig {
       spa.toOption,
       http.toOption,
       route,
+      pages,
       lifecycle.toOption,
       c.getEagerStringListOption("extend")
     )

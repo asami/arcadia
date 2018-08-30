@@ -19,7 +19,8 @@ import arcadia.domain._
  *  version Oct. 25, 2017
  *  version Nov. 16, 2017
  *  version Jan.  8, 2018
- * @version Apr.  8, 2018
+ *  version Apr.  8, 2018
+ * @version Jul. 23, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Scenario {
@@ -451,6 +452,7 @@ object Event {
   val EVENT_DELETE = "delete"
   val EVENT_BACK = "back"
   val EVENT_SEARCH = "search"
+  val EVENT_EXECUTE = "execute"
   val EVENT_EXCEPTION = "exception"
   val EVENT_END = "end"
 
@@ -564,8 +566,9 @@ object Intent {
 trait Action {
   def apply(p: Intent): Intent
 
-  protected def hidden_scenario(scenario: Scenario, state: State): Hidden =
-    Hidden(Some(scenario.withState(state).marshall))
+  protected def hidden_scenario(scenario: Scenario, state: State): Hiddens =
+    // Hidden(Some(scenario.withState(state).marshall))
+    Hiddens.scenario(scenario.withState(state).marshall)
 
   protected def button_input(strategy: RenderStrategy) = 
     Submit(InputSubmitKind, strategy.application.submitLabel(InputSubmitKind))

@@ -27,7 +27,8 @@ import arcadia.domain._
  *  version Jan. 22, 2018
  *  version Feb. 17, 2018
  *  version Mar. 21, 2018
- * @version Apr.  8, 2018
+ *  version Apr.  8, 2018
+ * @version Jul. 23, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -922,7 +923,7 @@ case class PropertyInputFormModel(
   method: Method,
   schema: Schema,
   record: Record,
-  hidden: Hidden,
+  hiddens: Hiddens,
   submit: Submits,
   expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
 ) extends Model with IFormModel with IComponentModel {
@@ -931,7 +932,7 @@ case class PropertyInputFormModel(
     strategy, None, None, None, None
   ) {
     protected def render_Content: NodeSeq =
-      property_input_form(uri, method, schema, record, hidden, submit)
+      property_input_form(uri, method, schema, record, hiddens, submit)
   }.apply
 }
 
@@ -940,7 +941,7 @@ case class PropertyConfirmFormModel(
   method: Method,
   schema: Schema,
   record: Record,
-  hidden: Hidden,
+  hiddens: Hiddens,
   submit: Submits,
   expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
 ) extends Model with IFormModel with IComponentModel {
@@ -949,7 +950,7 @@ case class PropertyConfirmFormModel(
     strategy, None, None, None, None
   ) {
     protected def render_Content: NodeSeq =
-      property_confirm_form(uri, method, schema, record, hidden, submit)
+      property_confirm_form(uri, method, schema, record, hiddens, submit)
   }.apply
 }
 
@@ -1017,4 +1018,12 @@ case class OperationOutcomeModel(
   ) {
     protected def render_Content: NodeSeq = operation_outcome(request, response)
   }.apply
+}
+
+case class CandidatesModel(
+  candidates: PowertypeClassCandidates
+) extends Model {
+  val expiresKind = Some(NoCacheExpires)
+  def toRecord: Record = RAISE.noReachDefect
+  def render(strategy: RenderStrategy) = RAISE.noReachDefect
 }

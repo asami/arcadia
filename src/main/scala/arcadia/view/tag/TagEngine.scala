@@ -20,7 +20,10 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  *  version Nov. 14, 2017
  *  version Dec. 13, 2017
  *  version Jan. 21, 2018
- * @version Feb. 17, 2018
+ *  version Feb. 17, 2018
+ *  version Apr. 15, 2018
+ *  version May.  3, 2018
+ * @version Aug.  5, 2018
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -71,9 +74,29 @@ class TagEngine(
     }
 
     private def _eval_element(p: Elem, children: Seq[XmlContent]): Option[XmlContent] = {
-      val expr = Expression(p, children, parcel)
+      val expr = Expression(_normalize(p), children, parcel)
       tags.stream.flatMap(_.eval(expr)).headOption orElse Some(XmlContent(expr.element))
     }
+
+    private def _normalize(p: Elem) = p.copy(attributes = _normalize_attributes(p.attributes))
+
+    private def _normalize_attributes(p: MetaData): MetaData = {
+      val xs: Vector[(String, String)] = XmlUtils.attributeVector(p).flatMap(_normalize_attribute)
+      XmlUtils.attributes(xs)
+    }
+
+    private def _normalize_attribute(p: (String, String)): Vector[(String, String)] = {
+      val (name, value) = p
+      if (true) // FUTURE
+        Vector(p)
+      else if (_is_upper(name))
+        Vector((name.toLowerCase, _unescape(value)))
+      else
+        Vector(p)
+    }
+
+    private def _is_upper(p: String) = p.forall(_.isUpper)
+    private def _unescape(p: String) = p.replace("&quot;", "\"").replace("&apos;", "\"")
   }
 }
 object TagEngine {
@@ -89,6 +112,7 @@ object Tags {
   val embeded = Tags(Vector(
     TableTag,
     GridTag,
+    ListTag,
     DetailTag,
     SearchBoxTag,
     ContentTag,
@@ -98,6 +122,7 @@ object Tags {
     BadgeTag,
     ButtonTag,
     CommandTag,
+    TabsTag,
     ModelTag,
     ErrorTag,
     WidgetTag

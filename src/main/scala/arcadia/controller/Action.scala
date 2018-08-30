@@ -28,7 +28,8 @@ import arcadia.scenario.ScenarioEngine
  *  version Jan. 22, 2018
  *  version Feb. 17, 2018
  *  version Mar. 26, 2018
- * @version Apr. 10, 2018
+ *  version Apr. 15, 2018
+ * @version Jul. 16, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -151,6 +152,8 @@ object Action {
   import Schema.json._
   import Record.json._
   import Parameter.json._
+
+  val currentPageFormAction = new URI("")
 
   implicit val MethoFormat = new JsonUtils.ValueFormat[Method](
     _.toLowerCase match {
@@ -458,7 +461,7 @@ case class InvokeDirectiveAction(
       title,
       description,
       submitLabel,
-      parameters,
+      Parameter.resolve(parcel, parameters),
       active
     )
     set_sink(parcel)(model)
@@ -548,6 +551,7 @@ case class ContentAction(
 }
 
 case class SearchBoxAction(
+  action: Option[URI],
   columns: Option[Seq[FormColumn]],
   source: Option[Source],
   sink: Option[Sink]
@@ -565,9 +569,9 @@ case class SearchBoxAction(
         form = Column.Form(c.placeholder.map(I18NString(_)))
       )
     }
-    val action = ???
-    val schema = ???
-    val searchbox = arcadia.view.Renderer.SearchBox(action, schema)
+    val formaction = action getOrElse Action.currentPageFormAction
+    val schema = Schema(a)
+    val searchbox = arcadia.view.Renderer.SearchBox(formaction, schema)
     SearchBoxModel(searchbox)
   }
 

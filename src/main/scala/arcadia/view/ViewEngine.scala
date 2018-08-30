@@ -20,7 +20,8 @@ import arcadia.model.{Model, ErrorModel}
  *  version Oct. 31, 2017
  *  version Nov. 15, 2017
  *  version Dec. 18, 2017
- * @version Jan.  7, 2018
+ *  version Jan.  7, 2018
+ * @version Jul. 28, 2018
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -103,6 +104,7 @@ class ViewEngine(
     // }
     a.mode = "develop"
     a.allowReload = true // TODO
+//    a.escapeMarkup = false // style="background-image: url('assets/img/bg37.jpg') ;"
     a.importStatements = a.importStatements ::: List(
       "import arcadia.view._",
       "import arcadia.model._",

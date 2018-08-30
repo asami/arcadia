@@ -1,15 +1,17 @@
 package arcadia.model
 
-import scala.xml.{NodeSeq, Group, Text, Node}
+import scala.xml.{NodeSeq, Group, Text, Node, Elem}
 import java.net.{URI, URL}
 import java.util.Locale
 import play.api.libs.json._
+import org.goldenport.Strings
 import org.goldenport.exception.RAISE
 import org.goldenport.i18n.{I18NString, I18NElement}
-import org.goldenport.xml.XhtmlUtils
+import org.goldenport.xml.{XmlUtils, XhtmlUtils}
 import org.goldenport.value._
-import org.goldenport.record.v2.Record
+import org.goldenport.record.v2._
 import org.goldenport.json.JsonUtils
+import org.goldenport.util.SeqUtils
 import com.asamioffice.goldenport.text.UString
 import com.asamioffice.goldenport.io.UURL
 import arcadia._
@@ -23,7 +25,10 @@ import arcadia.domain._
  *  version Nov. 22, 2017
  *  version Dec. 17, 2017
  *  version Jan.  6, 2018
- * @version Apr.  8, 2018
+ *  version Apr.  8, 2018
+ *  version May.  4, 2018
+ *  version Jul. 23, 2018
+ * @version Aug.  6, 2018
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -144,29 +149,35 @@ case class Card(
   header: Option[TitleLine],
   footer: Option[TitleLine],
   content: Option[I18NElement],
+  summary: Option[I18NElement],
   link: Option[DomainEntityLink],
   record: Option[Record]
 ) extends Particle {
-  def isImageTopOnly = image_top.isDefined && header.isEmpty && footer.isEmpty && content.isEmpty
+  def isImageTopOnly = image_top.isDefined && header.isEmpty && footer.isEmpty && content.isEmpty && summary.isEmpty
 }
 object Card {
-  def create(pic: Picture, rec: Record): Card = Card(Some(pic), None, None, None, None, Some(rec))
+  def create(pic: Picture, rec: Record): Card = Card(Some(pic), None, None, None, None, None, Some(rec))
 
-  def create(pic: Picture, header: TitleLine, content: NodeSeq, rec: Record): Card = Card(Some(pic), Some(header), None, Some(I18NElement(content)), None, Some(rec))
+  def create(pic: Picture, header: TitleLine, content: NodeSeq, rec: Record): Card = Card(Some(pic), Some(header), None, Some(I18NElement(content)), Some(_summary(content)), None, Some(rec))
 
-  def create(pic: Picture, header: Option[TitleLine], content: NodeSeq, rec: Record): Card = Card(Some(pic), header, None, Some(I18NElement(content)), None, Some(rec))
+  def create(pic: Picture, header: Option[TitleLine], content: NodeSeq, rec: Record): Card = Card(Some(pic), header, None, Some(I18NElement(content)), Some(_summary(content)), None, Some(rec))
 
-  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq], rec: Record): Card = Card(Some(pic), header, None, content.map(I18NElement(_)), None, Some(rec))
+  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq], rec: Record): Card = Card(Some(pic), header, None, content.map(I18NElement(_)), content.map(_summary), None, Some(rec))
 
-  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq], link: Option[DomainEntityLink], rec: Record): Card = Card(Some(pic), header, None, content.map(I18NElement(_)), link, Some(rec))
+  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq], summary: Option[NodeSeq], link: Option[DomainEntityLink], rec: Record): Card = Card(Some(pic), header, None, content.map(I18NElement(_)), summary.map(I18NElement(_)).orElse(content.map(_summary)), link, Some(rec))
 
-  def create(pic: Option[Picture], header: Option[TitleLine], footer: Option[TitleLine], content: NodeSeq): Card = Card(pic, header, footer, Some(I18NElement(content)), None, None)
+  def create(pic: Option[Picture], header: Option[TitleLine], footer: Option[TitleLine], content: NodeSeq, summary: Option[NodeSeq]): Card = Card(pic, header, footer, Some(I18NElement(content)), summary.map(I18NElement(_)).orElse(Some(_summary(content))), None, None)
 
   def parseList(p: String): List[Card] = Particle.parseParticleList(p) match {
     case JsSuccess(xs, _) => xs.collect {
       case m: Card => m
     }
     case m: JsError => RAISE.syntaxErrorFault(m.toString)
+  }
+
+  private def _summary(p: NodeSeq): I18NElement = {
+    val s = Strings.cutstring(p.text)
+    I18NElement(s)
   }
 }
 
@@ -301,8 +312,30 @@ case object BackSubmitKind extends SubmitKind {
 case object SearchSubmitKind extends SubmitKind {
   def name: String = Event.EVENT_SEARCH
 }
+case object ExecuteSubmitKind extends SubmitKind {
+  def name: String = Event.EVENT_EXECUTE
+}
 
-case class Hidden(
+case class Hiddens(
+  hiddens: Record
+) {
+  def toKeyValues: Vector[(String, String)] = hiddens.toStringVector
+}
+object Hiddens {
+  val empty = Hiddens(Record.empty)
+
+  def apply(k: String, v: String): Hiddens = Hiddens(
+    Record.dataApp(k -> v)
+  )
+
+  def apply(x: (String,  String), xs: (String, String)*): Hiddens = Hiddens(
+    Record.createApp(x +: xs)
+  )
+
+  def scenario(v: String): Hiddens = Hiddens(ScenarioCommand.PROP_SCENARIO, v)
+}
+
+case class Hidden( // TODO refactor
 //  event: Option[String],
   scenario: Option[String]
 ) {
@@ -367,6 +400,138 @@ object FormColumn {
     }
     case m: JsError => RAISE.syntaxErrorFault(m.toString)
   }
+}
+
+case class Tabs(panes: List[TabPane]) extends Particle
+
+case class TabPane(
+  label: I18NElement,
+  content: XmlContent
+) extends Particle {
+}
+object TabPane {
+  def apply(label: String, m: NodeSeq): TabPane = TabPane(I18NElement(label), XmlContent(m))
+
+  def apply(p: Elem): TabPane = {
+    val name = XmlUtils.getAttribute(p, "name", "***No name({m.hashCode})***")
+    val content = XmlUtils.nodesToNode(p.child)
+    TabPane(name, content)
+  }
+}
+
+sealed trait Candidates extends Particle { // ? Particle
+}
+object Candidates {
+  import org.goldenport.json.JsonUtils.Implicits._
+  import Schema.json._
+
+  implicit object PowertypeFormat extends Format[Powertype] {
+    def reads(json: JsValue): JsResult[Powertype] = {
+      val r = PowertypeInstance(
+        JsonUtils.getInt("value", json),
+        JsonUtils.toString("name", json),
+        JsonUtils.getString("label", json),
+        (json \ "i18nLabel") match {
+          case m: JsObject => I18NStringFormat.reads(m) match {
+            case JsSuccess(s, _) => Some(s)
+            case JsError(e) => None
+          }
+          case _ => None
+        }
+      )
+      JsSuccess(r)
+    }
+    def writes(o: Powertype): JsValue = {
+      val a = SeqUtils.buildTupleVector[JsValue](
+        Vector(
+          "value" -> JsNumber(o.value),
+          "name" -> JsString(o.name),
+          "label" -> JsString(o.label)
+        ),
+        Vector(
+          "i18nLabel" -> o.i18nLabel.map(I18NStringFormat.writes)
+        )
+      )
+      JsObject(a)
+    }
+  }
+
+  implicit object PowertypeClassFormat extends Format[PowertypeClass] {
+    def reads(json: JsValue): JsResult[PowertypeClass] = {
+      (json \ "elements") match {
+        case JsArray(xs) =>
+          _sequence(xs.map(PowertypeFormat.reads)).
+            map(PowertypeClassInstance)
+        case _ => JsError(s"$json")
+      }
+    }
+    def writes(o: PowertypeClass): JsValue = {
+      val elements = JsArray(o.elements.map(PowertypeFormat.writes))
+      val a = List(
+        "elements" -> elements
+      )
+      JsObject(a)
+    }
+  }
+
+  implicit object CandidatesFormat extends Format[Candidates] {
+    def reads(p: JsValue): JsResult[Candidates] = p match {
+      case JsString(name) => JsSuccess(NamedCandidates(name))
+      case m: JsObject => PowertypeClassFormat.reads(p).map(PowertypeClassCandidates)
+      case JsArray(xs) => _sequence(xs.map(PowertypeFormat.reads)).map(PowertypeCandidates)
+      case _ => JsError(s"$p")
+    }
+    def writes(o: Candidates): JsValue = o match {
+      case PowertypeClassCandidates(powertype) => PowertypeClassFormat.writes(powertype)
+      case PowertypeCandidates(xs) => JsArray(xs.map(PowertypeFormat.writes))
+      case NamedCandidates(name) => JsString(name)
+    }
+  }
+
+  private def _sequence[T](ps: Seq[JsResult[T]]): JsResult[Seq[T]] = {
+    @annotation.tailrec
+    def go(ls: List[JsResult[T]], rs: Vector[T]): JsResult[Seq[T]] = ls match {
+      case Nil => JsSuccess(rs)
+      case x :: xs => x match {
+        case JsSuccess(s, _) => go(xs, rs :+ s)
+        case m: JsError => m
+      }
+    }
+    go(ps.toList, Vector.empty)
+  }
+}
+
+case class PowertypeClassCandidates(powertype: PowertypeClass) extends Candidates {
+}
+
+case class PowertypeCandidates(powertypes: Seq[Powertype]) extends Candidates {
+}
+
+case class NamedCandidates(name: String) extends Candidates {
+}
+
+case class PowertypeClassInstance(
+  elements: Seq[Powertype]
+) extends PowertypeClass {
+  type T = Powertype
+}
+
+case class PowertypeInstance(
+  value: Int,
+  name: String,
+  override val label: String,
+  override val i18nLabel: Option[I18NString]
+) extends Powertype
+object PowertypeInstance {
+  def apply(
+    v: Option[Int],
+    n: String,
+    l: Option[String],
+    i: Option[I18NString]
+  ): PowertypeInstance =
+    PowertypeInstance(v.getOrElse(-1), n, l.getOrElse(n), i)
+
+  def apply(name: String): PowertypeInstance = PowertypeInstance(None, name, None, None)
 }
 
 case class BrokenParticle(error: JsError) extends Particle {
@@ -437,6 +602,7 @@ object Particle {
       case "xml" => Json.fromJson[Xml](o)
       case "parameter" => Json.fromJson[RequestParameter](o)
       case "column" => Json.fromJson[FormColumn](o)
+      case "candidates" => Json.fromJson[Candidates](o)
       case m => JsError(s"Unknown particle: $o")
     }
     a.getOrElse {

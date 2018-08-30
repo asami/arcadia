@@ -14,6 +14,7 @@ import arcadia._
 import arcadia.context._
 import arcadia.view._
 import arcadia.model._
+import arcadia.controller.Action
 import arcadia.controller.Controller.PROP_REDIRECT
 
 /*
@@ -22,7 +23,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Dec. 13, 2017
  *  version Jan. 22, 2018
  *  version Feb. 17, 2018
- * @version Apr.  8, 2018
+ *  version Apr. 15, 2018
+ * @version May.  6, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -47,7 +49,7 @@ trait Tag {
 
   protected final def command_submit_label(expr: Expression, p: Option[I18NElement]): String = {
     val a = expr.get("submitLabel").map(I18NElement.apply).getOrElse(
-      expr.parcel.render.fold(I18NElement("Execute"))(_.default.commandSubmitLabel)
+      expr.parcel.render.fold(I18NElement("Execute"))(_.label.commandSubmit)
     )
     expr.format(a)
   }
@@ -119,6 +121,20 @@ case object GridTag extends Tag with SelectByName {
   }
 }
 
+case object ListTag extends Tag with SelectByName {
+  val name = "list"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val column = p.getStringList("column")
+    val card = p.get("card")
+    val model = p.effectiveModel match {
+      case m: ITableModel => m.withSchemaKind(column, ListTable)
+      case m => m
+    }
+    p.withTable(ListTable).withCard(card).applyModel(model)
+  }
+}
+
 case object DetailTag extends Tag with SelectByName {
   val name = "detail"
 
@@ -139,30 +155,28 @@ case object SearchBoxTag extends Tag with SelectByName {
   // keywords, created_at, updated_at, publish_at,
   // public_at, close_at, start_at, end_at
   protected def eval_Expression(p: Expression): XmlContent = {
-    def defaults = Vector("keywords")
-    val columns = p.getStringList("column").map {
-      case Nil => defaults
-      case xs => xs // TODO parse column
-    }.getOrElse {
-      defaults
-    }
-    val model = p.effectiveModel match {
-      case m: SearchBoxModel => m
-      case m: EntityListModel => p.parcel.execute { context =>
-        val action = ???
-        val schema = ???
-        SearchBoxModel(action, schema)
+    def create = p.parcel.execute { context =>
+      val defaults = Vector("keywords")
+      val columns = p.getStringList("column").map {
+        case Nil => defaults
+        case xs => xs // TODO parse column
+      }.getOrElse {
+        defaults
       }
-      case m => p.parcel.execute { context =>
-        val action = ???
+      val formaction = Action.currentPageFormAction
+      val schema = {
         val a = columns.map(x =>
           context.
             getDefaultPropertyColumn(x).
             getOrElse(Column(x))
         )
-        val schema = Schema(a)
-        SearchBoxModel(action, schema)
+        Schema(a)
       }
+      SearchBoxModel(formaction, schema)
+    }
+    val model = p.effectiveModel match {
+      case m: SearchBoxModel => create
+      case m: EntityListModel => create
     }
     p.applyModel(model)
   }
@@ -335,6 +349,22 @@ case object CommandTag extends Tag with SelectByName {
         isactive,
         isreturnback
       )
+    }.apply
+    XmlContent(r)
+  }
+}
+
+case object TabsTag extends Tag with SelectByName {
+  val TAB_PANE = "tab-pane"
+  val name = "tabs"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val a = p.children.flatMap(_.xml collect {
+      case m: Elem if m.label == TAB_PANE => TabPane(m)
+    })
+    val b = Tabs(a.toList)
+    val r = new Renderer(p.strategy) {
+      protected def render_Content: NodeSeq = tabs(b)
     }.apply
     XmlContent(r)
   }

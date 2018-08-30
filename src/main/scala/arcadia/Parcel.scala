@@ -9,7 +9,7 @@ import org.goldenport.values.PathName
 import org.goldenport.util.{SeqUtils, MapUtils, StringUtils}
 import arcadia.context._
 import arcadia.domain._
-import arcadia.model.{Model, ErrorModel, Badge, IRecordModel}
+import arcadia.model.{Model, ErrorModel, Badge, IRecordModel, CandidatesModel}
 import arcadia.view.{ViewEngine, RenderStrategy, Partials, View,
   UsageKind, TableKind, CardKind
 }
@@ -22,7 +22,8 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Oct. 31, 2017
  *  version Nov. 16, 2017
  *  version Jan. 15, 2018
- * @version Mar. 26, 2018
+ *  version Mar. 26, 2018
+ * @version Jul. 17, 2018
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -174,7 +175,11 @@ case class Parcel(
   def getEntityType: Option[DomainEntityType] = render.flatMap(_.getEntityType)
   def fetchString(p: UrnSource): Option[String] = context.flatMap(_.fetchString(p))
   def fetchBadge(p: UrnSource): Option[Badge] = context.flatMap(_.fetchBadge(p))
-
+  def fetchCandidates(p: String): CandidatesModel = getModel(p).collect {
+    case m: CandidatesModel => m
+  }.getOrElse {
+    context.flatMap(_.fetchCandidates(p)).getOrElse(RAISE.noReachDefect)
+  }
   def goOrigin: Parcel = RAISE.notImplementedYetDefect
   def goError(e: Throwable): Parcel = withModel(ErrorModel.create(this, e))
   def goError(s: String): Parcel = withModel(ErrorModel.create(this, s))
