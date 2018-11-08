@@ -3,7 +3,7 @@ package arcadia
 import scala.util.control.NonFatal
 import java.net.URI
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2.Record
+import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.trace.{TraceContext, Result}
 import org.goldenport.values.PathName
 import org.goldenport.util.{SeqUtils, MapUtils, StringUtils}
@@ -23,7 +23,9 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Nov. 16, 2017
  *  version Jan. 15, 2018
  *  version Mar. 26, 2018
- * @version Jul. 17, 2018
+ *  version Jul. 17, 2018
+ *  version Aug. 31, 2018
+ * @version Sep.  5, 2018
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -186,11 +188,11 @@ case class Parcel(
   def goNotFound(s: String): Parcel = withModel(ErrorModel.notFound(this, s))
   def goUnknownEvent(p: scenario.Event): Parcel = withModel(ErrorModel.create(this, p))
 
-  def inputQueryParameters: Record = context.map(_.inputQueryParameters) getOrElse Record.empty
-  def inputFormParameters: Record = context.map(_.inputFormParameters) getOrElse Record.empty
+  def inputQueryParameters: IRecord = context.map(_.inputQueryParameters) getOrElse Record.empty
+  def inputFormParameters: IRecord = context.map(_.inputFormParameters) getOrElse Record.empty
   def controllerUri: URI = context.map(_.controllerUri) getOrElse RAISE.noReachDefect
 
-  def webMeta: List[String] = inputQueryParameters.eagerStringList("_web")
+  def webMeta: List[String] = inputQueryParameters.takeStringList("_web")
   def isShowTrace: Boolean = webMeta.contains("show.trace")
 
 //  def eventName: String = context.flatMap(_.getFormParameter("Submit")) getOrElse RAISE.notImplementedYetDefect

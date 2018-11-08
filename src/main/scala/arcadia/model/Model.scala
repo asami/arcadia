@@ -4,7 +4,8 @@ import scala.xml.{NodeSeq, Group, Text}
 import java.net.URI
 import java.util.Locale
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2._
+import org.goldenport.record.v3.{IRecord, Record}
+import org.goldenport.record.v2.{Record => _, _}
 import org.goldenport.record.v2.util.RecordUtils
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.trace.TraceContext
@@ -28,7 +29,10 @@ import arcadia.domain._
  *  version Feb. 17, 2018
  *  version Mar. 21, 2018
  *  version Apr.  8, 2018
- * @version Jul. 23, 2018
+ *  version Jul. 23, 2018
+ *  version Aug. 31, 2018
+ *  version Sep.  1, 2018
+ * @version Nov.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -36,7 +40,7 @@ trait Model {
   def featureName: String = _feature_name
   def featureNameAliases: Set[String] = Set.empty
   def expiresKind: Option[ExpiresKind]
-  def toRecord: Record // for API
+  def toRecord: IRecord // for API
   def show: String = s"${getClass.getSimpleName}"
 
   def apply(strategy: RenderStrategy): Content = XmlContent(render(strategy), expiresKind)
@@ -127,7 +131,7 @@ trait ISheetModel extends IRecordModel {
 trait ITableModel extends IRecordsModel {
   def tableKind: Option[TableKind]
   def getEntityType: Option[DomainEntityType]
-  def records: List[Record]
+  def records: List[IRecord]
   def thead: TableHeadModel
   def tbody: TableBodyModel
   def withSchemaKind(
@@ -154,7 +158,7 @@ trait IEntityListModel extends ITableModel { self: Model =>
 trait IRecordModel extends Model {
   def getEntityType: Option[DomainEntityType]
   def getSchema: Option[Schema]
-  def record: Record
+  def record: IRecord
   def getDomainObjectId: Option[DomainObjectId] = DomainObjectId.get(record, getEntityType)
   def getDomainEntityId: Option[DomainEntityId] = getDomainObjectId.collect {
     case m: DomainEntityId => m
@@ -164,7 +168,7 @@ trait IRecordModel extends Model {
 trait IRecordsModel extends Model {
   def getEntityType: Option[DomainEntityType]
   def getSchema: Option[Schema]
-  def records: List[Record]
+  def records: List[IRecord]
 }
 
 trait IDashboardModel { self: Model =>
@@ -184,7 +188,7 @@ trait IFormModel { self: Model =>
 
 case object EmptyModel extends Model {
   val expiresKind = None
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -202,7 +206,7 @@ case class ErrorModel(
   trace: Option[TraceContext]
 ) extends Model {
   val expiresKind = Some(NoCacheExpires)
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -258,20 +262,20 @@ sealed trait ValueModel extends Model with IAtomicModel {
 }
 case class SingleValueModel(datatype: DataType, v: Option[Any]) extends ValueModel {
   val expiresKind = None
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy) = Text(v.toString) // TODO
 }
 case class MultipleValueModel(datatype: DataType, v: List[Any]) extends Model with ValueModel {
   val expiresKind = None
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy) = Text(v.toString) // TODO
 }
 object ValueModel {
-  def create(column: Column, rec: Record): ValueModel =
+  def create(column: Column, rec: IRecord): ValueModel =
     if (column.isSingle)
-      SingleValueModel(column.datatype, rec.getOne(column.name))
+      SingleValueModel(column.datatype, rec.get(column.name))
     else
-      MultipleValueModel(column.datatype, rec.effectiveList(column.name))
+      MultipleValueModel(column.datatype, rec.takeList(column.name))
 
   def create(p: String): ValueModel = SingleValueModel(XString, Some(p))
 }
@@ -293,7 +297,7 @@ case class WidgetModel(
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IComponentModel {
   override val featureName = s"widget__$name"
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_WIDGET -> ViewWidget(WidgetModel.this, strategy)
   )
@@ -309,7 +313,7 @@ case class IndexModel(
   carousel: Option[CarouselModel],
   expiresKind: Option[ExpiresKind] = Some(AgilePageExpires)
 ) extends Model with IPageModel {
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy) = RAISE.notImplementedYetDefect
 
   def getEntityList(name: String): Option[EntityListModel] = entities.find(_._1 == name).map(_._2)
@@ -319,7 +323,7 @@ case class CarouselModel(
   pictures: List[Picture],
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IComponentModel {
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -333,7 +337,7 @@ case class BannerModel(
   pictures: List[Picture],
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IComponentModel {
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -345,7 +349,7 @@ case class BadgeModel(
   badge: Badge,
   expiresKind: Option[ExpiresKind] = Some(PrivatePageExpires)
 ) extends Model with IComponentModel {
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -357,7 +361,7 @@ case class NoticeModel(
   getXml: Option[Xml],
   expiresKind: Option[ExpiresKind] = None // TODO
 ) extends Model with IComponentModel {
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -369,7 +373,7 @@ case class XmlModel(
   xml: Xml,
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IComponentModel {
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -423,7 +427,7 @@ case class EntityDetailModel(
   override val caption: Option[I18NElement],
   entityType: DomainEntityType,
   getSchema: Option[Schema],
-  record: Record,
+  record: IRecord,
   expiresKind: Option[ExpiresKind] = Some(AgilePageExpires)
 ) extends Model with IEntityDetailModel with IComponentModel {
   def getEntityType = Some(entityType)
@@ -431,7 +435,7 @@ case class EntityDetailModel(
     PROP_VIEW_OBJECT -> ViewObject.create(record, strategy),
     PROP_VIEW_RECORD -> ViewRecord.create(record, strategy)
   )
-  def toRecord: Record = throw new UnsupportedOperationException()
+  def toRecord: IRecord = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -441,7 +445,7 @@ case class EntityDetailModel(
 object EntityDetailModel extends ModelClass {
   def apply(
     klass: DomainEntityType,
-    record: Record
+    record: IRecord
   ): EntityDetailModel = EntityDetailModel(
     Some(I18NElement(klass.v)), klass, None, record
   )
@@ -459,7 +463,7 @@ case class EntityListModel(
   override val caption: Option[I18NElement],
   entityType: DomainEntityType,
   getSchema: Option[Schema],
-  records: List[Record],
+  records: List[IRecord],
   transfer: Transfer,
   tableKind: Option[TableKind] = None,
   expiresKind: Option[ExpiresKind] = Some(AgilePageExpires),
@@ -470,7 +474,7 @@ case class EntityListModel(
     PROP_VIEW_LIST -> records.map(ViewObject.create(_, strategy)),
     PROP_VIEW_RECORD -> records.map(ViewRecord.create(_, strategy))
   )
-  def toRecord: Record = throw new UnsupportedOperationException()
+  def toRecord: IRecord = throw new UnsupportedOperationException()
 
   def get(i: Int): Option[EntityDetailModel] = records.lift(i).map(EntityDetailModel(entityType, _))
 
@@ -507,14 +511,14 @@ case class EntityListModel(
   ){
     protected def render_Content: NodeSeq = table(Renderer.TableOrder(tableKind, getSchema, getEntityType, dataHref, records))
   }.apply
-  lazy val effectiveSchema = getSchema.getOrElse(RecordUtils.buildSchema(records))
+  lazy val effectiveSchema = getSchema.getOrElse(Record.buildSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
   lazy val tbody: TableBodyModel = TableBodyModel(Some(effectiveSchema), records, tableKind)
 }
 object EntityListModel extends ModelClass {
   def apply(
     klass: DomainEntityType,
-    records: List[Record],
+    records: List[IRecord],
     transfer: Transfer
   ): EntityListModel = EntityListModel(
     Some(I18NElement(klass.v)), klass, None, records, transfer
@@ -541,14 +545,14 @@ object EntityListModel extends ModelClass {
 case class PropertySheetModel(
   override val caption: Option[I18NElement],
   getSchema: Option[Schema],
-  record: Record,
+  record: IRecord,
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IRecordModel with IComponentModel {
   def getEntityType = None
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORD -> ViewRecord.create(record, strategy)
   )
-  def toRecord: Record = throw new UnsupportedOperationException()
+  def toRecord: IRecord = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, caption
   ){
@@ -556,10 +560,10 @@ case class PropertySheetModel(
   }.apply
 }
 object PropertySheetModel extends ModelClass {
-  def apply(caption: String, schema: Schema, record: Record): PropertySheetModel = PropertySheetModel(
+  def apply(caption: String, schema: Schema, record: IRecord): PropertySheetModel = PropertySheetModel(
     Some(I18NElement(caption)), Some(schema), record
   )
-  def apply(record: Record): PropertySheetModel = PropertySheetModel(
+  def apply(record: IRecord): PropertySheetModel = PropertySheetModel(
     None, None, record
   )
 
@@ -575,7 +579,7 @@ object PropertySheetModel extends ModelClass {
 case class PropertyTableModel(
   override val caption: Option[I18NElement],
   getSchema: Option[Schema],
-  records: List[Record],
+  records: List[IRecord],
   tableKind: Option[TableKind] = None,
   expiresKind: Option[ExpiresKind] = None,
   dataHref: Option[URI] = None
@@ -613,19 +617,19 @@ case class PropertyTableModel(
 
   def withDataHref(p: Option[URI]): PropertyTableModel = copy(dataHref = p)
 
-  def toRecord: Record = throw new UnsupportedOperationException()
+  def toRecord: IRecord = throw new UnsupportedOperationException()
 
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, caption
   ){
     protected def render_Content: NodeSeq = property_table(getSchema, records, dataHref)
   }.apply
-  lazy val effectiveSchema = getSchema.getOrElse(RecordUtils.buildSchema(records))
+  lazy val effectiveSchema = getSchema.getOrElse(Record.buildSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
   lazy val tbody: TableBodyModel = TableBodyModel(Some(effectiveSchema), records, tableKind)
 }
 object PropertyTableModel extends ModelClass {
-  def apply(records: List[Record]): PropertyTableModel = PropertyTableModel(
+  def apply(records: List[IRecord]): PropertyTableModel = PropertyTableModel(
     None, None, records
   )
 
@@ -639,7 +643,7 @@ object PropertyTableModel extends ModelClass {
 case class TableModel(
   override val caption: Option[I18NElement],
   getSchema: Option[Schema],
-  records: List[Record],
+  records: List[IRecord],
   tableKind: Option[TableKind],
   expiresKind: Option[ExpiresKind] = None,
   dataHref: Option[URI] = None
@@ -676,7 +680,7 @@ case class TableModel(
 
   def withDataHref(p: Option[URI]): TableModel = copy(dataHref = p)
 
-  def toRecord: Record = throw new UnsupportedOperationException()
+  def toRecord: IRecord = throw new UnsupportedOperationException()
 
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, caption
@@ -684,17 +688,17 @@ case class TableModel(
     protected def render_Content: NodeSeq = table(strategy.tableKind(tableKind), getSchema, records, dataHref)
   }.apply
 
-  lazy val effectiveSchema = getSchema.getOrElse(RecordUtils.buildSchema(records))
+  lazy val effectiveSchema = getSchema.getOrElse(Record.buildSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
   lazy val tbody: TableBodyModel = TableBodyModel(Some(effectiveSchema), records, tableKind)
 }
 object TableModel {
-  def apply(records: Seq[Record]): TableModel = TableModel(None, None, records.toList, None)
-  def apply(caption: I18NElement, records: Seq[Record]): TableModel =
+  def apply(records: Seq[IRecord]): TableModel = TableModel(None, None, records.toList, None)
+  def apply(caption: I18NElement, records: Seq[IRecord]): TableModel =
     TableModel(Some(caption), None, records.toList, None)
-  def apply(caption: I18NElement, schema: Schema, records: Seq[Record]): TableModel =
+  def apply(caption: I18NElement, schema: Schema, records: Seq[IRecord]): TableModel =
     TableModel(Some(caption), Some(schema), records.toList, None)
-  def apply(schema: Schema, records: Seq[Record], kind: TableKind, expires: ExpiresKind, datahref: String): TableModel =
+  def apply(schema: Schema, records: Seq[IRecord], kind: TableKind, expires: ExpiresKind, datahref: String): TableModel =
     TableModel(None, Some(schema), records.toList, Some(kind), Some(expires), Some(new URI(datahref)))
 }
 
@@ -703,7 +707,7 @@ case class TableHeadModel(
   tableKind: Option[TableKind],
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IOrganismModel {
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ){
@@ -716,7 +720,7 @@ case class TableHeadRecordModel(
   tableKind: TableKind,
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IRecordModel with IOrganismModel {
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ){
@@ -729,16 +733,16 @@ case class TableHeadRecordModel(
 
 case class TableBodyModel(
   getSchema: Option[Schema],
-  records: List[Record],
+  records: List[IRecord],
   tableKind: Option[TableKind],
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IRecordsModel with IOrganismModel {
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ){
     protected def render_Content: NodeSeq = {
-      val s = getSchema.getOrElse(RecordUtils.buildSchema(records))
+      val s = getSchema.getOrElse(Record.buildSchema(records))
       table_body(strategy.tableKind(tableKind), s, records)
     }
   }.apply
@@ -748,11 +752,11 @@ case class TableBodyModel(
 
 case class TableBodyRecordsModel(
   getSchema: Option[Schema],
-  records: List[Record],
+  records: List[IRecord],
   tableKind: TableKind,
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IRecordModel with IOrganismModel {
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ){
@@ -764,16 +768,16 @@ case class TableBodyRecordsModel(
 
 case class TableBodyRecordModel(
   getSchema: Option[Schema],
-  record: Record,
+  record: IRecord,
   tableKind: TableKind,
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IRecordModel with IOrganismModel {
-  def toRecord: Record = record
+  def toRecord: IRecord = record
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ){
     protected def render_Content: NodeSeq = {
-      val s = getSchema.getOrElse(RecordUtils.buildSchema(record))
+      val s = getSchema.getOrElse(Record.buildSchema(record))
       table_body_record(tableKind, s, record)
     }
   }.apply
@@ -786,7 +790,7 @@ case class TableHeadRecordDataModel(
   tableKind: TableKind,
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IMoleculeModel {
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ){
@@ -802,7 +806,7 @@ case class TableBodyRecordDataModel(
   tableKind: TableKind,
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IMoleculeModel {
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ){
@@ -832,14 +836,14 @@ case class CardModel(
 case class RecordModel(
   override val caption: Option[I18NElement],
   getSchema: Option[Schema],
-  record: Record,
+  record: IRecord,
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IRecordModel with IComponentModel {
   def getEntityType = None
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORD -> ViewRecord.create(record, strategy)
   )
-  def toRecord: Record = throw new UnsupportedOperationException()
+  def toRecord: IRecord = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, caption
   ){
@@ -848,21 +852,21 @@ case class RecordModel(
 }
 object RecordModel {
   def apply(
-    record: Record
+    record: IRecord
   ): RecordModel = RecordModel(None, None, record)
 }
 
 case class RecordsModel(
   override val caption: Option[I18NElement],
   getSchema: Option[Schema],
-  records: List[Record],
+  records: List[IRecord],
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IRecordsModel with IComponentModel {
   def getEntityType = None
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORDS -> records.map(ViewRecord.create(_, strategy))
   )
-  def toRecord: Record = throw new UnsupportedOperationException()
+  def toRecord: IRecord = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, caption
   ){
@@ -870,10 +874,10 @@ case class RecordsModel(
   }.apply
 }
 object RecordsModel {
-  def apply(records: Seq[Record]): RecordsModel = RecordsModel(None, None, records.toList)
-  def apply(caption: I18NElement, records: Seq[Record]): RecordsModel =
+  def apply(records: Seq[IRecord]): RecordsModel = RecordsModel(None, None, records.toList)
+  def apply(caption: I18NElement, records: Seq[IRecord]): RecordsModel =
     RecordsModel(Some(caption), None, records.toList)
-  def apply(caption: I18NElement, schema: Schema, records: Seq[Record]): RecordsModel =
+  def apply(caption: I18NElement, schema: Schema, records: Seq[IRecord]): RecordsModel =
     RecordsModel(Some(caption), Some(schema), records.toList)
 }
 
@@ -887,7 +891,7 @@ case class TableCardModel(
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
     PROP_VIEW_RECORDS -> records.records.map(ViewRecord.create(_, strategy))
   )
-  def toRecord: Record = throw new UnsupportedOperationException()
+  def toRecord: IRecord = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -896,7 +900,7 @@ case class TableCardModel(
   }.apply
 }
 object TableCardModel {
-  def apply(title: I18NElement, schema: Schema, records: Seq[Record], expires: ExpiresKind, datahref: String): TableCardModel =
+  def apply(title: I18NElement, schema: Schema, records: Seq[IRecord], expires: ExpiresKind, datahref: String): TableCardModel =
     TableCardModel(
       TableModel(schema, records, DashboardTable, expires, datahref),
       None,
@@ -908,7 +912,7 @@ case class SearchBoxModel(
   searchbox: Renderer.SearchBox
 ) extends Model with IFormModel with IComponentModel {
   val expiresKind: Option[ExpiresKind] = None
-  def toRecord: Record = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = RAISE.notImplementedYetDefect
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(strategy) {
     protected def render_Content: NodeSeq = searchbox_form(searchbox)
   }.apply
@@ -922,12 +926,12 @@ case class PropertyInputFormModel(
   uri: URI,
   method: Method,
   schema: Schema,
-  record: Record,
+  record: IRecord,
   hiddens: Hiddens,
   submit: Submits,
   expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
 ) extends Model with IFormModel with IComponentModel {
-  def toRecord: Record = throw new UnsupportedOperationException()
+  def toRecord: IRecord = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -940,12 +944,12 @@ case class PropertyConfirmFormModel(
   uri: URI,
   method: Method,
   schema: Schema,
-  record: Record,
+  record: IRecord,
   hiddens: Hiddens,
   submit: Submits,
   expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
 ) extends Model with IFormModel with IComponentModel {
-  def toRecord: Record = throw new UnsupportedOperationException()
+  def toRecord: IRecord = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -958,11 +962,11 @@ case class UpdateEntityDirectiveFormModel(
   uri: URI,
   label: I18NString,
   id: DomainEntityId,
-  properties: Record,
+  properties: IRecord,
   isActive: Boolean
 ) extends Model with IFormModel with IComponentModel {
   val expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
-  def toRecord: Record = throw new UnsupportedOperationException()
+  def toRecord: IRecord = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -980,7 +984,7 @@ case class InvokeDirectiveFormModel(
   isActive: Boolean
 ) extends Model with IFormModel with IComponentModel {
   val expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
-  def toRecord: Record = throw new UnsupportedOperationException()
+  def toRecord: IRecord = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -993,12 +997,12 @@ case class InvokeWithIdDirectiveFormModel(
   method: Method,
   label: I18NString,
   id: DomainObjectId,
-  properties: Record,
+  properties: IRecord,
   isActive: Boolean,
   idPropertyName: Option[String]
 ) extends Model with IFormModel with IComponentModel {
   val expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
-  def toRecord: Record = throw new UnsupportedOperationException()
+  def toRecord: IRecord = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -1012,7 +1016,7 @@ case class OperationOutcomeModel(
 ) extends Model with ISectionModel {
   def title = Some(I18NElement(request.operationName))
   val expiresKind = Some(NoCacheExpires)
-  def toRecord: Record = throw new UnsupportedOperationException()
+  def toRecord: IRecord = throw new UnsupportedOperationException()
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -1024,6 +1028,6 @@ case class CandidatesModel(
   candidates: PowertypeClassCandidates
 ) extends Model {
   val expiresKind = Some(NoCacheExpires)
-  def toRecord: Record = RAISE.noReachDefect
+  def toRecord: IRecord = RAISE.noReachDefect
   def render(strategy: RenderStrategy) = RAISE.noReachDefect
 }

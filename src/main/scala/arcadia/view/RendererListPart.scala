@@ -1,13 +1,13 @@
 package arcadia.view
 
-import org.goldenport.record.v2._
 import scala.xml.{NodeSeq, Group, Elem, Node, Text}
 import arcadia.model._
 import Renderer._
 
 /*
  * @since   Apr. 15, 2018
- * @version May.  2, 2018
+ *  version May.  2, 2018
+ * @version Sep.  1, 2018
  * @author  ASAMI, Tomoharu
  */
 trait RendererListPart { self: Renderer =>

@@ -6,7 +6,8 @@ import java.net.URI
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
 import org.goldenport.xml.XmlUtils
-import org.goldenport.record.v2.{Schema, Column, Record}
+import org.goldenport.record.v3.{IRecord, Record}
+import org.goldenport.record.v2.{Schema, Column}
 import org.goldenport.i18n.I18NElement
 import org.goldenport.trace.Result
 import org.goldenport.values.PathName
@@ -24,7 +25,9 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Jan. 22, 2018
  *  version Feb. 17, 2018
  *  version Apr. 15, 2018
- * @version May.  6, 2018
+ *  version May.  6, 2018
+ *  version Sep.  1, 2018
+ * @version Nov.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -256,7 +259,7 @@ case object ButtonTag extends Tag with SelectByName {
     val id = p.id.v
     val action: String = s"$op/$id"
     val buttonname: String = expr.format(p.label)
-    val properties: Record = p.properties
+    val properties: IRecord = p.properties
     _button(expr, Put, action, buttonname, properties, p.isActive, true)
   }
 
@@ -266,7 +269,7 @@ case object ButtonTag extends Tag with SelectByName {
     val idname = p.idPropertyName getOrElse "id"
     val action: String = s"$op?$idname=$id"
     val buttonname: String = expr.format(p.label)
-    val properties: Record = p.properties
+    val properties: IRecord = p.properties
     _button(expr, p.method, action, buttonname, properties, p.isActive, true)
   }
 
@@ -275,14 +278,14 @@ case object ButtonTag extends Tag with SelectByName {
     method: Method,
     action: String,
     buttonname: String,
-    properties: Record,
+    properties: IRecord,
     isactive: Boolean,
     isreturnback: Boolean
   ): XmlContent = {
-    def returnback: Record =
+    def returnback: IRecord =
       if (isreturnback)
         expr.parcel.getLogicalUri.map(x =>
-          Record.dataApp(PROP_REDIRECT -> x.toString)
+          Record.data(PROP_REDIRECT -> x.toString)
         ).getOrElse(Record.empty)
       else
         Record.empty
@@ -290,7 +293,7 @@ case object ButtonTag extends Tag with SelectByName {
     // TODO renderer
     val buttonclass = "btn btn-primary btn-block"
     val r = <form method={method.name} action={action}> {
-      xs.toStringVector.map {
+      xs.asNameStringVector.map {
         case (k, v) => <input type="hidden" name={k} value={v}></input>
       } :+ (
         if (isactive)

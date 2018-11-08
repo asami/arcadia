@@ -4,7 +4,8 @@ import scala.xml._
 import java.net.URI
 import play.api.libs.json.JsValue
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2.{Record, Schema, Column}
+import org.goldenport.record.v3.IRecord
+import org.goldenport.record.v2.{Schema, Column}
 import org.goldenport.values.PathName
 import arcadia._
 import arcadia.model._
@@ -19,7 +20,8 @@ import arcadia.domain._
  *  version Nov. 13, 2017
  *  version Jan. 14, 2018
  *  version Mar. 18, 2018
- * @version Jul. 17, 2018
+ *  version Jul. 17, 2018
+ * @version Aug. 31, 2018
  * @author  ASAMI, Tomoharu
  */
 trait PlatformExecutionContext {
@@ -39,8 +41,8 @@ trait PlatformExecutionContext {
   def getDefaultPropertyColumn(name: String): Option[Column]
   def getEntity(entitytype: DomainEntityType, id: DomainObjectId): Option[EntityDetailModel]
   def readEntityList(p: Query): EntityListModel
-  def createEntity(klass: DomainEntityType, data: Record): DomainObjectId
-  def updateEntity(klass: DomainEntityType, id: DomainObjectId, data: Record): Unit 
+  def createEntity(klass: DomainEntityType, data: IRecord): DomainObjectId
+  def updateEntity(klass: DomainEntityType, id: DomainObjectId, data: IRecord): Unit 
   def deleteEntity(klass: DomainEntityType, id: DomainObjectId): Unit
   def fetchString(urn: UrnSource): Option[String]
   def fetchBadge(urn: UrnSource): Option[Badge]
@@ -60,8 +62,8 @@ trait PlatformExecutionContext {
   }
   def controllerUri: URI
   def getIdInRequest: Option[DomainObjectId]
-  def inputQueryParameters: Record
-  def inputFormParameters: Record
+  def inputQueryParameters: IRecord
+  def inputFormParameters: IRecord
   def getFormParameter(key: String): Option[String]
   def assets: String
 }

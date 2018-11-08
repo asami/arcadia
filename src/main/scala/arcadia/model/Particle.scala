@@ -9,7 +9,8 @@ import org.goldenport.exception.RAISE
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.xml.{XmlUtils, XhtmlUtils}
 import org.goldenport.value._
-import org.goldenport.record.v2._
+import org.goldenport.record.v3.{IRecord, Record}
+import org.goldenport.record.v2.{Record => _, _}
 import org.goldenport.json.JsonUtils
 import org.goldenport.util.SeqUtils
 import com.asamioffice.goldenport.text.UString
@@ -28,7 +29,9 @@ import arcadia.domain._
  *  version Apr.  8, 2018
  *  version May.  4, 2018
  *  version Jul. 23, 2018
- * @version Aug.  6, 2018
+ *  version Aug. 31, 2018
+ *  version Sep.  5, 2018
+ * @version Nov.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -135,7 +138,7 @@ object Picture {
     case m: JsError => RAISE.syntaxErrorFault(m.toString)
   }
 
-  def get(rec: Record, key: Symbol): Option[Picture] = rec.getOne(key).map {
+  def get(rec: IRecord, key: Symbol): Option[Picture] = rec.get(key).map {
     case m: Picture => m
     case m: URI => create(m)
     case m: URL => create(m)
@@ -151,20 +154,20 @@ case class Card(
   content: Option[I18NElement],
   summary: Option[I18NElement],
   link: Option[DomainEntityLink],
-  record: Option[Record]
+  record: Option[IRecord]
 ) extends Particle {
   def isImageTopOnly = image_top.isDefined && header.isEmpty && footer.isEmpty && content.isEmpty && summary.isEmpty
 }
 object Card {
-  def create(pic: Picture, rec: Record): Card = Card(Some(pic), None, None, None, None, None, Some(rec))
+  def create(pic: Picture, rec: IRecord): Card = Card(Some(pic), None, None, None, None, None, Some(rec))
 
-  def create(pic: Picture, header: TitleLine, content: NodeSeq, rec: Record): Card = Card(Some(pic), Some(header), None, Some(I18NElement(content)), Some(_summary(content)), None, Some(rec))
+  def create(pic: Picture, header: TitleLine, content: NodeSeq, rec: IRecord): Card = Card(Some(pic), Some(header), None, Some(I18NElement(content)), Some(_summary(content)), None, Some(rec))
 
-  def create(pic: Picture, header: Option[TitleLine], content: NodeSeq, rec: Record): Card = Card(Some(pic), header, None, Some(I18NElement(content)), Some(_summary(content)), None, Some(rec))
+  def create(pic: Picture, header: Option[TitleLine], content: NodeSeq, rec: IRecord): Card = Card(Some(pic), header, None, Some(I18NElement(content)), Some(_summary(content)), None, Some(rec))
 
-  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq], rec: Record): Card = Card(Some(pic), header, None, content.map(I18NElement(_)), content.map(_summary), None, Some(rec))
+  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq], rec: IRecord): Card = Card(Some(pic), header, None, content.map(I18NElement(_)), content.map(_summary), None, Some(rec))
 
-  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq], summary: Option[NodeSeq], link: Option[DomainEntityLink], rec: Record): Card = Card(Some(pic), header, None, content.map(I18NElement(_)), summary.map(I18NElement(_)).orElse(content.map(_summary)), link, Some(rec))
+  def create(pic: Picture, header: Option[TitleLine], content: Option[NodeSeq], summary: Option[NodeSeq], link: Option[DomainEntityLink], rec: IRecord): Card = Card(Some(pic), header, None, content.map(I18NElement(_)), summary.map(I18NElement(_)).orElse(content.map(_summary)), link, Some(rec))
 
   def create(pic: Option[Picture], header: Option[TitleLine], footer: Option[TitleLine], content: NodeSeq, summary: Option[NodeSeq]): Card = Card(pic, header, footer, Some(I18NElement(content)), summary.map(I18NElement(_)).orElse(Some(_summary(content))), None, None)
 
@@ -317,19 +320,19 @@ case object ExecuteSubmitKind extends SubmitKind {
 }
 
 case class Hiddens(
-  hiddens: Record
+  hiddens: IRecord
 ) {
-  def toKeyValues: Vector[(String, String)] = hiddens.toStringVector
+  def toKeyValues: Vector[(String, String)] = hiddens.asNameStringVector
 }
 object Hiddens {
   val empty = Hiddens(Record.empty)
 
   def apply(k: String, v: String): Hiddens = Hiddens(
-    Record.dataApp(k -> v)
+    Record.data(k -> v)
   )
 
   def apply(x: (String,  String), xs: (String, String)*): Hiddens = Hiddens(
-    Record.createApp(x +: xs)
+    Record.create(x +: xs)
   )
 
   def scenario(v: String): Hiddens = Hiddens(ScenarioCommand.PROP_SCENARIO, v)
@@ -364,8 +367,8 @@ case object Delete extends Method {
 }
 
 case class RequestParameter(
-  query: Option[Record],
-  form: Option[Record]
+  query: Option[IRecord],
+  form: Option[IRecord]
 ) extends Particle {
 }
 object RequestParameter {
@@ -549,13 +552,13 @@ object Particle {
     def writes(p: DomainObjectId): JsValue = RAISE.notImplementedYetDefect
   }
   implicit val DomainEntityIdFormat = Json.format[DomainEntityId]
-  implicit object RecordFormat extends Format[Record] { // TODO migrate to record.
-    def reads(json: JsValue): JsResult[Record] = json match {
-      case m: JsObject => JsSuccess(Record.create(JsonUtils.toMapS(m)))
-      case _ => JsError(s"Not json object: $json")
-    }
-    def writes(p: Record): JsValue = RAISE.notImplementedYetDefect
-  }
+  // implicit object RecordFormat extends Format[Record] { // TODO migrate to record.
+  //   def reads(json: JsValue): JsResult[Record] = json match {
+  //     case m: JsObject => JsSuccess(Record.create(JsonUtils.toMapS(m)))
+  //     case _ => JsError(s"Not json object: $json")
+  //   }
+  //   def writes(p: Record): JsValue = RAISE.notImplementedYetDefect
+  // }
   implicit val RequestParameterFormat = Json.format[RequestParameter]
   implicit object LabelIndicatorFormat extends Format[LabelIndicator] {
     def reads(json: JsValue): JsResult[LabelIndicator] = LabelIndicator.parseJsValue(json)

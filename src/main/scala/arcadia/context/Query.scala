@@ -1,6 +1,6 @@
 package arcadia.context
 
-import org.goldenport.record.v2.Record
+import org.goldenport.record.v3.{IRecord, Record}
 import arcadia._
 import arcadia.model._
 import arcadia.view._
@@ -8,7 +8,8 @@ import arcadia.domain._
 
 /*
  * @since   Oct.  8, 2017
- * @version Nov. 23, 2017
+ *  version Nov. 23, 2017
+ * @version Aug. 31, 2018
  * @author  ASAMI, Tomoharu
  */
 case class Query(
@@ -16,11 +17,11 @@ case class Query(
   start: Int = 0,
   limit: Int = 20,
   maxlimit: Int = 40,
-  parameters: Record = Record.empty
+  parameters: IRecord = Record.empty
 ) {
-  def withParameter(params: Option[Record]): Query = params.fold(this)(withParameter)
+  def withParameter(params: Option[IRecord]): Query = params.fold(this)(withParameter)
 
-  def withParameter(params: Record): Query =
+  def withParameter(params: IRecord): Query =
     if (params.isEmpty)
       this
     else {

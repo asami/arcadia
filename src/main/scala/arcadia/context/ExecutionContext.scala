@@ -4,7 +4,8 @@ import scala.xml._
 import java.net.URI
 import play.api.libs.json.JsValue
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2.{Record, Schema, Column}
+import org.goldenport.record.v3.IRecord
+import org.goldenport.record.v2.{Schema, Column}
 import org.goldenport.record.v2.util.SchemaBuilder
 import org.goldenport.values.PathName
 import arcadia._
@@ -19,7 +20,9 @@ import arcadia.domain._
  *  version Oct. 30, 2017
  *  version Nov. 13, 2017
  *  version Jan. 15, 2018
- * @version Jul. 17, 2018
+ *  version Jul. 17, 2018
+platformExecutionContext.getFormParameter(key) *  version Aug. 31, 2018
+platformExecutionContext.getFormParameter(key) * @version Sep.  5, 2018
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -58,18 +61,18 @@ case class ExecutionContext(
   }
   def getEntity(entitytype: DomainEntityType, id: DomainObjectId): Option[EntityDetailModel] = platformExecutionContext.getEntity(entitytype, id)
   def readEntityList(p: Query): EntityListModel = platformExecutionContext.readEntityList(p)
-  def createEntity(klass: DomainEntityType, data: Record): DomainObjectId = platformExecutionContext.createEntity(klass, data)
-  def updateEntity(klass: DomainEntityType, id: DomainObjectId, data: Record): Unit = platformExecutionContext.updateEntity(klass, id, data)
+  def createEntity(klass: DomainEntityType, data: IRecord): DomainObjectId = platformExecutionContext.createEntity(klass, data)
+  def updateEntity(klass: DomainEntityType, id: DomainObjectId, data: IRecord): Unit = platformExecutionContext.updateEntity(klass, id, data)
   def deleteEntity(klass: DomainEntityType, id: DomainObjectId): Unit = platformExecutionContext.deleteEntity(klass, id)
   def fetchString(urn: UrnSource): Option[String] = platformExecutionContext.fetchString(urn)
   def fetchBadge(urn: UrnSource): Option[Badge] = platformExecutionContext.fetchBadge(urn)
   def fetchCandidates(name: String): Option[CandidatesModel] = platformExecutionContext.fetchCandidates(name)
   def controllerUri: URI = platformExecutionContext.controllerUri
   def getIdInRequest: Option[DomainObjectId] = platformExecutionContext.getIdInRequest
-  def inputQueryParameters: Record = platformExecutionContext.inputQueryParameters
-  def inputFormParameters: Record = platformExecutionContext.inputFormParameters
-  def getFormParameter(key: String): Option[String] = platformExecutionContext.getFormParameter(key)
-  def assets: String = config.getAssets getOrElse platformExecutionContext.assets
+  lazy val inputQueryParameters: IRecord = platformExecutionContext.inputQueryParameters.toRecord.http.request.normalize
+  lazy val inputFormParameters: IRecord = platformExecutionContext.inputFormParameters.toRecord.http.request.normalize
+  def getFormParameter(key: String): Option[String] = inputFormParameters.getString(key)
+  lazy val assets: String = config.getAssets getOrElse platformExecutionContext.assets
 
   def toCode(e: Throwable): Int = ExecutionContext.toCode(e)
 }
