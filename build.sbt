@@ -2,9 +2,9 @@ organization := "org.goldenport"
 
 name := "arcadia"
 
-version := "0.0.33"
+version := "0.1.0"
 
-scalaVersion := "2.10.3"
+scalaVersion := "2.12.7"
 // crossScalaVersions := Seq("2.10.39.2", "2.9.1")
 
 scalacOptions += "-deprecation"
@@ -20,15 +20,15 @@ resolvers += "Asami Maven Repository" at "http://www.asamioffice.com/maven"
 // override goldenport-record
 // libraryDependencies += "org.goldenport" %% "goldenport-scala-lib" % "1.2.24"
 
-libraryDependencies += "org.goldenport" %% "goldenport-record" % "1.2.21"
+libraryDependencies += "org.goldenport" %% "goldenport-record" % "2.1.0"
 
-libraryDependencies += "com.typesafe.play" %% "play-json" % "2.2.2" % "provided" exclude("org.scala-stm", "scala-stm_2.10.0")
+libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.10" % "provided" exclude("org.scala-stm", "scala-stm_2.10.0")
 
 libraryDependencies += "org.scalatra.scalate" %% "scalate-core" % "1.8.0"
 
-libraryDependencies += "org.fusesource.scalamd" %% "scalamd" % "1.6"
+libraryDependencies += "org.scalatra.scalate" %% "scalamd" % "1.7.1"
 
-libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.6" % "test"
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % "test"
 
 libraryDependencies += "junit" % "junit" % "4.10" % "test"
 
