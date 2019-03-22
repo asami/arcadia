@@ -32,7 +32,8 @@ import arcadia.view.ViewEngine._
  *  version Feb. 17, 2018
  *  version Mar. 21, 2018
  *  version May.  6, 2018
- * @version Aug.  5, 2018
+ *  version Aug.  5, 2018
+ * @version Oct. 24, 2018
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -951,14 +952,14 @@ object SchemaRule {
           UsageSchemaRule.create(
             SchemaBuilder.create(
               CLT(PROP_DOMAIN_OBJECT_ID, "Id", XEverforthid), // TODO generic platform entity id
-                                                              //      CLiT(PROP_DOMAIN_OBJECT_NAME, "Name", "名前", XString),
-              CLiT(PROP_DOMAIN_OBJECT_TITLE, "Title", "タイトル", XString),
-              //      CLiT(PROP_DOMAIN_OBJECT_SUBTITLE, "Sub Title", "サブタイトル", XString),
-              //      CLiT(PROP_DOMAIN_OBJECT_SUMMARY, "Summary", "概要", XString),
-              CLiT(PROP_DOMAIN_OBJECT_CONTENT, "Content", "内容", XString),
-              CLiT(PROP_DOMAIN_OBJECT_IMAGE_ICON, "Icon", "アイコン", XImageLink), // TODO XImage
-              CLiT(PROP_DOMAIN_OBJECT_IMAGE_PRIMARY, "Image", "画像", XImageLink) // TODO XImage
-                                                                                  //      CLiT(PROP_DOMAIN_OBJECT_IMAGE_SECONDARY, "Image", "画像", XImageLink)
+                                                              //      CLejT(PROP_DOMAIN_OBJECT_NAME, "Name", "名前", XString),
+              CLejT(PROP_DOMAIN_OBJECT_TITLE, "Title", "タイトル", XString),
+              //      CLejT(PROP_DOMAIN_OBJECT_SUBTITLE, "Sub Title", "サブタイトル", XString),
+              //      CLejT(PROP_DOMAIN_OBJECT_SUMMARY, "Summary", "概要", XString),
+              CLejT(PROP_DOMAIN_OBJECT_CONTENT, "Content", "内容", XString),
+              CLejT(PROP_DOMAIN_OBJECT_IMAGE_ICON, "Icon", "アイコン", XImageLink), // TODO XImage
+              CLejT(PROP_DOMAIN_OBJECT_IMAGE_PRIMARY, "Image", "画像", XImageLink) // TODO XImage
+                                                                                  //      CLejT(PROP_DOMAIN_OBJECT_IMAGE_SECONDARY, "Image", "画像", XImageLink)
             )
           )
         )

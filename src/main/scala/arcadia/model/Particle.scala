@@ -28,7 +28,8 @@ import arcadia.domain._
  *  version Apr.  8, 2018
  *  version May.  4, 2018
  *  version Jul. 23, 2018
- * @version Aug.  6, 2018
+ *  version Aug.  6, 2018
+ * @version Oct. 24, 2018
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -459,10 +460,13 @@ object Candidates {
   implicit object PowertypeClassFormat extends Format[PowertypeClass] {
     def reads(json: JsValue): JsResult[PowertypeClass] = {
       (json \ "elements") match {
-        case JsArray(xs) =>
-          _sequence(xs.map(PowertypeFormat.reads)).
-            map(PowertypeClassInstance)
-        case _ => JsError(s"$json")
+        case JsDefined(js) => js match {
+          case JsArray(xs) =>
+            _sequence(xs.map(PowertypeFormat.reads)).
+              map(PowertypeClassInstance)
+          case _ => JsError(s"$json")
+        }
+        case _: JsUndefined => JsError(s"$json")
       }
     }
     def writes(o: PowertypeClass): JsValue = {
