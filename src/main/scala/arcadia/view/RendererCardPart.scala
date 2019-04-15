@@ -2,7 +2,7 @@ package arcadia.view
 
 import scala.xml.{NodeSeq, Group, Elem, Node, Text}
 import org.goldenport.record.v3.{IRecord, Record}
-import org.goldenport.record.v2.{Record => _, _}
+import org.goldenport.record.v2.{Record => _, Table => _, _}
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.xml.XmlUtils
 import org.goldenport.util.{DateTimeUtils, DateUtils, StringUtils, SeqUtils}
@@ -14,7 +14,8 @@ import Renderer._
  *  version Apr. 30, 2018
  *  version May.  1, 2018
  *  version Jul.  8, 2018
- * @version Sep.  1, 2018
+ *  version Sep.  1, 2018
+ * @version Apr. 16, 2019
  * @author  ASAMI, Tomoharu
  */
 trait RendererCardPart { self: Renderer =>
