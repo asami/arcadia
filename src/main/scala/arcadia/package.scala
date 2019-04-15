@@ -1,6 +1,7 @@
 /*
  *  version Aug. 30, 2017
- * @version Oct. 24, 2018
+ *  version Oct. 24, 2018
+ * @version Nov.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 package object arcadia {

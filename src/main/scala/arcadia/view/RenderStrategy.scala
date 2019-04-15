@@ -8,7 +8,8 @@ import java.sql.Timestamp
 import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
 import org.goldenport.Strings.blankopt
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2._
+import org.goldenport.record.v3.{IRecord, Record}
+import org.goldenport.record.v2.{Record => _, _}
 import org.goldenport.record.v2.util.{SchemaBuilder, RecordUtils}
 import org.goldenport.i18n.I18NElement
 import org.goldenport.xml.XhtmlUtils
@@ -33,7 +34,9 @@ import arcadia.view.ViewEngine._
  *  version Mar. 21, 2018
  *  version May.  6, 2018
  *  version Aug.  5, 2018
- * @version Oct. 24, 2018
+ *  version Sep.  1, 2018
+ *  version Oct. 24, 2018
+ * @version Nov.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -122,8 +125,8 @@ case class RenderStrategy(
 
   def resolveSchema(entitytype: DomainEntityType, s: Schema): Schema = schema.resolve(this, entitytype, s)
 
-  def format(column: Column, rec: Record): String = {
-    rec.getOne(column.name).map {
+  def format(column: Column, rec: IRecord): String = {
+    rec.get(column.name).map {
       case m => column.datatype.format(m)
     }.getOrElse("")
   }
@@ -898,7 +901,7 @@ case class SchemaRule(
   def resolve(p: RenderStrategy, t: Renderer.TableOrder): Schema = {
     val ctx = p.renderContext
     ctx.schema getOrElse {
-      val schema = t.schema.getOrElse(RecordUtils.buildSchema(t.records.getOrElse(Nil)))
+      val schema = t.schema.getOrElse(Record.buildSchema(t.records.getOrElse(Nil)))
       (ctx.entityType orElse t.entityType).fold(schema)(resolve(p, _, schema))
     }
   }

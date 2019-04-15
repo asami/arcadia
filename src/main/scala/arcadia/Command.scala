@@ -1,6 +1,7 @@
 package arcadia
 
-import org.goldenport.record.v2.{Record, Schema}
+import org.goldenport.record.v3.{IRecord, Record}
+import org.goldenport.record.v2.Schema
 import org.goldenport.i18n.I18NElement
 import org.goldenport.values.PathName
 import arcadia.domain._
@@ -18,7 +19,8 @@ import arcadia.context.Request
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
  *  version Jan.  7, 2018
- * @version Mar. 13, 2018
+ *  version Mar. 13, 2018
+ * @version Aug. 31, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Command {
@@ -76,14 +78,14 @@ case class DashboardCommand() extends Command {
 
 case class EntityDetailCommand(
   klass: DomainEntityType,
-  record: Record
+  record: IRecord
 ) extends Command {
   override lazy val getModel = Some(EntityDetailModel(klass, record))
 }
 
 case class EntityListCommand(
   klass: DomainEntityType,
-  records: List[Record],
+  records: List[IRecord],
   transfer: Transfer
 ) extends Command {
   override lazy val getModel = Some(EntityListModel(klass, records, transfer))
@@ -91,7 +93,7 @@ case class EntityListCommand(
 object EntityListCommand {
   def apply(
     klass: DomainEntityType,
-    records: Seq[Record],
+    records: Seq[IRecord],
     transfer: Transfer
   ): EntityListCommand = EntityListCommand(klass, records.toList, transfer)
 }
@@ -99,7 +101,7 @@ object EntityListCommand {
 case class PropertySheetCommand(
   caption: Option[I18NElement],
   schema: Schema,
-  record: Record
+  record: IRecord
 ) extends Command {
   override lazy val getModel = Some(PropertySheetModel(caption, Some(schema), record))
 }
@@ -107,25 +109,25 @@ case class PropertySheetCommand(
 case class PropertyTableCommand(
   caption: Option[I18NElement],
   schema: Schema,
-  records: List[Record]
+  records: List[IRecord]
 ) extends Command {
   override lazy val getModel = Some(PropertyTableModel(caption, Some(schema), records))
 }
 
 case class RecordCommand(
-  record: Record
+  record: IRecord
 ) extends Command {
   override lazy val getModel = Some(RecordModel(record))
 }
 
 case class RecordsCommand(
-  records: List[Record]
+  records: List[IRecord]
 ) extends Command {
   override lazy val getModel = Some(RecordsModel(records))
 }
 
 object RecordsCommand {
-  def apply(records: Seq[Record]): RecordsCommand = RecordsCommand(records.toList)
+  def apply(records: Seq[IRecord]): RecordsCommand = RecordsCommand(records.toList)
 }
 
 case class ScenarioCommand(
@@ -135,8 +137,8 @@ case class ScenarioCommand(
   exception: Option[Throwable] = None
 ) extends Command {
   import ScenarioCommand._
-  val queryRecord = Record.create(query)
-  val formRecord = Record.create(form)
+  val queryRecord = Record.createHttp(query)
+  val formRecord = Record.createHttp(form)
 
   def name: String = path.head
   def entityName: String = path(1)

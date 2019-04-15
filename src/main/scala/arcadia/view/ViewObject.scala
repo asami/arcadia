@@ -2,7 +2,7 @@ package arcadia.view
 
 import scala.util.control.NonFatal
 import java.net.URI
-import org.goldenport.record.v2._
+import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.xml.XmlUtils
 import org.goldenport.exception.RAISE
 import arcadia.domain._
@@ -13,7 +13,8 @@ import arcadia.model.Picture
  *  version Aug. 30, 2017
  *  version Sep.  4, 2017
  *  version Oct. 24, 2017
- * @version Dec. 17, 2017
+ *  version Dec. 17, 2017
+ * @version Aug. 31, 2018
  * @author  ASAMI, Tomoharu
  */
 case class ViewObject(v: DomainObject, strategy: RenderStrategy) {
@@ -175,5 +176,5 @@ object ViewObject {
   //   create(rec)
   // }
 
-  def create(rec: Record, strategy: RenderStrategy): ViewObject = ViewObject(RecordDomainObject(rec), strategy)
+  def create(rec: IRecord, strategy: RenderStrategy): ViewObject = ViewObject(RecordDomainObject(rec), strategy)
 }

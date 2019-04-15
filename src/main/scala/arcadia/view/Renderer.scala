@@ -6,7 +6,8 @@ import java.util.Locale
 import java.net.{URI, URL}
 import org.joda.time.DateTime
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2._
+import org.goldenport.record.v3.{IRecord, Record}
+import org.goldenport.record.v2.{Record => _, _}
 import org.goldenport.record.v2.util.{RecordUtils, SchemaBuilder}
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.xml.XmlUtils
@@ -30,7 +31,10 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Mar. 21, 2018
  *  version Apr. 22, 2018
  *  version May.  6, 2018
- * @version Jul. 23, 2018
+ *  version Jul. 23, 2018
+ *  version Aug. 31, 2018
+ *  version Sep.  1, 2018
+ * @version Nov.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -148,7 +152,7 @@ abstract class Renderer(
       CLT("call_tree", "Call Tree", XText)
     )
 
-    val rec = Record.dataAppOption(
+    val rec = Record.dataOption(
       "code" -> Some(code),
       "message" -> message.map(_(locale)),
       "topuri" -> topUri,
@@ -177,13 +181,13 @@ abstract class Renderer(
 
   protected def h2(p: Option[I18NString]): Node = p.map(x => <h2>string(x)</h2>).getOrElse(Group(Nil))
 
-  private def _get_href_base(p: Record): Option[URI] =
+  private def _get_href_base(p: IRecord): Option[URI] =
     (
-      p.getConcreteString(KEY_DOMAIN_OBJECT_HREF_BASE) orElse
-      p.getConcreteString(KEY_DOMAIN_OBJECT_ENTITYTYPE)
+      p.getString(KEY_DOMAIN_OBJECT_HREF_BASE) orElse
+      p.getString(KEY_DOMAIN_OBJECT_ENTITYTYPE)
     ).map(make_html_uri)
 
-  protected def get_link(table: Table, rec: Record): Option[DomainEntityLink] = {
+  protected def get_link(table: Table, rec: IRecord): Option[DomainEntityLink] = {
     val id = DomainEntityId.get(rec, table.entityType)
     (
       id,
@@ -194,7 +198,7 @@ abstract class Renderer(
     }
   }
 
-  protected def get_link(rec: Record): Option[DomainEntityLink] = {
+  protected def get_link(rec: IRecord): Option[DomainEntityLink] = {
     val id = DomainEntityId.get(rec)
     (
       id,
@@ -205,7 +209,7 @@ abstract class Renderer(
     }
   }
 
-  protected def table_data_url(p: Table, record: Record): Option[Link] = {
+  protected def table_data_url(p: Table, record: IRecord): Option[Link] = {
     def base = (p.dataHref.map(x => StringUtils.toPathnameBody(x.toString)) orElse p.entityType.map(_.v)).map(make_html_uri) orElse {
       _get_href_base(record)
     }
@@ -215,18 +219,18 @@ abstract class Renderer(
     }
   }
 
-  protected final def table_data_url_string(p: Table, record: Record): Option[String] =
+  protected final def table_data_url_string(p: Table, record: IRecord): Option[String] =
     table_data_url(p, record).map(_.dataHref(strategy.renderContext).toString)
 
-  protected def tabular(schema: Option[Schema], records: Seq[Record]): NodeSeq =
+  protected def tabular(schema: Option[Schema], records: Seq[IRecord]): NodeSeq =
     schema.fold(tabular(records))(tabular(_, records))
 
-  protected def tabular(records: Seq[Record]): NodeSeq = {
+  protected def tabular(records: Seq[IRecord]): NodeSeq = {
     val schema = build_schema(records)
     tabular(schema, records)
   }
 
-  protected def tabular(schema: Schema, records: Seq[Record]): NodeSeq = {
+  protected def tabular(schema: Schema, records: Seq[IRecord]): NodeSeq = {
     val t = TableWithRecords(TabularTable, strategy.size, schema, records)
     <table class={theme_table.css.table(t.table)}>{
     seq(
@@ -237,16 +241,16 @@ abstract class Renderer(
   }
 
   // Property
-  protected def property_table(schema: Option[Schema], records: Seq[Record], datahref: Option[URI]): NodeSeq =
+  protected def property_table(schema: Option[Schema], records: Seq[IRecord], datahref: Option[URI]): NodeSeq =
     table(PropertyTable, schema, records, datahref)
 
-  protected def property_table(schema: Schema, records: Seq[Record], datahref: Option[URI]): NodeSeq =
+  protected def property_table(schema: Schema, records: Seq[IRecord], datahref: Option[URI]): NodeSeq =
     table(PropertyTable, schema, records, datahref)
 
   protected def entity_property_sheet(
     entitytype: DomainEntityType,
     schema: Option[Schema],
-    record: Record
+    record: IRecord
   ): NodeSeq = schema.fold(
     property_sheet(schema, record)
   )(s =>
@@ -256,7 +260,7 @@ abstract class Renderer(
     )
   )
 
-  protected def property_sheet_list(records: Seq[Record]): NodeSeq = {
+  protected def property_sheet_list(records: Seq[IRecord]): NodeSeq = {
     import SchemaBuilder._
     val schema = SchemaBuilder.create(
       CT("no", XInt),
@@ -275,15 +279,15 @@ abstract class Renderer(
     </table>
   }
 
-  protected def property_sheet(schema: Option[Schema], record: Record): NodeSeq =
+  protected def property_sheet(schema: Option[Schema], record: IRecord): NodeSeq =
     schema.fold(property_sheet(record))(property_sheet(_, record))
 
-  protected def property_sheet(record: Record): NodeSeq = {
+  protected def property_sheet(record: IRecord): NodeSeq = {
     val schema = build_schema(Vector(record))
     property_sheet(schema, record)
   }
 
-  protected def property_sheet(schema: Schema, record: Record): NodeSeq = {
+  protected def property_sheet(schema: Schema, record: IRecord): NodeSeq = {
     val t = Table(PropertyTable, strategy.size, schema)
     <table class={theme_table.css.table(t)}>
       <tbody>{
@@ -302,20 +306,20 @@ abstract class Renderer(
 
   protected def property_sheet_confirm(): NodeSeq = RAISE.notImplementedYetDefect
 
-  protected def get_title(rec: Record): Option[I18NElement] =
+  protected def get_title(rec: IRecord): Option[I18NElement] =
     rec.getString(KEY_DOMAIN_OBJECT_TITLE).map(I18NElement.parse)
 
-  protected def get_subtitle(rec: Record): Option[I18NElement] =
+  protected def get_subtitle(rec: IRecord): Option[I18NElement] =
     rec.getString(KEY_DOMAIN_OBJECT_SUBTITLE).map(I18NElement.parse)
 
-  protected def get_content(rec: Record): Option[Node] =
+  protected def get_content(rec: IRecord): Option[Node] =
     rec.getString(KEY_DOMAIN_OBJECT_CONTENT).map(table_value_html)
 
-  protected def get_content_summary(rec: Record): Option[Node] =
+  protected def get_content_summary(rec: IRecord): Option[Node] =
     rec.getString(KEY_DOMAIN_OBJECT_SUMMARY).map(table_value_html_summary)
 
-  protected def picture_icon(rec: Record): Picture =
-    rec.getOne(KEY_DOMAIN_OBJECT_IMAGE_ICON).fold {
+  protected def picture_icon(rec: IRecord): Picture =
+    rec.get(KEY_DOMAIN_OBJECT_IMAGE_ICON).fold {
       Picture.create(theme.default.noImageIcon)
     } {
       case m: URL => Picture.create(m.toURI)
@@ -428,12 +432,12 @@ abstract class Renderer(
       CL("code", "Code")
     )
 
-    val rec = Record.dataApp(
+    val rec = Record.data(
       "pathname" -> req.pathname,
       "operation" -> req.operationName,
       "method" -> req.method,
       "code" -> res.code
-    ) + Record.dataAppOption(
+    ) + Record.dataOption(
     )
     property_sheet(schema, rec)
   }
@@ -441,11 +445,11 @@ abstract class Renderer(
   /*
    * Utilities
    */
-  protected final def build_schema(record: Record): Schema =
-    RecordUtils.buildSchema(Vector(record))
+  protected final def build_schema(record: IRecord): Schema =
+    Record.buildSchema(Vector(record))
 
-  protected final def build_schema(rs: Seq[Record]): Schema =
-    RecordUtils.buildSchema(rs)
+  protected final def build_schema(rs: Seq[IRecord]): Schema =
+    Record.buildSchema(rs)
 }
 
 object Renderer {
@@ -455,28 +459,28 @@ object Renderer {
     schema: Option[Schema],
     entityType: Option[DomainEntityType],
     dataHref: Option[URI],
-    records: Option[Seq[Record]]
+    records: Option[Seq[IRecord]]
   )
   object TableOrder {
     def apply(
       kind: TableKind,
       schema: Option[Schema],
       entitytype: DomainEntityType,
-      records: Seq[Record]
+      records: Seq[IRecord]
     ): TableOrder = TableOrder(Some(kind), None, schema, Some(entitytype), None, Some(records))
 
     def apply(
       kind: TableKind,
       schema: Option[Schema],
       entitytype: Option[DomainEntityType],
-      records: Seq[Record]
+      records: Seq[IRecord]
     ): TableOrder = TableOrder(Some(kind), None, schema, entitytype, None, Some(records))
 
     def apply(
       kind: Option[TableKind],
       schema: Option[Schema],
       entitytype: DomainEntityType,
-      records: Seq[Record]
+      records: Seq[IRecord]
     ): TableOrder = TableOrder(kind, None, schema, Some(entitytype), None, Some(records))
 
     def apply(
@@ -484,7 +488,7 @@ object Renderer {
       schema: Option[Schema],
       entitytype: Option[DomainEntityType],
       datahref: Option[URI],
-      records: Seq[Record]
+      records: Seq[IRecord]
     ): TableOrder = TableOrder(kind, None, schema, entitytype, datahref, Some(records))
   }
 
@@ -507,7 +511,7 @@ object Renderer {
 
   case class TableWithRecords(
     table: Table,
-    records: Seq[Record]
+    records: Seq[IRecord]
   ) {
     def kind = table.kind
     def size = table.size
@@ -520,7 +524,7 @@ object Renderer {
       size: RenderSize,
       schema: Schema,
       entitytype: DomainEntityType,
-      records: Seq[Record]
+      records: Seq[IRecord]
     ): TableWithRecords = TableWithRecords(
       Table(kind, size, schema, Some(entitytype), None),
       records
@@ -532,7 +536,7 @@ object Renderer {
       schema: Schema,
       entitytype: Option[DomainEntityType],
       datahref: Option[URI],
-      records: Seq[Record]
+      records: Seq[IRecord]
     ): TableWithRecords = TableWithRecords(
       Table(kind, size, schema, entitytype, datahref),
       records
@@ -542,7 +546,7 @@ object Renderer {
       kind: TableKind,
       size: RenderSize,
       schema: Schema,
-      records: Seq[Record]
+      records: Seq[IRecord]
     ): TableWithRecords = TableWithRecords(
       Table(kind, size, schema),
       records
@@ -560,14 +564,14 @@ object Renderer {
 
   case class TableColumnWithRecord(
     tableColumn: TableColumn,
-    record: Record
+    record: IRecord
   )
 
   case class InputForm(
     action: URI,
     method: Method,
     schema: Schema,
-    values: Record,
+    values: IRecord,
     hiddens: Hiddens,
     submits: Submits
   ) {

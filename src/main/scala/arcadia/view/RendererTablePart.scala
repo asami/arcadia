@@ -4,7 +4,8 @@ import scala.util.control.NonFatal
 import scala.xml.{NodeSeq, Group, Elem, Node, Text}
 import java.net.{URI, URL}
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2._
+import org.goldenport.record.v3.{IRecord, Record}
+import org.goldenport.record.v2.{Record => _, _}
 import org.goldenport.xml.XmlUtils
 import org.goldenport.xml.dom.DomUtils
 import org.goldenport.util.{DateTimeUtils, DateUtils, StringUtils, SeqUtils}
@@ -14,7 +15,9 @@ import Renderer._
 /*
  * @since   Apr. 15, 2018
  *  version Apr. 15, 2018
- * @version May.  1, 2018
+ *  version May.  1, 2018
+ *  version Sep.  1, 2018
+ * @version Nov.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 trait RendererTablePart { self: Renderer =>
@@ -30,21 +33,21 @@ trait RendererTablePart { self: Renderer =>
     table(t)
   }
 
-  protected def table(schema: Option[Schema], records: Seq[Record]): NodeSeq =
+  protected def table(schema: Option[Schema], records: Seq[IRecord]): NodeSeq =
     table(strategy.tableKind, schema, records, None)
 
-  protected def table(records: Seq[Record]): NodeSeq = {
+  protected def table(records: Seq[IRecord]): NodeSeq = {
     val schema = build_schema(records)
     table(schema, records)
   }
 
-  protected def table(schema: Schema, records: Seq[Record]): NodeSeq =
+  protected def table(schema: Schema, records: Seq[IRecord]): NodeSeq =
     table(strategy.tableKind, schema, records, None)
 
-  protected def table(kind: TableKind, schema: Option[Schema], records: Seq[Record], datahref: Option[URI]): NodeSeq =
+  protected def table(kind: TableKind, schema: Option[Schema], records: Seq[IRecord], datahref: Option[URI]): NodeSeq =
     table(TableOrder(Some(kind), None, schema, None, datahref, Some(records)))
 
-  protected def table(kind: TableKind, schema: Schema, records: Seq[Record], datahref: Option[URI]): NodeSeq =
+  protected def table(kind: TableKind, schema: Schema, records: Seq[IRecord], datahref: Option[URI]): NodeSeq =
     table(TableOrder(Some(kind), None, Some(schema), None, datahref, Some(records)))
 
   protected def table(p: TableWithRecords): NodeSeq =
@@ -82,7 +85,7 @@ trait RendererTablePart { self: Renderer =>
       for (c <- p.schema.columns) yield <th scope="col" class={theme_table.css.theadTh(p.tableColumn(c))}>{c.label(locale)}</th>
     }</tr>
 
-  protected def table_body(kind: TableKind, schema: Schema, records: Seq[Record]): Elem =
+  protected def table_body(kind: TableKind, schema: Schema, records: Seq[IRecord]): Elem =
     table_body(TableWithRecords(kind, strategy.size, schema, records))
   //   <tbody class={theme_table.css.tbody(kind)}>{table_body_records(kind, schema, records)}</tbody>
 
@@ -95,52 +98,52 @@ trait RendererTablePart { self: Renderer =>
   // protected def table_body_records(kind: TableKind, schema: Schema, records: Seq[Record]): Group =
   //   Group(records.toList.map(table_body_record(kind, schema, _)))
 
-  protected def table_body_record(kind: TableKind, schema: Schema, record: Record): Node =
+  protected def table_body_record(kind: TableKind, schema: Schema, record: IRecord): Node =
     table_body_record(Table(kind, strategy.size, schema), record)
   //   table_record(kind, schema, record)
 
-  protected def table_body_record(p: Table, record: Record): Node = 
+  protected def table_body_record(p: Table, record: IRecord): Node = 
     table_record(p, record)
 
   protected def table_body_record_data(column: Column, kind: TableKind, value: ValueModel): Elem =
     table_data(TableColumn(kind, strategy.size, column), value)
 
-  protected def table_records(schema: Option[Schema], records: Seq[Record]): Group =
+  protected def table_records(schema: Option[Schema], records: Seq[IRecord]): Group =
     schema.fold(
       table_records(build_schema(records), records)
     )(
       table_records(_, records)
     )
 
-  protected def table_records(schema: Schema, records: Seq[Record]): Group =
+  protected def table_records(schema: Schema, records: Seq[IRecord]): Group =
     table_records(strategy.tableKind, schema, records)
 
-  protected def table_records(kind: TableKind, schema: Schema, records: Seq[Record]): Group =
+  protected def table_records(kind: TableKind, schema: Schema, records: Seq[IRecord]): Group =
     table_records(TableWithRecords(kind, strategy.size, schema, records))
 
   protected def table_records(p: TableWithRecords): Group =
     Group(for (rec <- p.records) yield table_record(p.table, rec))
 
-  protected def table_record(p: Table, record: Record): Node =
+  protected def table_record(p: Table, record: IRecord): Node =
     p.kind match {
       case ListTable => table_record_list(p, record)
       case _ => table_record_standard(p, record)
     }
 
-  protected def table_record(schema: Option[Schema], record: Record): Node =
+  protected def table_record(schema: Option[Schema], record: IRecord): Node =
     schema.fold(
       table_record(build_schema(record), record)
     )(
       table_record(_, record)
     )
 
-  protected def table_record(schema: Schema, record: Record): Node =
+  protected def table_record(schema: Schema, record: IRecord): Node =
     table_record(strategy.tableKind, schema, record)
 
-  protected def table_record(kind: TableKind, schema: Schema, record: Record): Node =
+  protected def table_record(kind: TableKind, schema: Schema, record: IRecord): Node =
     table_record(Table(kind, strategy.size, schema), record)
 
-  protected def table_record_standard(p: Table, record: Record): Elem = {
+  protected def table_record_standard(p: Table, record: IRecord): Elem = {
     val attrs: Vector[(String, String)] = SeqUtils.buildTupleVector(
       Vector(
         "class" -> theme_table.css.getTbodyTr(p),
@@ -153,7 +156,7 @@ trait RendererTablePart { self: Renderer =>
     XmlUtils.element("tr", attrs, children)
   }
 
-  protected def table_record_list(p: Table, record: Record): Node = {
+  protected def table_record_list(p: Table, record: IRecord): Node = {
     val attrs = SeqUtils.buildTupleVector(
       Vector(
         "class" -> theme_table.css.getTbodyTr(p),
@@ -179,16 +182,16 @@ trait RendererTablePart { self: Renderer =>
     ))
   }
 
-  protected def table_data(p: Table, column: Column, record: Record): Elem =
+  protected def table_data(p: Table, column: Column, record: IRecord): Elem =
     table_data(p.tableColumn(column), record)
 
-  protected def table_data(p: TableColumn, record: Record): Elem =
+  protected def table_data(p: TableColumn, record: IRecord): Elem =
     <td class={theme_table.css.tbodyTd(p)}>{table_value(p, record)}</td>
 
   protected def table_data(p: TableColumn, v: ValueModel): Elem =
     <td class={theme_table.css.tbodyTd(p)}>{table_value(v)}</td>
 
-  protected def table_value(column: TableColumn, record: Record): NodeSeq =
+  protected def table_value(column: TableColumn, record: IRecord): NodeSeq =
     get_table_value(column, record).getOrElse(Text(""))
 
   protected def table_value(v: ValueModel): Node = v match {
@@ -211,7 +214,7 @@ trait RendererTablePart { self: Renderer =>
       case _ => table_value_string(v)
     }
 
-  protected def get_table_value(column: TableColumn, record: Record): Option[NodeSeq] = {
+  protected def get_table_value(column: TableColumn, record: IRecord): Option[NodeSeq] = {
     // TODO datetime formatting
     val c = column.column
     c.datatype match {
@@ -228,47 +231,47 @@ trait RendererTablePart { self: Renderer =>
     }
   }
 
-  protected def table_get_value_datetime(column: Column, record: Record): Option[Node] =
-    record.getFormTimestamp(column.name).map(table_value_datetime)
+  protected def table_get_value_datetime(column: Column, record: IRecord): Option[Node] =
+    record.getTimestamp(column.name).map(table_value_datetime)
 
-  protected def table_get_value_date(column: Column, record: Record): Option[Node] =
-    record.getFormDate(column.name).map(table_value_date)
-//     record.getFormDate(column.name) flatMap {
+  protected def table_get_value_date(column: Column, record: IRecord): Option[Node] =
+    record.getDate(column.name).map(table_value_date)
+//     record.getDate(column.name) flatMap {
 //       case m: java.util.Date => Some(Text(DateUtils.toIsoDateString(m)))
 // //      case m: DateTime => DateUtils.toIsoDateString(m)
 // //      case m: LocalDate => DateUtils.toIsoDateString(m)
 //       case m => table_get_value_string(column, record)
 //     }
 
-  protected def table_get_value_time(column: Column, record: Record): Option[Node] =
+  protected def table_get_value_time(column: Column, record: IRecord): Option[Node] =
     table_get_value_string(column, record) // XXX
 
-  protected def table_get_value_everforthid(column: Column, record: Record): Option[Node] =
+  protected def table_get_value_everforthid(column: Column, record: IRecord): Option[Node] =
     record.getString(column.name).map(table_value_everforthid)
 
-  protected def table_get_value_link(column: Column, record: Record): Option[Node] =
-    record.getFormOne(column.name).map(table_value_link)
+  protected def table_get_value_link(column: Column, record: IRecord): Option[Node] =
+    record.get(column.name).map(table_value_link)
 
-  protected def table_get_value_image_link(column: Column, record: Record): Option[Node] =
-    record.getFormOne(column.name).map(table_value_image_link)
+  protected def table_get_value_image_link(column: Column, record: IRecord): Option[Node] =
+    record.get(column.name).map(table_value_image_link)
 
-  protected def table_get_value_img(column: TableColumn, record: Record): Option[Node] =
-    record.getFormOne(column.name).map(table_value_img(column, _))
+  protected def table_get_value_img(column: TableColumn, record: IRecord): Option[Node] =
+    record.get(column.name).map(table_value_img(column, _))
 
-  protected def table_get_value_html(column: Column, record: Record): Option[Node] =
-    record.getFormString(column.name).map(table_value_html)
+  protected def table_get_value_html(column: Column, record: IRecord): Option[Node] =
+    record.getString(column.name).map(table_value_html)
 
-  protected def table_get_value_text(column: Column, record: Record): Option[Node] =
-    record.getFormString(column.name).map(table_value_text)
+  protected def table_get_value_text(column: Column, record: IRecord): Option[Node] =
+    record.getString(column.name).map(table_value_text)
 
-  protected def table_get_value_record(column: Column, record: Record): Option[NodeSeq] =
-    record.getRecordList(column.name) match {
+  protected def table_get_value_record(column: Column, record: IRecord): Option[NodeSeq] =
+    record.takeRecordList(column.name) match {
       case Nil => None
       case x :: Nil => Some(property_sheet(x))
       case xs => Some(property_sheet_list(xs))
     }
 
-  protected def table_get_value_string(column: Column, record: Record): Option[Node] =
+  protected def table_get_value_string(column: Column, record: IRecord): Option[Node] =
     record.getString(column.name).map(Text(_))
 
   protected def table_value_datetime(x: Any): Node = {

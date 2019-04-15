@@ -5,7 +5,8 @@ import java.net.{URL, URI}
 import play.api.libs.json._
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2._
+import org.goldenport.record.v3.{IRecord, Record}
+import org.goldenport.record.v2.{Record => _, _}
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.json.JsonUtils
 import org.goldenport.values.{Urn, PathName}
@@ -29,7 +30,10 @@ import arcadia.scenario.ScenarioEngine
  *  version Feb. 17, 2018
  *  version Mar. 26, 2018
  *  version Apr. 15, 2018
- * @version Jul. 16, 2018
+ *  version Jul. 16, 2018
+ *  version Aug. 31, 2018
+ *  version Sep.  5, 2018
+ * @version Nov.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -113,14 +117,14 @@ trait Action {
       case _ => parcel
     } getOrElse(parcel)
 
-  protected final def is_valid(cond: Option[Record], target: Record): Boolean =
+  protected final def is_valid(cond: Option[IRecord], target: IRecord): Boolean =
     cond.fold(true)(is_valid(_, target))
 
-  protected final def is_valid(cond: Record, target: Record): Boolean = {
+  protected final def is_valid(cond: IRecord, target: IRecord): Boolean = {
     // TODO sexpr for json
     cond.fields.map { field =>
-      lazy val targetv = target.getConcreteString(field.key)
-      field.getConcreteStringList match {
+      lazy val targetv = target.getString(field.key)
+      field.asStringList match {
         case Nil => !target.isDefined(field.key)
         case x :: Nil => targetv.fold(false)(_ === x)
         case xs => targetv.fold(false)(x => xs.exists(_ === x)) // OR
@@ -420,8 +424,8 @@ case class ReadEntityListAction(
 case class UpdateEntityDirectiveAction(
   uri: URI,
   label: I18NString,
-  condition: Option[Record],
-  properties: Option[Record],
+  condition: Option[IRecord],
+  properties: Option[IRecord],
   source: Option[Source],
   sink: Option[Sink]
 ) extends SourceSinkAction {
@@ -472,8 +476,8 @@ case class InvokeWithIdDirectiveAction(
   uri: URI,
   method: Option[Method],
   label: I18NString,
-  condition: Option[Record],
-  properties: Option[Record],
+  condition: Option[IRecord],
+  properties: Option[IRecord],
   idPropertyName: Option[String],
   source: Option[Source],
   sink: Option[Sink]

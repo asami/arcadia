@@ -6,7 +6,8 @@ import org.goldenport.exception.RAISE
 import org.goldenport.value.{NamedValueInstance, EnumerationClass}
 import org.goldenport.io.UriUtils
 import org.goldenport.util.StringUtils
-import org.goldenport.record.v2.{Record, Schema}
+import org.goldenport.record.v3.{IRecord, Record}
+import org.goldenport.record.v2.{Record => _, Schema}
 import org.goldenport.record.v2.util.RecordUtils
 import arcadia._
 import arcadia.context._
@@ -20,7 +21,9 @@ import arcadia.domain._
  *  version Nov. 16, 2017
  *  version Jan.  8, 2018
  *  version Apr.  8, 2018
- * @version Jul. 23, 2018
+ *  version Jul. 23, 2018
+ *  version Sep.  1, 2018
+ * @version Nov.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Scenario {
@@ -74,7 +77,7 @@ case class CreateEntityScenario(
   state: State,
   entityType: DomainEntityType,
   override val schema: Schema,
-  data: Record
+  data: IRecord
 ) extends Scenario {
   val scenarioClass = CreateEntityScenario
   override def getSchema = Some(schema)
@@ -85,7 +88,7 @@ case class CreateEntityScenario(
   override protected def adjust_Intent(p: Intent): Intent =
     p.withDomainEntityType(entityType)
 
-  def marshall = Record.dataApp(
+  def marshall = Record.data(
     "name" -> CreateEntityScenario.name,
     "state" -> state.marshall,
     "entity" -> entityType.v,
@@ -132,10 +135,10 @@ object CreateEntityScenario extends ScenarioClass {
     }
   }
 
-  private def _init(entity: DomainEntityType, schema: Schema, data: Record): CreateEntityScenario =
+  private def _init(entity: DomainEntityType, schema: Schema, data: IRecord): CreateEntityScenario =
     CreateEntityScenario(InitState, entity, schema, data)
 
-  protected[scenario] def start(p: Parcel, entity: DomainEntityType, schema: Schema, data: Record): Parcel = {
+  protected[scenario] def start(p: Parcel, entity: DomainEntityType, schema: Schema, data: IRecord): Parcel = {
     val parcel = p.withUsageKind(CreateUsage)
     val scenario = CreateEntityScenario(InputState, entity, schema, data)
     InputAction.model(parcel, scenario, schema, data)
@@ -153,7 +156,7 @@ object CreateEntityScenario extends ScenarioClass {
       val state = State.unmarshall((json \ "state").as[String])
       val entity = DomainEntityType((json \ "entity").as[String])
       val schema = Schema.json.unmarshall(json \ "schema")
-      val data = RecordUtils.js2record(json \ "data")
+      val data = Record.create(json \ "data")
       CreateEntityScenario(state, entity, schema, data)
     }
   }
@@ -163,7 +166,7 @@ case class UpdateEntityScenario(
   state: State,
   entityType: DomainEntityType,
   override val schema: Schema,
-  data: Record
+  data: IRecord
 ) extends Scenario {
   val scenarioClass = UpdateEntityScenario
   override def getSchema = Some(schema)
@@ -174,7 +177,7 @@ case class UpdateEntityScenario(
   override protected def adjust_Intent(p: Intent): Intent =
     p.withDomainEntityType(entityType)
 
-  def marshall = Record.dataApp(
+  def marshall = Record.data(
     "name" -> UpdateEntityScenario.name,
     "state" -> state.marshall,
     "entity" -> entityType.v,
@@ -221,10 +224,10 @@ object UpdateEntityScenario extends ScenarioClass {
     }
   }
 
-  private def _init(entity: DomainEntityType, schema: Schema, data: Record): UpdateEntityScenario =
+  private def _init(entity: DomainEntityType, schema: Schema, data: IRecord): UpdateEntityScenario =
     UpdateEntityScenario(InitState, entity, schema, data)
 
-  protected[scenario] def start(p: Parcel, entity: DomainEntityType, schema: Schema, data: Record): Parcel = {
+  protected[scenario] def start(p: Parcel, entity: DomainEntityType, schema: Schema, data: IRecord): Parcel = {
     val parcel = p.withUsageKind(CreateUsage)
     val scenario = UpdateEntityScenario(InputState, entity, schema, data)
     InputAction.model(parcel, scenario, schema, data)
@@ -242,7 +245,7 @@ object UpdateEntityScenario extends ScenarioClass {
       val state = State.unmarshall((json \ "state").as[String])
       val entity = DomainEntityType((json \ "entity").as[String])
       val schema = Schema.json.unmarshall(json \ "schema")
-      val data = RecordUtils.js2record(json \ "data")
+      val data = Record.create(json \ "data")
       UpdateEntityScenario(state, entity, schema, data)
     }
   }
@@ -252,7 +255,7 @@ case class DeleteEntityScenario(
   state: State,
   entityType: DomainEntityType,
   override val schema: Schema,
-  data: Record
+  data: IRecord
 ) extends Scenario {
   val scenarioClass = DeleteEntityScenario
   override def getSchema = Some(schema)
@@ -263,7 +266,7 @@ case class DeleteEntityScenario(
   override protected def adjust_Intent(p: Intent): Intent =
     p.withDomainEntityType(entityType)
 
-  def marshall = Record.dataApp(
+  def marshall = Record.data(
     "name" -> DeleteEntityScenario.name,
     "state" -> state.marshall,
     "entity" -> entityType.v,
@@ -310,10 +313,10 @@ object DeleteEntityScenario extends ScenarioClass {
     }
   }
 
-  private def _init(entity: DomainEntityType, schema: Schema, data: Record): DeleteEntityScenario =
+  private def _init(entity: DomainEntityType, schema: Schema, data: IRecord): DeleteEntityScenario =
     DeleteEntityScenario(InitState, entity, schema, data)
 
-  protected[scenario] def start(p: Parcel, entity: DomainEntityType, schema: Schema, data: Record): Parcel = {
+  protected[scenario] def start(p: Parcel, entity: DomainEntityType, schema: Schema, data: IRecord): Parcel = {
     val parcel = p.withUsageKind(CreateUsage)
     val scenario = DeleteEntityScenario(InputState, entity, schema, data)
     InputAction.model(parcel, scenario, schema, data)
@@ -331,7 +334,7 @@ object DeleteEntityScenario extends ScenarioClass {
       val state = State.unmarshall((json \ "state").as[String])
       val entity = DomainEntityType((json \ "entity").as[String])
       val schema = Schema.json.unmarshall(json \ "schema")
-      val data = RecordUtils.js2record(json \ "data")
+      val data = Record.create(json \ "data")
       DeleteEntityScenario(state, entity, schema, data)
     }
   }
@@ -479,7 +482,7 @@ object Event {
   }
 }
 
-case class InputEvent(parcel: Parcel, data: Record) extends Event {
+case class InputEvent(parcel: Parcel, data: IRecord) extends Event {
 //  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
   def withParcel(p: Parcel) = copy(parcel = p)
 }
@@ -528,7 +531,7 @@ case class Intent(
   def withState(p: State) = copy(state = p)
   def withModel(p: Model): Intent = copy(parcel = parcel.withModel(p))
   def toEvent = (scenario.withState(state), event.withParcel(parcel))
-  def inputFormParameters: Record = parcel.inputFormParameters
+  def inputFormParameters: IRecord = parcel.inputFormParameters
   def controllerUri: URI = parcel.controllerUri
   def domainEntityType: DomainEntityType = getDomainEntityType getOrElse {
     RAISE.noReachDefect
@@ -597,7 +600,7 @@ case object ValidationAction extends SchemaActionBase {
     p.withModel(m).withState(state)
   }
 
-  def model(scenario: Scenario, schema: Schema, data: Record, uri: URI, method: Method, state: State): Model = {
+  def model(scenario: Scenario, schema: Schema, data: IRecord, uri: URI, method: Method, state: State): Model = {
     val submits = Submits(Vector(
       Submit(OkSubmitKind),
       Submit(BackSubmitKind),
@@ -621,21 +624,21 @@ case object InputAction extends SchemaActionBase {
     model(p, scenario, schema, data)
   }
 
-  def model(p: Parcel, scenario: Scenario, schema: Schema, data: Record): Parcel = {
+  def model(p: Parcel, scenario: Scenario, schema: Schema, data: IRecord): Parcel = {
     val (m, s) = model(p.toStrategy, scenario, schema, data)
     p.withModel(m)
   }
 
-  def model(p: Intent, scenario: Scenario, schema: Schema, data: Record): Intent = {
+  def model(p: Intent, scenario: Scenario, schema: Schema, data: IRecord): Intent = {
     val (m, s) = model(p.toStrategy, scenario, schema, data)
     p.withModel(m).withState(s)
   }
 
-  def model(strategy: RenderStrategy, scenario: Scenario, schema: Schema, data: Record): (Model, State) = {
+  def model(strategy: RenderStrategy, scenario: Scenario, schema: Schema, data: IRecord): (Model, State) = {
     model(strategy, scenario, schema, data, new URI(""), Post)
   }
 
-  def model(strategy: RenderStrategy, scenario: Scenario, schema: Schema, data: Record, uri: URI, method: Method): (Model, State) = {
+  def model(strategy: RenderStrategy, scenario: Scenario, schema: Schema, data: IRecord, uri: URI, method: Method): (Model, State) = {
     val input = button_input(strategy)
     val cancel = button_cancel(strategy)
     val state = InputState
@@ -658,7 +661,7 @@ case object ShowAction extends Action {
     p.withModel(m)
   }
 
-  def model(scenario: Scenario, schema: Schema, data: Record, uri: URI, method: Method): Model = {
+  def model(scenario: Scenario, schema: Schema, data: IRecord, uri: URI, method: Method): Model = {
     val state = ShowState
     val submits = Submits(Vector(
       Submit(OkSubmitKind)

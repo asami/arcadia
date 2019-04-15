@@ -4,7 +4,8 @@ import scala.xml.{NodeSeq, Group, Elem, Node, Text}
 import java.util.Locale
 import java.net.{URI, URL}
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2._
+import org.goldenport.record.v3.{IRecord, Record}
+import org.goldenport.record.v2.{Record => _, _}
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.xml.XmlUtils
 import org.goldenport.util.{DateTimeUtils, DateUtils, StringUtils, SeqUtils}
@@ -17,7 +18,8 @@ import Renderer._
 /*
  * @since   Apr. 22, 2018
  *  version May. 14, 2018
- * @version Jul. 23, 2018
+ *  version Jul. 23, 2018
+ * @version Sep.  1, 2018
  * @author  ASAMI, Tomoharu
  */
 trait RendererFormPart { self: Renderer =>
@@ -25,7 +27,7 @@ trait RendererFormPart { self: Renderer =>
     action: URI,
     method: Method,
     schema: Schema,
-    record: Record,
+    record: IRecord,
     hiddens: Hiddens,
     submits: Submits
   ): NodeSeq = strategy.theme match {
@@ -247,7 +249,7 @@ trait RendererFormPart { self: Renderer =>
     action: URI,
     method: Method,
     schema: Schema,
-    record: Record,
+    record: IRecord,
     hiddens: Hiddens,
     submits: Submits
   ): NodeSeq = {
@@ -277,7 +279,7 @@ trait RendererFormPart { self: Renderer =>
     </form>
   }
 
-  protected def input_field(tc: TableColumn, record: Record) = {
+  protected def input_field(tc: TableColumn, record: IRecord) = {
     val column = tc.column
     if (column.form.readonly)
       table_data(tc, record)
@@ -285,7 +287,7 @@ trait RendererFormPart { self: Renderer =>
       <td class={theme_table.css.tbodyTd(tc)}>{_input_field(column, record)}</td>
   }
 
-  private def _input_field(column: Column, record: Record) = {
+  private def _input_field(column: Column, record: IRecord) = {
     val s = record.getString(column.name) getOrElse ""
     column.datatype match {
       case XText => <textarea name={column.name} rows="4" value={s}></textarea>
@@ -299,7 +301,7 @@ trait RendererFormPart { self: Renderer =>
     }
   )
 
-  protected def get_hidden_data(column: Column, record: Record) =
+  protected def get_hidden_data(column: Column, record: IRecord) =
     record.getString(column.name).map(s =>
       <input type="hidden" name={column.name} value={s}></input>
     )
@@ -308,7 +310,7 @@ trait RendererFormPart { self: Renderer =>
     action: URI,
     method: Method,
     schema: Schema,
-    record: Record,
+    record: IRecord,
     hiddens: Hiddens,
     submits: Submits
   ): NodeSeq = {
@@ -343,7 +345,7 @@ trait RendererFormPart { self: Renderer =>
 
   protected def update_entity_directive_form(
     action: URI,
-    record: Record
+    record: IRecord
   ): NodeSeq = {
     // TODO see ButtonTag
     <form action={action.toString} method="PUT"> {
@@ -353,7 +355,7 @@ trait RendererFormPart { self: Renderer =>
 
   protected def invoke_with_id_directive_form(
     action: URI,
-    record: Record
+    record: IRecord
   ): NodeSeq = {
     // TODO see ButtonTag
     <form action={action.toString} method="PUT"> {
@@ -485,10 +487,10 @@ trait RendererFormPart { self: Renderer =>
     isreturnback: Boolean
   ): Elem = {
     val buttonclass = "btn btn-primary btn-block"
-    def returnback: Record =
+    def returnback: IRecord =
       if (isreturnback)
         parcel.getLogicalUri.map(x =>
-          Record.dataApp(PROP_REDIRECT -> x.toString)
+          Record.data(PROP_REDIRECT -> x.toString)
         ).getOrElse(Record.empty)
       else
         Record.empty

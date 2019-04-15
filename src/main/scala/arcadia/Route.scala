@@ -9,7 +9,8 @@ import Controller.PROP_REDIRECT
  * @since   Dec. 20, 2017
  *  version Dec. 21, 2017
  *  version Jan. 14, 2018
- * @version Mar. 13, 2018
+ *  version Mar. 13, 2018
+ * @version Sep.  5, 2018
  * @author  ASAMI, Tomoharu
  */
 case class Route(
@@ -59,7 +60,7 @@ object Route {
 
   case object RedirectGuard extends Guard {
     def isAccept(p: Parcel) =
-      p.inputFormParameters.getConcreteString(PROP_REDIRECT).isDefined
+      p.inputFormParameters.getString(PROP_REDIRECT).isDefined
   }
 
   case object UnauthorizedAccessAction extends Action {
@@ -73,7 +74,7 @@ object Route {
 
   case object RedirectAction extends Action {
     protected def execute_Apply(p: Parcel) =
-      p.inputFormParameters.getConcreteString(PROP_REDIRECT).map(x =>
+      p.inputFormParameters.getString(PROP_REDIRECT).map(x =>
         p.withContent(RedirectContent(x))
       ).getOrElse(p)
   }

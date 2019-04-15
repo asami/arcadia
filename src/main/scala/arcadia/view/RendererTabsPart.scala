@@ -2,7 +2,6 @@ package arcadia.view
 
 import scala.xml.{NodeSeq, Group, Elem, Node, Text}
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2._
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.xml.XmlUtils
 import org.goldenport.util.{DateTimeUtils, DateUtils, StringUtils, SeqUtils}
@@ -11,7 +10,8 @@ import Renderer._
 
 /*
  * @since   May.  3, 2018
- * @version Jul.  2, 2018
+ *  version Jul.  2, 2018
+ * @version Sep.  1, 2018
  * @author  ASAMI, Tomoharu
  */
 trait RendererTabsPart { self: Renderer =>

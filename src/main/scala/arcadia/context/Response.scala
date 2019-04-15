@@ -3,7 +3,7 @@ package arcadia.context
 import scala.xml._
 import play.api.libs.json.JsValue
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v2.Record
+import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.util.SchemaBuilder
 import arcadia._
 import arcadia.model._
@@ -13,7 +13,8 @@ import arcadia.domain._
 
 /*
  * @since   Oct.  8, 2017
- * @version Oct.  9, 2017
+ *  version Aug. 31, 2018
+ * @version Nov.  7, 2018
  * @author  ASAMI, Tomoharu
  */
 trait Response {
@@ -21,8 +22,8 @@ trait Response {
   def mime: String
   def entityType: Option[DomainEntityType]
   def getString: Option[String]
-  def getRecord: Option[Record]
-  def getRecords: Option[List[Record]]
+  def getRecord: Option[IRecord]
+  def getRecords: Option[List[IRecord]]
   def transfer: Option[Transfer]
   def json: JsValue
 
@@ -40,7 +41,7 @@ trait Response {
         CO("transfer"),
         CO("json")
       ),
-      Record.dataApp(
+      Record.data(
         "code" -> code,
         "mime" -> mime,
         "entity" -> entityType,

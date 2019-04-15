@@ -1,7 +1,7 @@
 package arcadia.view
 
 import play.api.libs.json.JsValue
-import org.goldenport.record.v2.Record
+import org.goldenport.record.v3.Record
 import arcadia._
 import arcadia.context.{Query => CQuery, _}
 import arcadia.domain._
@@ -10,7 +10,8 @@ import arcadia.model._
 /*
  * @since   Sep. 25, 2017
  *  version Oct. 10, 2017
- * @version Nov.  3, 2017
+ *  version Nov.  3, 2017
+ * @version Sep.  1, 2018
  * @author  ASAMI, Tomoharu
  */
 case class ViewService(context: ExecutionContext, strategy: RenderStrategy) {

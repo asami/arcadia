@@ -1,7 +1,8 @@
 package arcadia.view
 
 import scala.xml.{NodeSeq, Group, Elem, Node, Text}
-import org.goldenport.record.v2._
+import org.goldenport.record.v3.{IRecord, Record}
+import org.goldenport.record.v2.{Record => _, _}
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.xml.XmlUtils
 import org.goldenport.util.{DateTimeUtils, DateUtils, StringUtils, SeqUtils}
@@ -12,11 +13,12 @@ import Renderer._
  * @since   Apr. 15, 2018
  *  version Apr. 30, 2018
  *  version May.  1, 2018
- * @version Jul.  8, 2018
+ *  version Jul.  8, 2018
+ * @version Sep.  1, 2018
  * @author  ASAMI, Tomoharu
  */
 trait RendererCardPart { self: Renderer =>
-  protected def to_card(rec: Record): Card = {
+  protected def to_card(rec: IRecord): Card = {
     val icon = picture_icon(rec)
     val title = get_title(rec)
     val subtitle = get_subtitle(rec)
@@ -27,13 +29,13 @@ trait RendererCardPart { self: Renderer =>
     Card.create(icon, header, content, summary, link, rec)
   }
 
-  protected def to_card(table: Table, rec: Record): Card =
+  protected def to_card(table: Table, rec: IRecord): Card =
     strategy.theme match {
       case MyColorTheme => _to_card_productclass_mycolor(table, rec)
       case _ => _to_card(table, rec)
     }
 
-  private def _to_card_productclass_mycolor(table: Table, rec: Record): Card = {
+  private def _to_card_productclass_mycolor(table: Table, rec: IRecord): Card = {
     val icon = picture_icon(rec)
     val title = get_title(rec).map(_(locale)) getOrElse Text("")
     val price = Text("10,000") // TODO
@@ -46,7 +48,7 @@ trait RendererCardPart { self: Renderer =>
     Card.create(icon, None, Some(content), None, link, rec)
   }
 
-  private def _to_card(table: Table, rec: Record): Card = {
+  private def _to_card(table: Table, rec: IRecord): Card = {
     val icon = picture_icon(rec)
     val title = get_title(rec)
     val subtitle = get_subtitle(rec)
@@ -57,7 +59,7 @@ trait RendererCardPart { self: Renderer =>
     Card.create(icon, header, content, summary, link, rec)
   }
 
-  protected def card(rec: Record): NodeSeq = card(to_card(rec))
+  protected def card(rec: IRecord): NodeSeq = card(to_card(rec))
 
   // TableCardModel 
   protected def card(
