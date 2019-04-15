@@ -5,7 +5,7 @@ import scala.xml.{NodeSeq, Group, Elem, Node, Text}
 import java.net.{URI, URL}
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v3.{IRecord, Record}
-import org.goldenport.record.v2.{Record => _, _}
+import org.goldenport.record.v2.{Record => _, Table => _, _}
 import org.goldenport.xml.XmlUtils
 import org.goldenport.xml.dom.DomUtils
 import org.goldenport.util.{DateTimeUtils, DateUtils, StringUtils, SeqUtils}
@@ -17,7 +17,8 @@ import Renderer._
  *  version Apr. 15, 2018
  *  version May.  1, 2018
  *  version Sep.  1, 2018
- * @version Nov.  7, 2018
+ *  version Nov.  7, 2018
+ * @version Apr. 16, 2019
  * @author  ASAMI, Tomoharu
  */
 trait RendererTablePart { self: Renderer =>

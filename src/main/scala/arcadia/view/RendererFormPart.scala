@@ -5,7 +5,7 @@ import java.util.Locale
 import java.net.{URI, URL}
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v3.{IRecord, Record}
-import org.goldenport.record.v2.{Record => _, _}
+import org.goldenport.record.v2.{Record => _, Table => _, _}
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.xml.XmlUtils
 import org.goldenport.util.{DateTimeUtils, DateUtils, StringUtils, SeqUtils}
@@ -19,7 +19,8 @@ import Renderer._
  * @since   Apr. 22, 2018
  *  version May. 14, 2018
  *  version Jul. 23, 2018
- * @version Sep.  1, 2018
+ *  version Sep.  1, 2018
+ * @version Apr. 16, 2019
  * @author  ASAMI, Tomoharu
  */
 trait RendererFormPart { self: Renderer =>
