@@ -5,18 +5,21 @@ import java.net.{URL, URI}
 import play.api.libs.json._
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
+import org.goldenport.collection.NonEmptyVector
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.{Record => _, _}
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.json.JsonUtils
 import org.goldenport.values.{Urn, PathName}
-import org.goldenport.io.UriBuilder
+import org.goldenport.io.{UriBuilder, UriUtils}
 import org.goldenport.trace.Result
+import org.goldenport.value._
 import org.goldenport.util.{StringUtils, SeqUtils, MapUtils}
 import arcadia._
 import arcadia.context._
 import arcadia.model._
 import arcadia.domain._
+import arcadia.rule._
 import arcadia.scenario.ScenarioEngine
 
 /*
@@ -33,7 +36,9 @@ import arcadia.scenario.ScenarioEngine
  *  version Jul. 16, 2018
  *  version Aug. 31, 2018
  *  version Sep.  5, 2018
- * @version Nov.  7, 2018
+ *  version Nov.  7, 2018
+ *  version Apr. 30, 2019
+ * @version May.  1, 2019
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -189,6 +194,8 @@ object Action {
   implicit val UpdateEntityDirectiveActionFormat = Json.format[UpdateEntityDirectiveAction]
   implicit val InvokeDirectiveActionFormat = Json.format[InvokeDirectiveAction]
   implicit val InvokeWithIdDirectiveActionFormat = Json.format[InvokeWithIdDirectiveAction]
+//  implicit val ResetPasswordDirectiveActionFormat = Json.format[ResetPasswordDirectiveAction]
+  implicit val ResetPasswordOperationActionFormat = Json.format[ResetPasswordOperationAction]
   implicit val CarouselActionFormat = Json.format[CarouselAction]
   implicit val BannerActionFormat = Json.format[BannerAction]
   implicit val BadgeActionFormat = Json.format[BadgeAction]
@@ -217,6 +224,8 @@ object Action {
         case "update-entity-directive" => Json.fromJson[UpdateEntityDirectiveAction](json)
         case "invoke-directive" => Json.fromJson[InvokeDirectiveAction](json)
         case "invoke-with-id-directive" => Json.fromJson[InvokeWithIdDirectiveAction](json)
+//        case "reset-password-directive" => Json.fromJson[ResetPasswordDirectiveAction](json)
+        case "reset-password-operation" => Json.fromJson[ResetPasswordOperationAction](json)
         case "carousel" => Json.fromJson[CarouselAction](json)
         case "banner" => Json.fromJson[BannerAction](json)
         case "badge" => Json.fromJson[BadgeAction](json)
@@ -258,14 +267,21 @@ trait SourceSinkAction extends Action {
   protected final def execute_source_sink(parcel: Parcel)(body: Source => Model): Parcel =
     source.fold(parcel) { src =>
       val r = body(src)
-      set_sink(parcel)(r)
+      set_sink(parcel, r)
     }
 
-  protected final def set_sink(parcel: Parcel)(model: Model): Parcel =
+  protected final def set_sink(parcel: Parcel, model: Model): Parcel =
     sink.fold(
       parcel.withModel(model)
     )(sk =>
       parcel.sink(sk, model)
+    )
+
+  protected final def set_sink(parcel: Parcel, command: Command, model: Model): Parcel =
+    sink.fold(
+      parcel.withCommand(command).withModel(model)
+    )(sk =>
+      parcel.sink(sk, command, model)
     )
 }
 
@@ -356,7 +372,7 @@ case class OperationAction(
   protected def execute_Apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
     def param = ModelParameter(model)
     val r = context.get(operation, query, form)
-    Model.get(param, r).map(set_sink(parcel)).getOrElse {
+    Model.get(param, r).map(set_sink(parcel, _)).getOrElse {
       RAISE.noReachDefect
     }
   }
@@ -414,7 +430,7 @@ case class ReadEntityListAction(
       withParameter(srcparams)
     val r0 = context.readEntityList(q)
     val r = r0.withDataHref(data_href)
-    set_sink(parcel)(r)
+    set_sink(parcel, r)
   }
 
   override protected def execute_Apply_Ajax(parcel: Parcel): Parcel =
@@ -441,7 +457,7 @@ case class UpdateEntityDirectiveAction(
       properties getOrElse Record.empty,
       active
     )
-    set_sink(parcel)(model)
+    set_sink(parcel, model)
   }
 }
 object UpdateEntityDirectiveAction {
@@ -453,11 +469,12 @@ case class InvokeDirectiveAction(
   title: Option[I18NElement],
   description: Option[I18NElement],
   submitLabel: Option[I18NElement],
-  parameters: List[Parameter],
+  parameters: Parameters,
   source: Option[Source],
   sink: Option[Sink]
 ) extends SourceSinkAction {
   protected def execute_Apply(parcel: Parcel): Parcel = {
+    val arguments = parcel.inputFormParameters // XXX use inputQueryParameters in GET
     val active = true
     val model = InvokeDirectiveFormModel(
       uri,
@@ -465,10 +482,11 @@ case class InvokeDirectiveAction(
       title,
       description,
       submitLabel,
-      Parameter.resolve(parcel, parameters),
+      Parameters.resolve(parcel, parameters),
+      arguments,
       active
     )
-    set_sink(parcel)(model)
+    set_sink(parcel, model)
   }
 }
 
@@ -496,11 +514,205 @@ case class InvokeWithIdDirectiveAction(
       active,
       idPropertyName
     )
-    set_sink(parcel)(model)
+    set_sink(parcel, model)
   }
 }
 object InvokeWithIdDirectiveAction {
 }
+
+trait InteractiveOperationAction extends SourceSinkAction {
+  import InteractiveOperationAction._
+
+  protected final def operation_status(parcel: Parcel): Status =
+    operation_Staus(parcel) getOrElse {
+      val params = parcel.inputFormParameters
+      params.getString(PROP_INTERACTIVE_OPERATION_STAUS).
+        map(x => Status.get(x).getOrElse(RAISE.noReachDefect)).
+        getOrElse(
+          if (params.isEmpty)
+            InitStatus
+          else
+            InputStatus
+        )
+    }
+
+  protected def operation_Staus(parcel: Parcel): Option[Status] = None
+
+  protected final def execute_Apply(parcel: Parcel): Parcel = {
+    operation_status(parcel) match {
+      case InitStatus => execute_Init(parcel)
+      case InputStatus => execute_Input(parcel)
+      case ConfirmStatus => execute_Confirm(parcel)
+      // case DoneStatus => execute_Done(parcel)
+      // case ErrorStatus => execute_Error(parcel)
+    }
+  }
+
+  protected def execute_init(parcel: Parcel): Parcel = {
+    execute_Init(parcel)
+  }
+
+  protected def execute_input(parcel: Parcel): Parcel = {
+    execute_Input(parcel)
+  }
+
+  protected def execute_confirm(parcel: Parcel): Parcel = {
+    execute_Confirm(parcel)
+  }
+
+  protected def execute_Init(parcel: Parcel): Parcel
+  protected def execute_Input(parcel: Parcel): Parcel
+  protected def execute_Confirm(parcel: Parcel): Parcel = RAISE.unsupportedOperationFault
+  // protected def execute_Done(parcel: Parcel): Parcel
+  // protected def execute_Error(parcel: Parcel): Parcel
+}
+object InteractiveOperationAction {
+  val PROP_INTERACTIVE_OPERATION_STAUS = "_interactive_operation_status"
+
+  sealed trait Status extends NamedValueInstance {
+  }
+  object Status extends EnumerationClass[Status] {
+    val elements = Vector(InitStatus, InputStatus, ConfirmStatus)
+  }
+  case object InitStatus extends Status {
+    val name = "init"
+  }
+  case object InputStatus extends Status {
+    val name = "input"
+  }
+  case object ConfirmStatus extends Status {
+    val name = "confirm"
+  }
+  // case object DoneStatus extends Status {
+  // }
+  // case object ErrorStatus extends Status {
+  // }
+  // val STATUS_INIT = "init"
+  // val STATUS_INPUT = "input"
+  // val STATUS_CONFIRM = "confirm"
+  // val STATUS_DONE = "done"
+  // val STATUS_ERROR = "error"
+}
+
+case class ResetPasswordOperationAction(
+  okLabel: Option[I18NElement],
+  source: Option[Source],
+  sink: Option[Sink]
+) extends InteractiveOperationAction {
+  import InteractiveOperationAction._
+
+  def inputView: String = "reset"
+  def confirmView: Option[String] = None // "confirm"
+  def doneView: String = "complete"
+  def errorView: String = "error"
+
+  protected def make_Model(parcel: Parcel) = {
+    val rule = parcel.context.map(_.resetPasswordRule) getOrElse ResetPasswordRule.default
+    rule.toDirectiveModel(new URI(""), okLabel, parcel.inputFormParameters)
+  }
+
+  protected def make_Model(parcel: Parcel, p: Invalid) = {
+    val rule = parcel.context.map(_.resetPasswordRule) getOrElse ResetPasswordRule.default
+    rule.toDirectiveModel(new URI(""), okLabel, parcel.inputFormParameters, Some(p))
+  }
+
+  protected def execute_Init(parcel: Parcel): Parcel = {
+    val model = make_Model(parcel)
+    val command = ViewCommand(inputView)
+    set_sink(parcel, command, model)
+  }
+
+  protected def execute_Input(parcel: Parcel): Parcel = {
+    implicit val strategyctx = parcel.toStrategy
+    val rule = parcel.context.map(_.resetPasswordRule) getOrElse ResetPasswordRule.default
+    val parameters = Parameters.resolve(parcel, rule.toParameters)
+    val input = parcel.inputFormParameters
+    val v = parameters.validate(input)(strategyctx)
+    v match {
+      case Valid => _do(parcel, input)
+      case m: Warning => _do(parcel, input)
+      case m: Invalid => _rerun(parcel, m)
+    }
+  }
+
+  private def _rerun(parcel: Parcel, p: Invalid) = {
+    val model = make_Model(parcel, p)
+    val command = ViewCommand(inputView)
+    set_sink(parcel, command, model)
+  }
+
+  private def _do(parcel: Parcel, input: IRecord) = parcel.applyOnContext { ctx =>
+    val res = ctx.post("resetpassword_complete", input)
+    if (res.isSuccess)
+      _done(parcel, res)
+    else
+      _error(parcel, res)
+  }
+
+  private def _done(parcel: Parcel, res: Response) = {
+    val command = ViewCommand(doneView)
+    val model = res.toModel
+    parcel.withCommand(command).withModel(model)
+  }
+
+  private def _error(parcel: Parcel, res: Response) = {
+    val command = ViewCommand(errorView)
+    val model = ErrorModel.create(res)
+    parcel.withCommand(command).withModel(model)
+  }
+}
+
+// case class ResetPasswordDirectiveAction(
+//   uri: URI,
+//   okLabel: Option[I18NElement],
+//   source: Option[Source],
+//   sink: Option[Sink]
+// ) extends SourceSinkAction {
+//   protected def execute_Apply(parcel: Parcel): Parcel = {
+//     val rule = parcel.context.map(_.resetPasswordRule) getOrElse ResetPasswordRule.default
+//     val targeturi = UriUtils.sibling(uri)
+//     val model = rule.toDirectiveModel(parcel.locale, targeturi, okLabel)
+//     set_sink(parcel)(model)
+//   }
+// }
+
+// case class ResetPasswordOperationAction(
+//   uri: URI,
+//   okLabel: Option[I18NElement],
+//   source: Option[Source],
+//   sink: Option[Sink]
+// ) extends SourceSinkAction {
+//   import org.goldenport.record.v2.{Valid, Invalid}
+
+//   protected def execute_Apply(parcel: Parcel): Parcel = {
+//     implicit val strategyctx = parcel.toStrategy
+//     val rule = parcel.context.map(_.resetPasswordRule) getOrElse ResetPasswordRule.default
+//     val parameters = Parameters.resolve(parcel, rule.toParameters(parcel.locale))
+//     val input = parcel.inputFormParameters
+//     val v = parameters.validate(input)(strategyctx)
+//     v match {
+//       case Valid => _do(parcel, input)
+//       case m: Warning => _do(parcel, input)
+//       case m: Invalid => _rerun(parcel, m)
+//     }
+//   }
+
+//   private def _do(parcel: Parcel, input: IRecord) = parcel.applyOnContext { ctx =>
+//     val res = ctx.post("resetpassword_complete", input)
+//     _go(parcel)
+//   }
+
+//   private def _go(parcel: Parcel) = {
+//     parcel // TODO
+//   }
+
+//   private def _rerun(parcel: Parcel, p: Invalid) = {
+//     val model = 
+//     parcel.
+
+//     ???
+//   }
+// }
 
 case class CarouselAction(
   source: Option[Source],

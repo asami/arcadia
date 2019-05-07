@@ -4,13 +4,14 @@ import scala.xml.{NodeSeq, Group, Elem, Node, Text}
 import java.util.Locale
 import java.net.{URI, URL}
 import org.goldenport.exception.RAISE
+import org.goldenport.collection.NonEmptyVector
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.{Record => _, Table => _, _}
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.xml.XmlUtils
 import org.goldenport.util.{DateTimeUtils, DateUtils, StringUtils, SeqUtils}
 import arcadia._
-import arcadia.context.Parameter
+import arcadia.context.{Parameter, Parameters}
 import arcadia.model._
 import arcadia.controller.Controller.PROP_REDIRECT
 import Renderer._
@@ -20,7 +21,8 @@ import Renderer._
  *  version May. 14, 2018
  *  version Jul. 23, 2018
  *  version Sep.  1, 2018
- * @version Apr. 16, 2019
+ *  version Apr. 30, 2019
+ * @version May.  1, 2019
  * @author  ASAMI, Tomoharu
  */
 trait RendererFormPart { self: Renderer =>
@@ -42,7 +44,7 @@ trait RendererFormPart { self: Renderer =>
   protected def property_input_form(p: InputForm) = strategy.theme match {
     case m: Bootstrap4RenderThemeBase => property_input_form_bootstrap4(p)
     case m: Bootstrap3RenderThemeBase => property_input_form_bootstrap3(p)
-    case m => RAISE.notImplementedYetDefect
+    case m => property_input_form_plain(p)
   }
 
   protected def property_input_form_bootstrap4(p: InputForm): NodeSeq =
@@ -97,6 +99,9 @@ trait RendererFormPart { self: Renderer =>
     {property_input_form_item_bootstrap3(c, id)}
     </div>
   }
+
+  protected def property_input_form_plain(p: InputForm): NodeSeq =
+    property_input_form_bootstrap4(p) // TODO
 
   protected def property_input_form_item(p: Column, id: String) = strategy.theme match {
     case m: Bootstrap4RenderThemeBase => property_input_form_item_bootstrap4(p, id)
@@ -483,9 +488,12 @@ trait RendererFormPart { self: Renderer =>
     title: Option[I18NElement],
     description: Option[I18NElement],
     submitname: String,
-    parameters: List[Parameter],
+    parameters: Parameters,
+    arguments: IRecord,
     isactive: Boolean,
-    isreturnback: Boolean
+    isreturnback: Boolean,
+    warnings: Option[NonEmptyVector[Warning]],
+    errors: Option[NonEmptyVector[Invalid]]
   ): Elem = {
     val buttonclass = "btn btn-primary btn-block"
     def returnback: IRecord =
@@ -522,7 +530,7 @@ trait RendererFormPart { self: Renderer =>
             case 2 => (2, 3)
             case 3 => (1, 2)
           }
-          parameters.flatMap(toinput(_, nl, nv)) :+ (
+          parameters.parameters.flatMap(toinput(_, nl, nv)) :+ (
             <div class="col-2">
               {submitbutton}
             </div>
@@ -546,7 +554,7 @@ trait RendererFormPart { self: Renderer =>
       }
       <div class="form-group"> {
         List(
-          parameters.flatMap(toinput),
+          parameters.parameters.flatMap(toinput),
           <div class="form-row">
             <div class="col-2">{
               submitbutton
@@ -556,16 +564,15 @@ trait RendererFormPart { self: Renderer =>
       } </div>
     }
     def forminput = {
-      val schema = Parameter.toSchema(parameters)(strategy)
+      val schema = Parameters.toSchema(parameters)(strategy)
       val hiddens = Hiddens(returnback)
       val button = Submit(ExecuteSubmitKind)
-      val values = Record.empty
       val submits = Submits(button)
       val input = InputForm(
         new URI(action),
-        Get,
+        method,
         schema,
-        values,
+        arguments,
         hiddens,
         submits
       )
@@ -580,11 +587,25 @@ trait RendererFormPart { self: Renderer =>
           <div class="col-auto">{_complement_p(x)}</div>
         </div>
       ).toList
+      val ws: Seq[Elem] = warnings.map(xs =>
+        List(
+          <div class="row"> {
+            xs.map(x => <div class="col-auto arcaida-warning">{x.message(locale)}</div>)
+          } </div>
+        )
+      ).getOrElse(Nil)
+      val es: Seq[Elem] = errors.map(xs =>
+        List(
+          <div class="row"> {
+            xs.map(x => <div class="col-auto arcadia-error">{x.message(locale)}</div>)
+          } </div>
+        )
+      ).getOrElse(Nil)
       val params: Seq[Elem] = if (parameters.length > 3)
         List(multiline)
       else
         List(singleline)
-      descs ++ params
+      descs ++ ws ++ es ++ params
     }</div>
     // val xs = returnback
     // val form = <form method={method.name} action={action}>{
@@ -602,7 +623,7 @@ trait RendererFormPart { self: Renderer =>
     //     List(singleline)
     //   descs ++ hiddens ++ params
     // }</form>
-    val card = <div class="card">{
+    val card = <div class="card"> {
       val headers = title.flatMap(_.get(locale)).map(x =>
         <div class="card-header">
           <div class="card-title">

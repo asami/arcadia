@@ -4,6 +4,7 @@ import scala.xml.{NodeSeq, Group, Text}
 import java.net.URI
 import java.util.Locale
 import org.goldenport.exception.RAISE
+import org.goldenport.collection.NonEmptyVector
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.{Record => _, _}
 import org.goldenport.record.v2.util.RecordUtils
@@ -32,7 +33,9 @@ import arcadia.domain._
  *  version Jul. 23, 2018
  *  version Aug. 31, 2018
  *  version Sep.  1, 2018
- * @version Nov.  7, 2018
+ *  version Nov.  7, 2018
+ *  version Apr. 30, 2019
+ * @version May.  1, 2019
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -238,6 +241,8 @@ object ErrorModel extends ModelClass {
   def create(parcel: Parcel, evt: scenario.Event): ErrorModel = RAISE.notImplementedYetDefect
   def create(code: Int, message: Option[String], exception: Option[Throwable]): ErrorModel =
     ErrorModel(code, message.map(I18NElement(_)), exception, None, None, None)
+  def create(res: Response): ErrorModel =
+    ErrorModel(res.code, None, None, None, None, None)
   def notFound(parcel: Parcel, m: String): ErrorModel = {
     val backuri = _back_uri(parcel)
     val msg = I18NElement(m)
@@ -980,8 +985,10 @@ case class InvokeDirectiveFormModel(
   title: Option[I18NElement],
   description: Option[I18NElement],
   submitLabel: Option[I18NElement],
-  parameters: List[Parameter],
-  isActive: Boolean
+  parameters: Parameters,
+  arguments: IRecord,
+  isActive: Boolean,
+  error: Option[Invalid] = None
 ) extends Model with IFormModel with IComponentModel {
   val expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
   def toRecord: IRecord = throw new UnsupportedOperationException()

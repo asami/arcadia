@@ -20,7 +20,8 @@ import arcadia.context.Request
  *  version Dec. 21, 2017
  *  version Jan.  7, 2018
  *  version Mar. 13, 2018
- * @version Aug. 31, 2018
+ *  version Aug. 31, 2018
+ * @version Apr. 30, 2019
  * @author  ASAMI, Tomoharu
  */
 trait Command {
@@ -40,6 +41,12 @@ case class MaterialCommand(pathname: PathName) extends Command {
 }
 object MaterialCommand {
   def apply(p: String): MaterialCommand = MaterialCommand(PathName(p))
+}
+
+case class ViewCommand(pathname: PathName) extends Command {
+}
+object ViewCommand {
+  def apply(p: String): ViewCommand = ViewCommand(PathName(p))
 }
 
 case class UnauthorizedCommand(

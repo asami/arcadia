@@ -14,7 +14,8 @@ import arcadia.domain._
 /*
  * @since   Oct.  8, 2017
  *  version Aug. 31, 2018
- * @version Nov.  7, 2018
+ *  version Nov.  7, 2018
+ * @version Apr. 30, 2019
  * @author  ASAMI, Tomoharu
  */
 trait Response {
@@ -26,6 +27,8 @@ trait Response {
   def getRecords: Option[List[IRecord]]
   def transfer: Option[Transfer]
   def json: JsValue
+
+  def isSuccess: Boolean = code == 200
 
   def render(strategy: RenderStrategy): NodeSeq = {
     import SchemaBuilder._
@@ -68,4 +71,18 @@ trait Response {
     case (Some(entity), Some(rs), Some(transfer)) => EntityListModel(None, entity, None, rs, transfer)
     case (_, _, _) => RAISE.unsupportedOperationFault // TODO
   }
+
+  def toModel: Model =
+    if (isSuccess) {
+      getRecords.
+        map(PropertyTableModel(None, None, _)).
+        getOrElse {
+          getRecord.map(PropertySheetModel(None, None, _)).
+            getOrElse {
+              EmptyModel // XXX
+            }
+        }
+    } else {
+      ErrorModel.create(this)
+    }
 }
