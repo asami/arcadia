@@ -5,9 +5,10 @@ import scala.xml._
 import java.net.URI
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
+import org.goldenport.collection.NonEmptyVector
 import org.goldenport.xml.XmlUtils
 import org.goldenport.record.v3.{IRecord, Record}
-import org.goldenport.record.v2.{Schema, Column}
+import org.goldenport.record.v2.{Schema, Column, Invalid, Warning}
 import org.goldenport.i18n.I18NElement
 import org.goldenport.trace.Result
 import org.goldenport.values.PathName
@@ -27,7 +28,9 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Apr. 15, 2018
  *  version May.  6, 2018
  *  version Sep.  1, 2018
- * @version Nov.  7, 2018
+ *  version Nov.  7, 2018
+ *  version Apr. 28, 2019
+ * @version May.  1, 2019
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -325,7 +328,10 @@ case object CommandTag extends Tag with SelectByName {
     val description = p.description
     val submitlabel: String = command_submit_label(expr, p.submitLabel)
     val parameters = p.parameters
-    _command(expr, method, action, title, description, submitlabel, parameters, p.isActive, false)
+    val arguments = p.arguments
+    val warnings = p.error.flatMap(_.displayWarnings)
+    val errors = p.error.map(_.displayErrors)
+    _command(expr, method, action, title, description, submitlabel, parameters, arguments, p.isActive, false, warnings, errors)
   }
 
   private def _command(
@@ -335,9 +341,12 @@ case object CommandTag extends Tag with SelectByName {
     title: Option[I18NElement],
     description: Option[I18NElement],
     submitlabel: String,
-    parameters: List[Parameter],
+    parameters: Parameters,
+    arguments: IRecord,
     isactive: Boolean,
-    isreturnback: Boolean
+    isreturnback: Boolean,
+    warnings: Option[NonEmptyVector[Warning]],
+    errors: Option[NonEmptyVector[Invalid]]
   ): XmlContent = {
     val strategy = expr.strategy
     val r = new Renderer(strategy) {
@@ -349,8 +358,11 @@ case object CommandTag extends Tag with SelectByName {
         description,
         submitlabel,
         parameters,
+        arguments,
         isactive,
-        isreturnback
+        isreturnback,
+        warnings,
+        errors
       )
     }.apply
     XmlContent(r)

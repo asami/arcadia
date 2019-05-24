@@ -1,6 +1,7 @@
 package arcadia
 
 import scala.util.control.NonFatal
+import java.util.Locale
 import java.net.URI
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v3.{IRecord, Record}
@@ -25,7 +26,9 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Mar. 26, 2018
  *  version Jul. 17, 2018
  *  version Aug. 31, 2018
- * @version Sep.  5, 2018
+ *  version Sep.  5, 2018
+ *  version Apr. 30, 2019
+ * @version May.  1, 2019
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -116,6 +119,7 @@ case class Parcel(
   def takeCommand[T <: Command]: T = command.map(_.asInstanceOf[T]) getOrElse {
     RAISE.noReachDefect
   }
+  def pathUri: URI = new URI(getPathName.map(_.v) getOrElse RAISE.noReachDefect) // XXX
   def getPathName: Option[PathName] = command.flatMap {
     case MaterialCommand(pathname) => Some(pathname)
     case _ => None
@@ -131,6 +135,7 @@ case class Parcel(
     //   p == pathname.body || pathname.getParent.fold(false)(_.body == p)
     command.flatMap {
       case MaterialCommand(pathname) => Some(_is_operation_pathname(basename, pathname))
+      case ViewCommand(pathname) => Some(_is_operation_pathname(basename, pathname))
       case _ => None
     }.getOrElse(
       context.
@@ -195,6 +200,8 @@ case class Parcel(
   def webMeta: List[String] = inputQueryParameters.takeStringList("_web")
   def isShowTrace: Boolean = webMeta.contains("show.trace")
 
+  def locale: Locale = context.map(_.locale) orElse platformContext.map(_.locale) getOrElse Locale.US
+
 //  def eventName: String = context.flatMap(_.getFormParameter("Submit")) getOrElse RAISE.notImplementedYetDefect
 //  def exception: Throwable = RAISE.notImplementedYetDefect
 //  def domainEntityType: DomainEntityType = context.flatMap(_.getFormParameter("web.entity.type")).map(DomainEntityType(_)) getOrElse RAISE.noReachDefect
@@ -230,6 +237,11 @@ case class Parcel(
 
   def sink(s: Sink, m: Model): Parcel = s match {
     case ModelHangerSink(key) => copy(modelHanger = modelHanger ++ Map(key -> m))
+  }
+
+  def sink(s: Sink, command: Command, m: Model): Parcel = s match {
+    case ModelHangerSink(key) =>
+      copy(command = Some(command), modelHanger = modelHanger ++ Map(key -> m))
   }
 }
 

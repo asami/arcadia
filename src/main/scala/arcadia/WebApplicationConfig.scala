@@ -10,7 +10,7 @@ import org.goldenport.i18n.I18NElement
 import org.goldenport.xml.XhtmlUtils
 import org.goldenport.json.JsonUtils.Implicits._
 import org.goldenport.value._
-import org.goldenport.util.HoconUtils.Implicits._
+import org.goldenport.hocon.RichConfig.Implicits._
 
 /*
  * @since   Aug. 12, 2017
@@ -19,7 +19,8 @@ import org.goldenport.util.HoconUtils.Implicits._
  *  version Nov. 15, 2017
  *  version Dec. 21, 2017
  *  version Mar. 13, 2018
- * @version Aug.  6, 2018
+ *  version Aug.  6, 2018
+ * @version Apr. 28, 2019
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationConfig(
@@ -30,6 +31,8 @@ case class WebApplicationConfig(
   logo_url: Option[URI],
   copyright_title: Option[I18NElement],
   copyright_url: Option[URI],
+  //
+  getLocale: Option[Locale],
   //
   feature_list: Option[WebApplicationConfig.FeatureList], // TopMenu, SideBar
   usecase_list: Option[WebApplicationConfig.UsecaseList], // navigator
@@ -59,6 +62,7 @@ case class WebApplicationConfig(
       logo_url orElse rhs.logo_url,
       copyright_title orElse rhs.copyright_title,
       copyright_url orElse rhs.copyright_url,
+      getLocale orElse rhs.getLocale,
       feature_list orElse rhs.feature_list,
       usecase_list orElse rhs.usecase_list,
       admin_list orElse rhs.admin_list,
@@ -102,6 +106,7 @@ case class WebApplicationConfig(
 
 object WebApplicationConfig {
   val empty = WebApplicationConfig(
+    None,
     None,
     None,
     None,
@@ -281,6 +286,7 @@ object WebApplicationConfig {
     None,
     None,
     None,
+    None,
     None
   )
 
@@ -366,7 +372,8 @@ object WebApplicationConfig {
       c.getUriOption("logo_image"),
       c.getUriOption("logo_url"),
       c.getI18NElementOption("copyright_title"),
-      c.getUriOption("logo_url"),
+      c.getUriOption("copyright_url"),
+      c.getLocaleOption("locale"),
       None,
       None,
       None,

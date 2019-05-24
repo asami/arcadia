@@ -13,7 +13,8 @@ import arcadia.context._
  *  version Oct. 31, 2017
  *  version Nov.  6, 2017
  *  version Jan. 22, 2018
- * @version Mar. 14, 2018
+ *  version Mar. 14, 2018
+ * @version May.  8, 2019
  * @author  ASAMI, Tomoharu
  */
 @RunWith(classOf[JUnitRunner])
@@ -220,7 +221,8 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
             Some(I18NElement("ユーザー")),
             None,
             None,
-            List(Parameter("id", placeholder = Some(I18NString("User ID/Access Token")))),
+            Parameters.create(
+              Parameter("id", placeholder = Some(I18NString("User ID/Access Token")))),
             None,
             Some(Sink("rcauser"))
           )

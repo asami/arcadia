@@ -32,7 +32,8 @@ import arcadia.domain._
  *  version Aug. 31, 2018
  *  version Sep.  5, 2018
  *  version Oct. 24, 2018
- * @version Nov.  7, 2018
+ *  version Nov.  7, 2018
+ * @version Apr. 24, 2019
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -285,7 +286,11 @@ case class Submit(kind: SubmitKind, label: I18NString) extends Particle {
   def value(locale: Locale) = label(locale)
 }
 object Submit {
+  lazy val ok = apply(OkSubmitKind)
+
   def apply(kind: SubmitKind): Submit = Submit(kind, kind.label)
+
+  def ok(label: Option[I18NString]): Submit = label.fold(ok)(Submit(OkSubmitKind, _))
 }
 
 sealed trait SubmitKind {

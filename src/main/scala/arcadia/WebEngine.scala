@@ -20,7 +20,9 @@ import arcadia.scenario._
  *  version Nov. 16, 2017
  *  version Dec. 21, 2017
  *  version Jan.  8, 2018
- * @version Mar. 13, 2018
+ *  version Mar. 13, 2018
+ *  version Apr. 30, 2019
+ * @version May.  1, 2019
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -32,9 +34,14 @@ class WebEngine(
   val view: ViewEngine = new ViewEngine(platform, application.view, extend.map(_.view))
   val scenariorule = ScenarioEngine.Rule.create() // TODO
   val scenario = new ScenarioEngine(platform, scenariorule)
-  val prologuecontroller = ControllerEngine.Rule.create(
-    RouterController(Route.prologue).gc
-  )
+  val prologuecontroller = {
+    val route =
+      if (true)
+        Route.empty
+      else
+        Route.prologue
+    ControllerEngine.Rule.create(RouterController(route).gc)
+  }
   val systemcontroller = WebApplication.standardControllerRule.append(
     ScenarioController(scenario).gc,
     RouterController(rule.route).gc,
@@ -58,22 +65,23 @@ class WebEngine(
         parcel0
     try {
       val r = parcel.executeWithTrace("WebEngine#apply", p.show) {
-        val a = controller.applyRerun(parcel, 1)
-        val c = a.content getOrElse {
-          a.model.flatMap {
-            case m: ErrorModel => Some(ErrorModelContent(m))
-            case _ => None
+        val a: Parcel = controller.applyRerun(parcel, 1)
+        val c: Content = a.content getOrElse {
+          view.applyOption(a).map {
+            case m: ErrorContent => m
+            case m =>
+              if (m.expiresPeriod.isDefined)
+                m
+              else
+                m.expiresKind.fold(m) { x =>
+                  application.config.getExpiresPeriod(x).fold(m)(m.withExpiresPeriod)
+                }
           }.getOrElse {
-            view.apply(a) match {
-              case m: ErrorContent => m
-              case m =>
-                if (m.expiresPeriod.isDefined)
-                  m
-                else
-                  m.expiresKind.fold(m) { x =>
-                    application.config.getExpiresPeriod(x).fold(m)(m.withExpiresPeriod)
-                  }
-            }
+            a.model.collect {
+              case m: ErrorModel => ErrorModelContent(m)
+            }.getOrElse(
+              view.error(a, 404)
+            )
           }
         }
         Result(c, c.show)

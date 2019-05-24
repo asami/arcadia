@@ -4,7 +4,7 @@ import scala.xml._
 import java.net.URI
 import play.api.libs.json.JsValue
 import org.goldenport.exception.RAISE
-import org.goldenport.record.v3.IRecord
+import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.{Schema, Column}
 import org.goldenport.record.v2.util.SchemaBuilder
 import org.goldenport.values.PathName
@@ -13,6 +13,7 @@ import arcadia.model._
 import arcadia.view._
 import arcadia.controller.UrnSource
 import arcadia.domain._
+import arcadia.rule._
 
 /*
  * @since   Aug. 29, 2017
@@ -21,8 +22,9 @@ import arcadia.domain._
  *  version Nov. 13, 2017
  *  version Jan. 15, 2018
  *  version Jul. 17, 2018
-platformExecutionContext.getFormParameter(key) *  version Aug. 31, 2018
-platformExecutionContext.getFormParameter(key) * @version Sep.  5, 2018
+ *  version Aug. 31, 2018
+ *  version Sep.  5, 2018
+ * @version Apr. 29, 2019
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -30,6 +32,7 @@ case class ExecutionContext(
   webapp: WebApplication
 ) {
   def config = webapp.config
+  def locale = webapp.getLocale getOrElse platformExecutionContext.locale
   def isLogined: Boolean = platformExecutionContext.isLogined
   def getOperationName: Option[String] = platformExecutionContext.getOperationName
   def getPathName: Option[PathName] = platformExecutionContext.getPathName
@@ -46,6 +49,8 @@ case class ExecutionContext(
   def get(uri: String, query: Map[String, Any], form: Map[String, Any]): Response = platformExecutionContext.get(uri, query, form)
   def post(uri: String, query: Option[Map[String, Any]], form: Option[Map[String, Any]]): Response = platformExecutionContext.post(uri, query.getOrElse(Map.empty), form.getOrElse(Map.empty))
   def post(uri: String, query: Map[String, Any], form: Map[String, Any]): Response = platformExecutionContext.post(uri, query, form)
+  def post(uri: String, form: IRecord): Response = platformExecutionContext.post(uri, Record.empty, form)
+  def post(uri: String, query: IRecord, form: IRecord): Response = platformExecutionContext.post(uri, query, form)
   def put(uri: String, query: Option[Map[String, Any]], form: Option[Map[String, Any]]): Response = platformExecutionContext.put(uri, query.getOrElse(Map.empty), form.getOrElse(Map.empty))
   def put(uri: String, query: Map[String, Any], form: Map[String, Any]): Response = platformExecutionContext.put(uri, query, form)
   def delete(uri: String, query: Option[Map[String, Any]], form: Option[Map[String, Any]]): Response = platformExecutionContext.delete(uri, query.getOrElse(Map.empty), form.getOrElse(Map.empty))
@@ -75,6 +80,9 @@ case class ExecutionContext(
   lazy val assets: String = config.getAssets getOrElse platformExecutionContext.assets
 
   def toCode(e: Throwable): Int = ExecutionContext.toCode(e)
+
+  def resetPasswordRule: ResetPasswordRule =
+    platformExecutionContext.getResetPasswordRule getOrElse ResetPasswordRule.default
 }
 
 object ExecutionContext {

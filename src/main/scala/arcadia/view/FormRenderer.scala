@@ -15,7 +15,7 @@ import Renderer._
 
 /*
  * @since   Jul.  2, 2018
- * @version Jul. 23, 2018
+ * @version Apr. 30, 2019
  * @author  ASAMI, Tomoharu
  */
 sealed trait FormRenderer {
@@ -41,7 +41,7 @@ sealed trait FormRenderer {
   protected lazy val placeholder_start = strategy.label.placeholderStart.toI18NString.apply(locale)
   protected lazy val placeholder_end = strategy.label.placeholderEnd.toI18NString.apply(locale)
 
-  def apply = <form method="GET" action={form.action.toString}>{
+  def apply = <form method={form.method.name} action={form.action.toString}>{
     body
   }</form>
 

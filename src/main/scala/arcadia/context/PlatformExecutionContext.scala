@@ -1,6 +1,7 @@
 package arcadia.context
 
 import scala.xml._
+import java.util.Locale
 import java.net.URI
 import play.api.libs.json.JsValue
 import org.goldenport.exception.RAISE
@@ -12,6 +13,7 @@ import arcadia.model._
 import arcadia.view._
 import arcadia.controller.UrnSource
 import arcadia.domain._
+import arcadia.rule._
 
 /*
  * @since   Aug. 29, 2017
@@ -21,10 +23,12 @@ import arcadia.domain._
  *  version Jan. 14, 2018
  *  version Mar. 18, 2018
  *  version Jul. 17, 2018
- * @version Aug. 31, 2018
+ *  version Aug. 31, 2018
+ * @version Apr. 29, 2019
  * @author  ASAMI, Tomoharu
  */
 trait PlatformExecutionContext {
+  def locale: Locale
   def isLogined: Boolean
   def getOperationName: Option[String]
   def getPathName: Option[PathName]
@@ -34,6 +38,7 @@ trait PlatformExecutionContext {
   def getMimetypeBySuffix(p: String): Option[MimeType]
   def get(uri: String, query: Map[String, Any], form: Map[String, Any]): Response
   def post(uri: String, query: Map[String, Any], form: Map[String, Any]): Response
+  def post(uri: String, query: IRecord, form: IRecord): Response = post(uri, query.toMap, form.toMap)
   def put(uri: String, query: Map[String, Any], form: Map[String, Any]): Response
   def delete(uri: String, query: Map[String, Any], form: Map[String, Any]): Response
   def invoke(op: InvokeCommand): Response
@@ -66,4 +71,5 @@ trait PlatformExecutionContext {
   def inputFormParameters: IRecord
   def getFormParameter(key: String): Option[String]
   def assets: String
+  def getResetPasswordRule: Option[ResetPasswordRule] = None
 }

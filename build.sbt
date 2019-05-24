@@ -2,7 +2,7 @@ organization := "org.goldenport"
 
 name := "arcadia"
 
-version := "0.1.1"
+version := "0.1.2-SNAPSHOT"
 
 scalaVersion := "2.12.7"
 // crossScalaVersions := Seq("2.10.39.2", "2.9.1")
@@ -20,7 +20,7 @@ resolvers += "Asami Maven Repository" at "http://www.asamioffice.com/maven"
 // override goldenport-record
 // libraryDependencies += "org.goldenport" %% "goldenport-scala-lib" % "1.2.24"
 
-libraryDependencies += "org.goldenport" %% "goldenport-record" % "2.1.1"
+libraryDependencies += "org.goldenport" %% "goldenport-record" % "2.1.2-SNAPSHOT"
 
 libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.10" % "provided" exclude("org.scala-stm", "scala-stm_2.10.0")
 

@@ -26,7 +26,8 @@ import arcadia.scenario._
  *  version Sep. 30, 2017
  *  version Oct. 27, 2017
  *  version Nov.  6, 2017
- * @version Jan.  6, 2018
+ *  version Jan.  6, 2018
+ * @version Apr. 28, 2019
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -36,6 +37,7 @@ case class WebApplication(
   controller: ControllerEngine.Rule,
   view: ViewEngine.Rule
 ) {
+  def getLocale = config.getLocale
   def extend: List[String] = config.extend getOrElse Nil
 }
 
