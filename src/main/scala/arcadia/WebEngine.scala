@@ -22,7 +22,8 @@ import arcadia.scenario._
  *  version Jan.  8, 2018
  *  version Mar. 13, 2018
  *  version Apr. 30, 2019
- * @version May.  1, 2019
+ *  version May.  1, 2019
+ * @version Jul. 20, 2019
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -36,7 +37,7 @@ class WebEngine(
   val scenario = new ScenarioEngine(platform, scenariorule)
   val prologuecontroller = {
     val route =
-      if (true)
+      if (false)
         Route.empty
       else
         Route.prologue

@@ -15,7 +15,8 @@ import arcadia.scenario.ScenarioEngine
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
  *  version Jan. 14, 2018
- * @version Mar. 26, 2018
+ *  version Mar. 26, 2018
+ * @version Jul. 21, 2019
  * @author  ASAMI, Tomoharu
  */
 abstract class Controller(rule: Controller.Rule) {
@@ -82,7 +83,7 @@ case object ResourceListController extends Controller(
 case object IndexController extends Controller(
   Controller.Rule(List(IndexAction()))
 ) {
-  override val guard = CommandGuard(classOf[IndexCommand])
+  override val guard = IndexGuard
 }
 
 case class ScenarioController(engine: ScenarioEngine) extends Controller(

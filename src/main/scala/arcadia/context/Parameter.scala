@@ -23,7 +23,8 @@ import arcadia.view.RenderStrategy
  *  version Apr. 10, 2018
  *  version Jul. 17, 2018
  *  version Apr. 28, 2019
- * @version May.  1, 2019
+ *  version May.  1, 2019
+ * @version Jul. 20, 2019
  * @author  ASAMI, Tomoharu
  */
 case class Parameter(
@@ -34,7 +35,7 @@ case class Parameter(
   placeholder: Option[I18NString] = None,
   value: Option[String] = None, // default value
   candidates: Option[Candidates] = None,
-  constraints: List[Constraint] = Nil,
+  constraints: Option[Constraints] = None,
   readonly: Option[Boolean] = None,
   hidden: Option[Boolean] = None
 ) {
@@ -61,7 +62,7 @@ case class Parameter(
     name,
     _datatype,
     multiplicity getOrElse MOne,
-    constraints = constraints,
+    constraints = constraints.map(_.constraints) getOrElse Nil,
     i18nLabel = label,
     form = Column.Form(
       placeholder,
@@ -95,7 +96,7 @@ object Parameter {
   def create(name: String, datatype: DataType): Parameter = Parameter(name, Some(datatype))
 
   def create(name: String, datatype: DataType, constraints: Seq[Constraint]): Parameter =
-    Parameter(name, datatype = Some(datatype), constraints = constraints.toList)
+    Parameter(name, datatype = Some(datatype), constraints = Constraints.createOption(constraints))
 
   def toSchema(
     ps: Seq[Parameter]
@@ -121,9 +122,52 @@ object Parameter {
     import Schema.json._
     import org.goldenport.json.JsonUtils.Implicits._
     import org.goldenport.record.v2.Constraint.json.Implicits._
+    import org.goldenport.record.v2.Constraints.json.Implicits._
     import org.goldenport.record.v2.Validator.json.Implicits._
 
-    implicit val ParameterFormat = Json.format[Parameter]
-    implicit val ParametersFormat = Json.format[Parameters]
+   implicit val ParameterFormat = Json.format[Parameter]
+//    implicit val ParametersFormat = Json.format[Parameters]
+
+    // implicit object ParameterFormat extends Format[Parameter] {
+    //   def reads(json: JsValue): JsResult[Parameter] = json match {
+    //     case m: JsObject =>
+    //       val name = JsonUtils.toString("name", m)
+    //       val datatype = JsonUtils.get(m, "datatype").map(Json.fromJson[DataType])
+    //       val multiplicity = JsonUtils.get(m, "multiplicity").map(Json.fromJson[Multiplicity])
+    //       val label = JsonUtils.get(m, "label").map(Json.fromJson[I18NString])
+    //       val placeholder = JsonUtils.get(m, "placeholder").map(Json.fromJson[I18NString])
+    //       val value = JsonUtils.getString("value", m)
+    //       val candidates = 
+    //       val constraints = ???
+    //       val readonly = ???
+    //       val hidden = ???
+    //       JsSuccess(Parameter(name, datatype, multiplicity, label, placeholder, value, candidates, constraints, readonly, hidden))
+    //     case _ => JsError(s"ParameterFormat($json)")
+    //   }
+    //   def writes(o: Parameter): JsValue = RAISE.notImplementedYetDefect
+    // }
+
+    implicit object ParametersFormat extends Format[Parameters] {
+      def reads(json: JsValue): JsResult[Parameters] = json match {
+        case JsArray(xs) =>
+          case class Z(
+            ps: Vector[Parameter] = Vector.empty,
+            errors: Vector[JsError] = Vector.empty
+          ) {
+            def r = if (errors.isEmpty)
+              JsSuccess(Parameters(ps.toList, Nil))
+            else
+              errors.head // TODO
+
+            def +(rhs: JsValue) = Json.fromJson[Parameter](rhs) match {
+              case JsSuccess(s, _) => copy(ps = ps :+ s)
+              case m: JsError => copy(errors = errors :+ m)
+            }
+          }
+          xs./:(Z())(_+_).r
+        case _ => JsError(s"ParametersFormat($json)")
+      }
+      def writes(o: Parameters): JsValue = RAISE.notImplementedYetDefect
+    }
   }
 }

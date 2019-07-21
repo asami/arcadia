@@ -22,7 +22,8 @@ import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL}
  *  version Sep. 30, 2017
  *  version Oct. 27, 2017
  *  version Nov. 14, 2017
- * @version Mar. 18, 2018
+CommandGuard(classOf[IndexCommand]) *  version Mar. 18, 2018
+CommandGuard(classOf[IndexCommand]) * @version Jul. 21, 2019
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -106,7 +107,7 @@ case class TemplateView(
 }
 
 case class IndexView(template: TemplateSource) extends TemplateViewBase(template) {
-  val guard = CommandGuard(classOf[IndexCommand])
+  val guard = IndexGuard
 }
 
 case class EntityDetailView(template: TemplateSource) extends TemplateViewBase(template) {

@@ -9,7 +9,8 @@ import arcadia.model._
  *  version Aug. 29, 2017
  *  version Sep. 23, 2017
  *  version Oct.  8, 2017
- * @version Nov.  5, 2017
+ *  version Nov.  5, 2017
+ * @version Jul. 21, 2019
  * @author  ASAMI, Tomoharu
  */
 trait Guard {
@@ -55,6 +56,27 @@ case class ModelNameGuard(name: String) extends Guard {
 
 case object DashboardModelGuard extends Guard {
   def isAccept(p: Parcel) = p.getEffectiveModel.fold(false)(_.isInstanceOf[IDashboardModel])
+}
+
+case class AndGuard(guards: Vector[Guard]) extends Guard {
+  def isAccept(p: Parcel) = guards.forall(_.isAccept(p))
+}
+object AndGuard {
+  def apply(p: Guard, ps: Guard*): AndGuard = AndGuard((p +: ps).toVector)
+}
+
+case class OrGuard(guards: Vector[Guard]) extends Guard {
+  def isAccept(p: Parcel) = guards.exists(_.isAccept(p))
+}
+object OrGuard {
+  def apply(p: Guard, ps: Guard*): OrGuard = OrGuard((p +: ps).toVector)
+}
+
+case object IndexGuard extends Guard {
+  def isAccept(p: Parcel) = (
+    p.command.fold(false)(_.isInstanceOf[IndexCommand]) ||
+      p.isOperationPathName("index")
+  )
 }
 
 case object AllModelGuard extends Guard {
