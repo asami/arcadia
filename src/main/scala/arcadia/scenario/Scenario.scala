@@ -23,7 +23,8 @@ import arcadia.domain._
  *  version Apr.  8, 2018
  *  version Jul. 23, 2018
  *  version Sep.  1, 2018
- * @version Nov.  7, 2018
+ *  version Nov.  7, 2018
+ * @version Jul. 29, 2019
  * @author  ASAMI, Tomoharu
  */
 trait Scenario {

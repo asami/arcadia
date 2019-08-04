@@ -35,7 +35,8 @@ import arcadia.view.ViewEngine._
  *  version May.  6, 2018
  *  version Aug.  5, 2018
  *  version Sep.  1, 2018
- * @version Nov.  7, 2018
+ *  version Nov.  7, 2018
+ * @version Aug.  5, 2019
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -900,7 +901,7 @@ case class SchemaRule(
   def resolve(p: RenderStrategy, t: Renderer.TableOrder): Schema = {
     val ctx = p.renderContext
     ctx.schema getOrElse {
-      val schema = t.schema.getOrElse(Record.buildSchema(t.records.getOrElse(Nil)))
+      val schema = t.schema.getOrElse(IRecord.makeSchema(t.records.getOrElse(Nil)))
       (ctx.entityType orElse t.entityType).fold(schema)(resolve(p, _, schema))
     }
   }

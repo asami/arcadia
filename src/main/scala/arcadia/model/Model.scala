@@ -35,7 +35,8 @@ import arcadia.domain._
  *  version Sep.  1, 2018
  *  version Nov.  7, 2018
  *  version Apr. 30, 2019
- * @version May.  1, 2019
+ *  version May.  1, 2019
+ * @version Aug.  5, 2019
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -516,7 +517,7 @@ case class EntityListModel(
   ){
     protected def render_Content: NodeSeq = table(Renderer.TableOrder(tableKind, getSchema, getEntityType, dataHref, records))
   }.apply
-  lazy val effectiveSchema = getSchema.getOrElse(Record.buildSchema(records))
+  lazy val effectiveSchema = getSchema.getOrElse(IRecord.makeSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
   lazy val tbody: TableBodyModel = TableBodyModel(Some(effectiveSchema), records, tableKind)
 }
@@ -629,7 +630,7 @@ case class PropertyTableModel(
   ){
     protected def render_Content: NodeSeq = property_table(getSchema, records, dataHref)
   }.apply
-  lazy val effectiveSchema = getSchema.getOrElse(Record.buildSchema(records))
+  lazy val effectiveSchema = getSchema.getOrElse(IRecord.makeSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
   lazy val tbody: TableBodyModel = TableBodyModel(Some(effectiveSchema), records, tableKind)
 }
@@ -693,7 +694,7 @@ case class TableModel(
     protected def render_Content: NodeSeq = table(strategy.tableKind(tableKind), getSchema, records, dataHref)
   }.apply
 
-  lazy val effectiveSchema = getSchema.getOrElse(Record.buildSchema(records))
+  lazy val effectiveSchema = getSchema.getOrElse(IRecord.makeSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
   lazy val tbody: TableBodyModel = TableBodyModel(Some(effectiveSchema), records, tableKind)
 }
@@ -747,7 +748,7 @@ case class TableBodyModel(
     strategy, None, None, None, None
   ){
     protected def render_Content: NodeSeq = {
-      val s = getSchema.getOrElse(Record.buildSchema(records))
+      val s = getSchema.getOrElse(IRecord.makeSchema(records))
       table_body(strategy.tableKind(tableKind), s, records)
     }
   }.apply
@@ -782,7 +783,7 @@ case class TableBodyRecordModel(
     strategy, None, None, None, None
   ){
     protected def render_Content: NodeSeq = {
-      val s = getSchema.getOrElse(Record.buildSchema(record))
+      val s = getSchema.getOrElse(IRecord.makeSchema(record))
       table_body_record(tableKind, s, record)
     }
   }.apply

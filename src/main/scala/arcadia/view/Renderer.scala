@@ -34,7 +34,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Jul. 23, 2018
  *  version Aug. 31, 2018
  *  version Sep.  1, 2018
- * @version Nov.  7, 2018
+ *  version Nov.  7, 2018
+ * @version Aug.  5, 2019
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -446,10 +447,10 @@ abstract class Renderer(
    * Utilities
    */
   protected final def build_schema(record: IRecord): Schema =
-    Record.buildSchema(Vector(record))
+    IRecord.makeSchema(Vector(record))
 
   protected final def build_schema(rs: Seq[IRecord]): Schema =
-    Record.buildSchema(rs)
+    IRecord.makeSchema(rs)
 }
 
 object Renderer {
