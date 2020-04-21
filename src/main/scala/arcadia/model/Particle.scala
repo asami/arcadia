@@ -32,7 +32,8 @@ import arcadia.domain._
  *  version Aug. 31, 2018
  *  version Sep.  5, 2018
  *  version Nov.  7, 2018
- * @version Apr. 24, 2019
+ *  version Apr. 24, 2019
+ * @version Apr. 17, 2020
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -311,7 +312,7 @@ case object CreateSubmitKind extends SubmitKind {
 case object UpdateSubmitKind extends SubmitKind {
   def name: String = Event.EVENT_UPDATE
 }
-case object DELETESubmitKind extends SubmitKind {
+case object DeleteSubmitKind extends SubmitKind {
   def name: String = Event.EVENT_DELETE
 }
 case object BackSubmitKind extends SubmitKind {

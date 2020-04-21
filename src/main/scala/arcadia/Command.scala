@@ -8,8 +8,8 @@ import arcadia.domain._
 import arcadia.view._
 import arcadia.view.ViewEngine._
 import arcadia.model._
-import arcadia.scenario.Scenario
-import arcadia.context.Request
+import arcadia.scenario.{Scenario, Event => ScenarioEvent}
+import arcadia.context.{Request, PlatformExecutionContext}
 
 /*
  * @since   Jul. 16, 2017
@@ -21,7 +21,9 @@ import arcadia.context.Request
  *  version Jan.  7, 2018
  *  version Mar. 13, 2018
  *  version Aug. 31, 2018
- * @version Apr. 30, 2019
+ *  version Apr. 30, 2019
+ *  version Mar. 23, 2020
+ * @version Apr. 17, 2020
  * @author  ASAMI, Tomoharu
  */
 trait Command {
@@ -47,6 +49,10 @@ case class ViewCommand(pathname: PathName) extends Command {
 }
 object ViewCommand {
   def apply(p: String): ViewCommand = ViewCommand(PathName(p))
+}
+
+case class ErrorCommand(error: ErrorModel) extends Command {
+  override def getModel = Some(error)
 }
 
 case class UnauthorizedCommand(
@@ -138,6 +144,18 @@ object RecordsCommand {
 }
 
 case class ScenarioCommand(
+  scenario: Scenario,
+  pathname: PathName,
+  event: ScenarioEvent
+) extends Command {
+}
+object ScenarioCommand {
+  val PROP_SUBMIT_PREFIX = "$submit_"
+  val PROP_SUBMIT = "$submit"
+  val PROP_SCENARIO = "$scenario"
+}
+
+case class ScenarioCandidateCommand(
   path: List[String],
   query: Map[String, List[String]],
   form: Map[String, List[String]],
@@ -153,10 +171,9 @@ case class ScenarioCommand(
   def getSubmit: Option[String] = form.keys.find(_.startsWith(PROP_SUBMIT_PREFIX)).map(_.substring(PROP_SUBMIT_PREFIX.length))
   def getScenario: Option[Scenario] = formRecord.getString(PROP_SCENARIO).map(Scenario.unmarshall)
 }
-object ScenarioCommand {
-  val PROP_SUBMIT_PREFIX = "$submit_"
-  val PROP_SCENARIO = "$scenario"
+
+case class InvokePlatformCommand(service: Any) extends Command {
 }
 
-case class InvokeCommand(service: Any) extends Command {
+case class InvokeOperationCommand(context: PlatformExecutionContext, request: Request) extends Command {
 }

@@ -21,6 +21,7 @@ import arcadia.model._
 import arcadia.domain._
 import arcadia.rule._
 import arcadia.scenario.ScenarioEngine
+import arcadia.scenario._
 
 /*
  * @since   Jul. 16, 2017
@@ -38,7 +39,9 @@ import arcadia.scenario.ScenarioEngine
  *  version Sep.  5, 2018
  *  version Nov.  7, 2018
  *  version Apr. 30, 2019
- * @version May.  1, 2019
+ *  version May.  1, 2019
+ *  version Mar. 31, 2020
+ * @version Apr. 18, 2020
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -164,7 +167,7 @@ object Action {
 
   val currentPageFormAction = new URI("")
 
-  implicit val MethoFormat = new JsonUtils.ValueFormat[Method](
+  implicit val MethodFormat = new JsonUtils.ValueFormat[Method](
     _.toLowerCase match {
       case "get" => Get
       case "post" => Post
@@ -202,6 +205,8 @@ object Action {
   implicit val NoticeActionFormat = Json.format[NoticeAction]
   implicit val ContentActionFormat = Json.format[ContentAction]
   implicit val SearchBoxActionFormat = Json.format[SearchBoxAction]
+  implicit val InvokeOperationScenarioActionFormat = Json.format[InvokeOperationScenarioAction]
+  implicit val LoginScenarioActionFormat = Json.format[LoginScenarioAction]
 
   implicit object ActionReads extends Reads[Action] {
     def reads(json: JsValue): JsResult[Action] = parseJsValue(json)
@@ -232,6 +237,8 @@ object Action {
         case "notice" => Json.fromJson[NoticeAction](json)
         case "content" => Json.fromJson[ContentAction](json)
         case "searchbox" => Json.fromJson[SearchBoxAction](json)
+        case "invoke-operation-scenario" => Json.fromJson[InvokeOperationScenarioAction](json)
+        case "login-scenario" => Json.fromJson[LoginScenarioAction](json)
         case _ => JsError(s"Unknown action '$s'")
       }
       case None => JsError(s"No action")
@@ -520,6 +527,86 @@ case class InvokeWithIdDirectiveAction(
 object InvokeWithIdDirectiveAction {
 }
 
+case class InvokeOperationScenarioAction(
+  formAction: Option[URI],
+  operation: URI,
+  method: Option[Method],
+  title: Option[I18NElement],
+  description: Option[I18NElement],
+  submitLabel: Option[I18NElement],
+  parameters: Parameters,
+  successView: Option[String],
+  errorView: Option[String],
+  source: Option[Source],
+  sink: Option[Sink]
+) extends SourceSinkAction {
+  def effectiveMethod: Method = method getOrElse Get
+
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    parcel.getPlatformContext.map { ctx =>
+      val x = InvokeOperationScenario.launch(parcel, this)
+      val rule = ScenarioEngine.Rule()
+      val engine = new ScenarioEngine(ctx, rule)
+      engine.apply(x)
+    }.getOrElse(RAISE.noReachDefect)
+  }
+
+  // protected def execute_Apply(parcel: Parcel): Parcel = {
+  //   val arguments = parcel.inputFormParameters // XXX use inputQueryParameters in GET
+  //   val active = true
+  //   val model = InvokeDirectiveFormModel(
+  //     uri,
+  //     method getOrElse Get,
+  //     title,
+  //     description,
+  //     submitLabel,
+  //     Parameters.resolve(parcel, parameters),
+  //     arguments,
+  //     active
+  //   )
+  //   set_sink(parcel, model)
+  // }
+}
+
+case class LoginScenarioAction(
+  formAction: Option[URI],
+  title: Option[I18NElement],
+  description: Option[I18NElement],
+  usernameLabel: Option[I18NElement],
+  passwordLabel: Option[I18NElement],
+  submitLabel: Option[I18NElement],
+  successRedirect: Option[String],
+  successView: Option[String],
+  errorView: Option[String],
+  source: Option[Source],
+  sink: Option[Sink]
+) extends SourceSinkAction {
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    parcel.getPlatformContext.map { ctx =>
+      val x = LoginScenario.launch(parcel, this)
+      val rule = ScenarioEngine.Rule()
+      val engine = new ScenarioEngine(ctx, rule)
+      engine.apply(x)
+    }.getOrElse(RAISE.noReachDefect)
+  }
+
+  // protected def execute_Apply(parcel: Parcel): Parcel = {
+  //   val arguments = parcel.inputFormParameters // XXX use inputQueryParameters in GET
+  //   val active = true
+  //   val model = InvokeDirectiveFormModel(
+  //     uri,
+  //     method getOrElse Get,
+  //     title,
+  //     description,
+  //     submitLabel,
+  //     Parameters.resolve(parcel, parameters),
+  //     arguments,
+  //     active
+  //   )
+  //   set_sink(parcel, model)
+  // }
+}
+
 trait InteractiveOperationAction extends SourceSinkAction {
   import InteractiveOperationAction._
 
@@ -613,7 +700,7 @@ case class ResetPasswordOperationAction(
 
   protected def make_Model(parcel: Parcel, p: Invalid) = {
     val rule = parcel.context.map(_.resetPasswordRule) getOrElse ResetPasswordRule.default
-    rule.toDirectiveModel(new URI(""), okLabel, parcel.inputFormParameters, Some(p))
+    rule.toDirectiveModel(new URI(""), okLabel, parcel.inputFormParameters, IFormModel.Conclusion(p))
   }
 
   protected def execute_Init(parcel: Parcel): Parcel = {
@@ -642,7 +729,7 @@ case class ResetPasswordOperationAction(
   }
 
   private def _do(parcel: Parcel, input: IRecord) = parcel.applyOnContext { ctx =>
-    val res = ctx.post("resetpassword_complete", input)
+    val res = ctx.post("resetpassword_complete", input) // TODO customizable
     if (res.isSuccess)
       _done(parcel, res)
     else
@@ -829,11 +916,11 @@ case class RedirectSinglePageAction(
     def uri(p: URI) = parcel.getEffectiveModel.fold(p) {
       case m: OperationOutcomeModel =>
         val builder = UriBuilder(p)
-        val a = builder.addPath(page).addQuery(m.request.query.toStringVector)
+        val a = builder.addPath(page).addQuery(m.request.query.toRecord.asNameStringVector)
         a.build
       case _ => p
     }
-    val a = parcel.render.flatMap(_.application.singlePageApplication.flatMap(_.base_uri.headOption))
+    val a = parcel.render.flatMap(_.applicationRule.singlePageApplication.flatMap(_.base_uri.headOption))
     a.map(x => parcel.withContent(RedirectContent(uri(x)))).
       getOrElse(parcel)
   }
@@ -855,11 +942,26 @@ case class RedirectSinglePageAction(
   // }.mkString("&")
 }
 
-case class InvokeAction(
+case class InvokePlatformAction(
 ) extends Action {
   protected def execute_Apply(parcel: Parcel): Parcel = {
     parcel.command.collect {
-      case m: InvokeCommand => m
+      case m: InvokePlatformCommand => m
+    }.flatMap(cmd =>
+      parcel.context.map { ctx =>
+        val res = ctx.invoke(cmd)
+        val param = ModelParameter(None)
+        Model.get(param, res).map(parcel.withModel).getOrElse(parcel)
+      }
+    ).getOrElse(parcel)
+  }
+}
+
+case class InvokeOperationAction(
+) extends Action {
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    parcel.command.collect {
+      case m: InvokeOperationCommand => m
     }.flatMap(cmd =>
       parcel.context.map { ctx =>
         val res = ctx.invoke(cmd)

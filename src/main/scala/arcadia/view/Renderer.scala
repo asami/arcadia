@@ -35,7 +35,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Aug. 31, 2018
  *  version Sep.  1, 2018
  *  version Nov.  7, 2018
- * @version Aug.  5, 2019
+ *  version Aug.  5, 2019
+ * @version Apr. 15, 2020
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -138,11 +139,15 @@ abstract class Renderer(
     code: Int,
     message: Option[I18NElement],
     exception: Option[Throwable],
+    invalid: Option[Invalid],
     topUri: Option[URI],
     backUri: Option[URI],
     trace: Option[TraceContext]
   ): NodeSeq = {
     import SchemaBuilder._
+
+    val msg: Option[I18NElement] = message orElse invalid.map(_.i18nMessage.toI18NElement)
+
     val schema = SchemaBuilder.create(
       CL("code", "Code"),
       CL("message", "Message"),
@@ -155,7 +160,7 @@ abstract class Renderer(
 
     val rec = Record.dataOption(
       "code" -> Some(code),
-      "message" -> message.map(_(locale)),
+      "message" -> msg.map(_(locale)),
       "topuri" -> topUri,
       "backuri" -> backUri,
       "exception_message" -> exception.flatMap(x => Option(x.getMessage)),

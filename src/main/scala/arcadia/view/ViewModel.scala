@@ -3,6 +3,7 @@ package arcadia.view
 import scala.xml._
 import org.goldenport.exception.RAISE
 import org.goldenport.values.PathName
+import org.goldenport.util.StringUtils
 import arcadia._
 import arcadia.context.{Query => CQuery, ExecutionContext}
 import arcadia.domain._
@@ -13,7 +14,9 @@ import arcadia.model._
  *  version Sep. 30, 2017
  *  version Oct. 21, 2017
  *  version Jan. 21, 2018
- * @version Aug.  5, 2018
+ *  version Aug.  5, 2018
+ *  version Mar. 31, 2020
+ * @version Apr. 11, 2020
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -134,15 +137,29 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
    * Attributes
    */
   def isLogined: Boolean = strategy.isLogined
-  def applicationTitle: NodeSeq = strategy.application.applicationTitle(locale)
-  def applicationLogo: NodeSeq = strategy.application.applicationLogo(locale)
+  def applicationTitle: NodeSeq = strategy.applicationRule.applicationTitle(locale)
+  def applicationLogo: NodeSeq = strategy.applicationRule.applicationLogo(locale)
   def isActiveFeature(p: String): Boolean = model.isActiveFeature(p)
 
   lazy val getExecutionContext: Option[ExecutionContext] = strategy.viewContext.flatMap(_.parcel.context)
   def resolvePathName(p: String): PathName = resolvePathName(PathName(p))
   def resolvePathName(pn: PathName): PathName = getExecutionContext.fold(pn)(_.resolvePathName(pn))
+
   def pageTitle: NodeSeq = strategy.getPage.map(_.title(locale)).getOrElse(Text("No title"))
   def pageContentHeaderStyle: String = strategy.getPage.flatMap(_.contentHeaderStyle).getOrElse("background-image: url('assets/img/bg37.jpg') ;") // TODO
+  def pageIsHeadText: Boolean = _page_is(_.isHeadText)
+  def pageHeadText: String = _page_text(_.headText)
+  def pageIsHeadImage: Boolean = _page_is(_.isHeadImage)
+  def pageHeadImage: String = _page_text(_.headImage)
+  def pageIsMailAddress: Boolean = _page_is(_.isMailAddress)
+  def pageMailAddress: String = _page_text(_.mailAddress)
+
+  private def _page_is(f: WebApplicationRule.Page => Boolean): Boolean = _page_is(f, false)
+  private def _page_is(f: WebApplicationRule.Page => Boolean, default: Boolean): Boolean =
+    strategy.getPage.map(f).getOrElse(default)
+  private def _page_text(f: WebApplicationRule.Page => Option[Any]): String = _page_text(f, "")
+  private def _page_text(f: WebApplicationRule.Page => Option[Any], default: String): String =
+    strategy.getPage.flatMap(f).map(strategy.format).getOrElse(default)
 
   /*
    * View
@@ -160,4 +177,6 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
     strategy.viewContext.flatMap(_.parcel.context.map(_.assets)) getOrElse {
       "assets"
     }
+
+  def assets(path: String): String = StringUtils.concatPath(assets, path)
 }

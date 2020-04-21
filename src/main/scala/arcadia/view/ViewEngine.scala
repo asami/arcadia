@@ -21,7 +21,8 @@ import arcadia.model.{Model, ErrorModel}
  *  version Nov. 15, 2017
  *  version Dec. 18, 2017
  *  version Jan.  7, 2018
- * @version Jul. 28, 2018
+ *  version Jul. 28, 2018
+ * @version Mar. 21, 2020
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -269,6 +270,7 @@ object ViewEngine {
   final val PROP_VIEW_RECORD = "record"
   final val PROP_VIEW_RECORDS = "records"
   final val PROP_VIEW_WIDGET = "widget"
+  final val PROP_VIEW_FORM = "form"
 
   case class Rule(
     theme: Option[RenderTheme],

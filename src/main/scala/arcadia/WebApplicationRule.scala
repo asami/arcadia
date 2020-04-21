@@ -5,7 +5,7 @@ import scala.concurrent.duration._
 import java.util.Locale
 import java.net.URI
 import com.typesafe.config.{Config, ConfigFactory}
-import org.goldenport.record.v2.Record
+import org.goldenport.record.v3.Record
 import org.goldenport.i18n.I18NElement
 import org.goldenport.i18n.I18NString
 import org.goldenport.xml.XhtmlUtils
@@ -21,7 +21,9 @@ import arcadia.view._
  *  version Nov. 15, 2017
  *  version Dec. 20, 2017
  *  version Mar. 13, 2018
- * @version Aug.  6, 2018
+ *  version Aug.  6, 2018
+ *  version Mar. 24, 2020
+ * @version Apr. 11, 2020
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationRule(
@@ -69,8 +71,8 @@ case class WebApplicationRule(
         case (None, None) => None
       },
       route.complement(rhs.route),
-      pages.complement(rhs.pages),
-      properties.complements(rhs.properties)
+      extraPages.complement(rhs.extraPages),
+      properties.complement(rhs.properties)
     )
   }
 
@@ -123,7 +125,7 @@ object WebApplicationRule {
           map(x => copy(ms = ms + (x.name -> x.complement(rhs)))).
           getOrElse(copy(ms = ms + (rhs.name -> rhs)))
       }
-      pages./:(Z())(_+_).r
+      rhs.pages./:(Z())(_+_).r
     }
   }
   object Pages {
@@ -136,13 +138,24 @@ object WebApplicationRule {
     name: String,
     title: Option[I18NElement] = None,
     icon: Option[String] = None,
-    contentHeaderStyle: Option[String] = None
+    contentHeaderStyle: Option[String] = None,
+    headText: Option[String] = None,
+    headImage: Option[String] = None,
+    mailAddress: Option[String] = None,
+    properties: Record = Record.empty
   ) {
     def title(locale: Locale): NodeSeq = title.flatMap(_.get(locale)) getOrElse {
       XhtmlUtils.title(name)
     }
 
+    def isHeadText: Boolean = headText.isDefined
+    def isHeadImage: Boolean = headImage.isDefined
+    def isMailAddress: Boolean = mailAddress.isDefined
+
     def pathname: String = name // TODO
+
+    def get(name: String)(implicit strategy: RenderStrategy): Option[String] =
+      properties.get(name).map(strategy.format)
 
     def isAccept(p: View) = p match {
       case m: PageView => m.name == name

@@ -5,7 +5,8 @@ import scala.concurrent.duration._
 import java.util.Locale
 import java.net.URI
 import com.typesafe.config.{Config, ConfigFactory}
-import org.goldenport.record.v2.Record
+import org.goldenport.record.v3.Record
+import org.goldenport.record.v3.Record.json._
 import org.goldenport.i18n.I18NElement
 import org.goldenport.xml.XhtmlUtils
 import org.goldenport.json.JsonUtils.Implicits._
@@ -20,7 +21,9 @@ import org.goldenport.hocon.RichConfig.Implicits._
  *  version Dec. 21, 2017
  *  version Mar. 13, 2018
  *  version Aug.  6, 2018
- * @version Apr. 28, 2019
+ *  version Apr. 28, 2019
+ *  version Mar. 24, 2020
+ * @version Apr. 13, 2020
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationConfig(
@@ -39,6 +42,7 @@ case class WebApplicationConfig(
   admin_list: Option[WebApplicationConfig.AdminList], // navigator
   info_list: Option[WebApplicationConfig.InfoList], // footer
   //
+  base_path: Option[String],
   singlePageApplication: Option[WebApplicationConfig.SinglePageApplication],
   http: Option[WebApplicationConfig.HttpConfig],
   route: Option[WebApplicationConfig.RouteConfig],
@@ -47,10 +51,13 @@ case class WebApplicationConfig(
   lifecycle: Option[WebApplicationConfig.LifecycleConfig],
   extend: Option[List[String]] // related feature: mixin
 ) {
+  import WebApplicationConfig._
   // def applicationTitle(locale: Locale): Node = application_title.flatMap(_.get(locale)) getOrElse Group(Nil)
 
   // def applicationLogo(locale: Locale): Node =
   //   XhtmlUtils.anchorOrImgOrTextOrNodeOrEmpty(logo_title.flatMap(_.get(locale)), logo_image, logo_url)
+
+  def withPages(ps: Seq[Page]) = copy(page = Some(Pages(ps.toList)))
 
   def complement(rhs: WebApplicationConfig) = {
     import scalaz._, Scalaz._
@@ -67,6 +74,7 @@ case class WebApplicationConfig(
       usecase_list orElse rhs.usecase_list,
       admin_list orElse rhs.admin_list,
       info_list orElse rhs.info_list,
+      base_path,
       singlePageApplication orElse rhs.singlePageApplication,
       http orElse rhs.http,
       route orElse rhs.route, // TODO
@@ -123,6 +131,7 @@ object WebApplicationConfig {
     None,
     None,
     None,
+    None,
     None
   )
 
@@ -136,13 +145,26 @@ object WebApplicationConfig {
     name: String,
     title: Option[I18NElement] = None,
     icon: Option[String] = None,
-    contentHeaderStyle: Option[String] = None
+    contentHeaderStyle: Option[String] = None,
+    headText: Option[String] = None,
+    headImage: Option[String] = None,
+    mailAddress: Option[String] = None,
+    properties: Record = Record.empty
   ) {
     def title(locale: Locale): NodeSeq = title.flatMap(_.get(locale)) getOrElse {
       XhtmlUtils.title(name)
     }
 
-    lazy val toRule = WebApplicationRule.Page(name, title, icon, contentHeaderStyle)
+    lazy val toRule = WebApplicationRule.Page(
+      name,
+      title,
+      icon,
+      contentHeaderStyle,
+      headText,
+      headImage,
+      mailAddress,
+      properties
+    )
   }
 
   case class FeatureList(
@@ -287,6 +309,7 @@ object WebApplicationConfig {
     None,
     None,
     None,
+    None,
     None
   )
 
@@ -300,6 +323,10 @@ object WebApplicationConfig {
     else
       _parse_hocon(a)
   }
+
+  def createPage(p: Page, ps: Page*): WebApplicationConfig = createPages(p +: ps)
+
+  def createPages(ps: Seq[Page]): WebApplicationConfig = WebApplicationConfig.empty.withPages(ps)
 
   import org.goldenport.json.JsonUtils._
   import org.goldenport.json.JsonUtils.Implicits._
@@ -378,6 +405,7 @@ object WebApplicationConfig {
       None,
       None,
       None,
+      c.getStringOption("base_path"),
       spa.toOption,
       http.toOption,
       route,

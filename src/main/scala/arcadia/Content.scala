@@ -13,6 +13,7 @@ import org.goldenport.xml.{XmlUtils, XmlPrinter}
 import org.goldenport.util.SeqUtils.mkStringOption
 import org.goldenport.util.DateTimeUtils.httpDateTimeString
 import arcadia.model.ErrorModel
+import arcadia.context.Session
 
 /*
  * @since   Jul. 16, 2017
@@ -21,7 +22,8 @@ import arcadia.model.ErrorModel
  *  version Oct. 27, 2017
  *  version Nov. 17, 2017
  *  version Dec. 21, 2017
- * @version Jan.  8, 2018
+ *  version Jan.  8, 2018
+ * @version Apr. 20, 2020
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
@@ -56,6 +58,7 @@ sealed trait Content {
     )
     r.toStringVector
   }
+  def session: Option[Session]
   def asXml: NodeSeq = RAISE.noReachDefect
   def asXmlContent: XmlContent = RAISE.noReachDefect
 
@@ -88,6 +91,7 @@ case class StringContent(
   lastModified: Option[DateTime],
   code: Int = 200
 ) extends Content {
+  val session = None
   def withCode(p: Int) = copy(code = p)
   def withExpiresPeriod(p: FiniteDuration): StringContent = copy(expiresPeriod = Some(p))
 
@@ -129,6 +133,7 @@ case class XmlContent(
   lastModified: Option[DateTime],
   code: Int = 200
 ) extends Content {
+  val session = None
   override def asXml: NodeSeq = xml
   override def asXmlContent: XmlContent = this
   override lazy val contenttype = to_contenttype("utf-8")
@@ -210,6 +215,7 @@ case class BinaryContent(
   lastModified: Option[DateTime],
   code: Int = 200
 ) extends Content {
+  val session = None
   def withCode(p: Int) = copy(code = p)
   def withExpiresPeriod(p: FiniteDuration): BinaryContent = copy(expiresPeriod = Some(p))
 
@@ -222,6 +228,7 @@ object BinaryContent {
 
 case class RedirectContent(
   uri: URI = new URI("index.html"),
+  session: Option[Session] = None,
   code: Int = 303
 ) extends Content {
   def mimetype: MimeType = MimeType.text_html
@@ -231,14 +238,16 @@ case class RedirectContent(
   def proxyExpiresPeriod: Option[FiniteDuration] = None
   def etag: Option[ETag] = None
   def lastModified: Option[DateTime] = None
+  def getAccessToken: Option[String] = session.flatMap(_.accessToken)
+
   def withExpiresPeriod(p: FiniteDuration): RedirectContent = this
   def withCode(p: Int) = copy(code = p)
 
   lazy val show = "RedirectContent"
-
 }
 object RedirectContent {
   def apply(p: String): RedirectContent = RedirectContent(new URI(p))
+  def apply(p: String, session: Option[Session]): RedirectContent = RedirectContent(new URI(p), session)
 }
 
 trait ErrorContent extends Content {
@@ -252,6 +261,7 @@ trait ErrorContent extends Content {
   def lastModified: Option[DateTime] = None
   def withExpiresPeriod(p: FiniteDuration): Content = this
   def withCode(p: Int) = this
+  def session = None
 }
 
 case class ErrorModelContent(model: ErrorModel) extends ErrorContent {
