@@ -23,7 +23,7 @@ import org.goldenport.hocon.RichConfig.Implicits._
  *  version Aug.  6, 2018
  *  version Apr. 28, 2019
  *  version Mar. 24, 2020
- * @version Apr. 13, 2020
+ * @version Apr. 23, 2020
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationConfig(
@@ -149,7 +149,7 @@ object WebApplicationConfig {
     headText: Option[String] = None,
     headImage: Option[String] = None,
     mailAddress: Option[String] = None,
-    properties: Record = Record.empty
+    properties: Option[Record] = None
   ) {
     def title(locale: Locale): NodeSeq = title.flatMap(_.get(locale)) getOrElse {
       XhtmlUtils.title(name)
@@ -163,7 +163,7 @@ object WebApplicationConfig {
       headText,
       headImage,
       mailAddress,
-      properties
+      properties.getOrElse(Record.empty)
     )
   }
 
