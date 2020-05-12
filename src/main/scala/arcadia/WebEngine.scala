@@ -25,7 +25,8 @@ import arcadia.scenario._
  *  version May.  1, 2019
  *  version Jul. 20, 2019
  *  version Mar. 31, 2020
- * @version Apr.  1, 2020
+ *  version Apr.  1, 2020
+ * @version May.  8, 2020
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -47,6 +48,8 @@ class WebEngine(
     ControllerEngine.Rule.create(RouterController(route).gc)
   }
   val systemcontroller = WebApplication.standardControllerRule.append(
+    InvokePlatformController.gc,
+    InvokeOperationController.gc,
     ScenarioController(scenario).gc,
     RouterController(rule.route).gc,
     RouterController(Route.system).gc
