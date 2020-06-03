@@ -20,7 +20,8 @@ import arcadia.view._
  *  version Aug. 29, 2017
  *  version Sep. 17, 2017
  *  version Nov. 10, 2017
- * @version Mar. 18, 2020
+ *  version Mar. 18, 2020
+ * @version Jun.  2, 2020
  * @author  ASAMI, Tomoharu
  */
 abstract class WebModule() {
@@ -46,10 +47,10 @@ object WebModule {
   val warSuffixes = Set("war", "zip")
   val htmlSuffixes = Set("html", "xhtml")
 
-  def create(url: URL, basedir: File): WebModule = {
+  def create(url: URL, basedir: File, user: Option[String], password: Option[String]): WebModule = {
     val pathname = url.toString
     if (StringUtils.isSuffix(pathname, warSuffixes))
-      new WarWebModule(url, basedir)
+      new WarWebModule(url, basedir, user, password)
     else if (url.getProtocol == "file")
       DirectoryWebModule(url)
     else
@@ -125,13 +126,18 @@ object DirectoryWebModule {
   def apply(url: URL): DirectoryWebModule = fromPathname(url.getFile)
 }
 
-class WarWebModule(war: URL, basedir: File) extends WebModule {
+class WarWebModule(
+  war: URL,
+  basedir: File,
+  user: Option[String],
+  password: Option[String]
+) extends WebModule {
   // val basedir = {
   //   val r = new File("target/war")
   //   r.mkdirs()
   //   r
   // }
-  val bag = ProjectVersionDirectoryBag.createFromZip(basedir, war)
+  val bag = ProjectVersionDirectoryBag.createFromZip(basedir, war, user, password)
   lazy val module = new DirectoryWebModule(bag.homeDirectory)
 
   def toWebApplication(platform: PlatformContext) = module.toWebApplication(platform)
@@ -169,9 +175,9 @@ class WarWebModule(war: URL, basedir: File) extends WebModule {
     // WebApplication(appname, controller, view)
 }
 object WarWebModule {
-  def apply(uri: String, basedir: File): WarWebModule = {
+  def apply(uri: String, basedir: File, user: Option[String], password: Option[String]): WarWebModule = {
     val url = UURL.getURLFromFileOrURLName(uri)
-    new WarWebModule(url, basedir)
+    new WarWebModule(url, basedir, user, password)
   }
 }
 

@@ -31,7 +31,8 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Apr. 30, 2019
  *  version May.  1, 2019
  *  version Mar. 31, 2020
- * @version Apr. 20, 2020
+ *  version Apr. 20, 2020
+ * @version Jun.  3, 2020
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -118,7 +119,7 @@ case class Parcel(
   //   s"Parcel(${b})"
   // }
 
-  lazy val show: String = {
+  lazy val show: String = try {
     val a = Vector(
       command.map(_.show),
       model.map(_.show),
@@ -129,6 +130,8 @@ case class Parcel(
     ).flatten
     val b = a.mkString(",")
     s"Parcel(${b})"
+  } catch {
+    case NonFatal(e) => s"Parcel(${e})"
   }
 
   def toStrategy: RenderStrategy = render getOrElse {

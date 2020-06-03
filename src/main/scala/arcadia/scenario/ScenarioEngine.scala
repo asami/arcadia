@@ -9,7 +9,8 @@ import arcadia.context._
  * @since   Sep. 17, 2017
  *  version Oct. 25, 2017
  *  version Nov. 16, 2017
- * @version Mar. 23, 2020
+ *  version Mar. 23, 2020
+ * @version May. 29, 2020
  * @author  ASAMI, Tomoharu
  */
 class ScenarioEngine(
@@ -41,11 +42,14 @@ class ScenarioEngine(
       }
     }
 
-  private def _apply(p: Parcel, cmd: ScenarioCommand): Parcel =
+  private def _apply(p: Parcel, cmd: ScenarioCommand): Parcel = try {
     cmd.event match {
       case m: StartEvent => _start(p, cmd, m)
       case m => _go(p, cmd, m)
     }
+  } catch {
+    case NonFatal(e) => p.goError(e)
+  }
 
   private def _start(p: Parcel, cmd: ScenarioCommand, evt: StartEvent): Parcel = {
     val vcmd = ViewCommand(cmd.pathname)

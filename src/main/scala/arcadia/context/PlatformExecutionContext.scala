@@ -27,7 +27,8 @@ import arcadia.rule._
  *  version Aug. 31, 2018
  *  version Apr. 29, 2019
  *  version Mar. 23, 2020
- * @version Apr. 17, 2020
+ *  version Apr. 17, 2020
+ * @version May. 29, 2020
  * @author  ASAMI, Tomoharu
  */
 trait PlatformExecutionContext {
@@ -55,6 +56,7 @@ trait PlatformExecutionContext {
   def updateEntity(klass: DomainEntityType, id: DomainObjectId, data: IRecord): Unit 
   def deleteEntity(klass: DomainEntityType, id: DomainObjectId): Unit
   def login(username: String, password: String): Either[Conclusion, Session]
+  def resetPassword(token: String, password: String, confirmpassword: Option[String]): Either[Conclusion, Unit] = RAISE.unsupportedOperationFault
   def fetchString(urn: UrnSource): Option[String]
   def fetchBadge(urn: UrnSource): Option[Badge]
   def fetchCandidates(name: String): Option[CandidatesModel] = name match {

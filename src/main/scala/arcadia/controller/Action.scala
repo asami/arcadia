@@ -41,7 +41,8 @@ import arcadia.scenario._
  *  version Apr. 30, 2019
  *  version May.  1, 2019
  *  version Mar. 31, 2020
- * @version Apr. 18, 2020
+ *  version Apr. 18, 2020
+ * @version May. 28, 2020
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -198,7 +199,7 @@ object Action {
   implicit val InvokeDirectiveActionFormat = Json.format[InvokeDirectiveAction]
   implicit val InvokeWithIdDirectiveActionFormat = Json.format[InvokeWithIdDirectiveAction]
 //  implicit val ResetPasswordDirectiveActionFormat = Json.format[ResetPasswordDirectiveAction]
-  implicit val ResetPasswordOperationActionFormat = Json.format[ResetPasswordOperationAction]
+//  implicit val ResetPasswordOperationActionFormat = Json.format[ResetPasswordOperationAction]
   implicit val CarouselActionFormat = Json.format[CarouselAction]
   implicit val BannerActionFormat = Json.format[BannerAction]
   implicit val BadgeActionFormat = Json.format[BadgeAction]
@@ -207,6 +208,7 @@ object Action {
   implicit val SearchBoxActionFormat = Json.format[SearchBoxAction]
   implicit val InvokeOperationScenarioActionFormat = Json.format[InvokeOperationScenarioAction]
   implicit val LoginScenarioActionFormat = Json.format[LoginScenarioAction]
+  implicit val ResetPasswordScenarioActionFormat = Json.format[ResetPasswordScenarioAction]
 
   implicit object ActionReads extends Reads[Action] {
     def reads(json: JsValue): JsResult[Action] = parseJsValue(json)
@@ -230,7 +232,7 @@ object Action {
         case "invoke-directive" => Json.fromJson[InvokeDirectiveAction](json)
         case "invoke-with-id-directive" => Json.fromJson[InvokeWithIdDirectiveAction](json)
 //        case "reset-password-directive" => Json.fromJson[ResetPasswordDirectiveAction](json)
-        case "reset-password-operation" => Json.fromJson[ResetPasswordOperationAction](json)
+//        case "reset-password-operation" => Json.fromJson[ResetPasswordOperationAction](json)
         case "carousel" => Json.fromJson[CarouselAction](json)
         case "banner" => Json.fromJson[BannerAction](json)
         case "badge" => Json.fromJson[BadgeAction](json)
@@ -239,6 +241,7 @@ object Action {
         case "searchbox" => Json.fromJson[SearchBoxAction](json)
         case "invoke-operation-scenario" => Json.fromJson[InvokeOperationScenarioAction](json)
         case "login-scenario" => Json.fromJson[LoginScenarioAction](json)
+        case "reset-password-scenario" => Json.fromJson[ResetPasswordScenarioAction](json)
         case _ => JsError(s"Unknown action '$s'")
       }
       case None => JsError(s"No action")
@@ -607,6 +610,29 @@ case class LoginScenarioAction(
   // }
 }
 
+case class ResetPasswordScenarioAction(
+  formAction: Option[URI],
+  title: Option[I18NElement],
+  description: Option[I18NElement],
+  passwordLabel: Option[I18NElement],
+  passwordConfirmLabel: Option[I18NElement],
+  executeLabel: Option[I18NElement],
+  successRedirect: Option[String],
+  successView: Option[String],
+  errorView: Option[String],
+  source: Option[Source],
+  sink: Option[Sink]
+) extends SourceSinkAction {
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    parcel.getPlatformContext.map { ctx =>
+      val x = ResetPasswordScenario.launch(parcel, this)
+      val rule = ScenarioEngine.Rule()
+      val engine = new ScenarioEngine(ctx, rule)
+      engine.apply(x)
+    }.getOrElse(RAISE.noReachDefect)
+  }
+}
+
 trait InteractiveOperationAction extends SourceSinkAction {
   import InteractiveOperationAction._
 
@@ -700,7 +726,7 @@ case class ResetPasswordOperationAction(
 
   protected def make_Model(parcel: Parcel, p: Invalid) = {
     val rule = parcel.context.map(_.resetPasswordRule) getOrElse ResetPasswordRule.default
-    rule.toDirectiveModel(new URI(""), okLabel, parcel.inputFormParameters, IFormModel.Conclusion(p))
+    rule.toDirectiveModel(new URI(""), okLabel, parcel.inputFormParameters, FormModel.Conclusion(p))
   }
 
   protected def execute_Init(parcel: Parcel): Parcel = {

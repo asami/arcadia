@@ -30,7 +30,9 @@ import arcadia.controller._
  *  version Sep.  1, 2018
  *  version Nov.  7, 2018
  *  version Jul. 29, 2019
- * @version Apr. 20, 2020
+ *  version Apr. 20, 2020
+ *  version May. 28, 2020
+ * @version Jun.  1, 2020
  * @author  ASAMI, Tomoharu
  */
 trait Scenario {
@@ -42,7 +44,7 @@ trait Scenario {
   def schema: Schema = getSchema getOrElse RAISE.noReachDefect // ScenarioDefect
   def getSchema: Option[Schema] = None
   def getCallerUri: Option[URI] = None
-  def start(parcel: Parcel): Parcel
+  def start(parcel: Parcel): Parcel = RAISE.unsupportedOperationFault
   def execute(evt: Event): Parcel = apply(evt)._2.parcel
   def apply(evt: Event): (Scenario, Event) = {
     val i = Intent(evt, this, state)
@@ -77,7 +79,7 @@ trait ScenarioClass {
   lazy val _name: String = StringUtils.classNameToHypenName("Scenario", this)
   def name: String = _name
   // launch via scenario endopoint.
-  def launch(parcel: Parcel, cmd: ScenarioCandidateCommand): Option[Scenario]
+  def launch(parcel: Parcel, cmd: ScenarioCandidateCommand): Option[Scenario] = RAISE.unsupportedOperationFault
   def unmarshallOption(p: String): Option[Scenario]
 }
 
@@ -91,7 +93,7 @@ case class CreateEntityScenario(
   override def getSchema = Some(schema)
   val stateMachine = CreateEntityScenario.stateMachine
   def withState(p: State) = copy(state = p)
-  def start(parcel: Parcel): Parcel = CreateEntityScenario.start(parcel, entityType, schema, data)
+  override def start(parcel: Parcel): Parcel = CreateEntityScenario.start(parcel, entityType, schema, data)
 
   override protected def adjust_Intent(p: Intent): Intent =
     p.withDomainEntityType(entityType)
@@ -129,7 +131,7 @@ object CreateEntityScenario extends ScenarioClass {
     )
   }
 
-  def launch(p: Parcel, cmd: ScenarioCandidateCommand): Option[Scenario] = {
+  override def launch(p: Parcel, cmd: ScenarioCandidateCommand): Option[Scenario] = {
     val parcel = p.withUsageKind(CreateUsage)
     def entitytype = cmd.entityType
     def resolveschema(p: Schema): Schema =
@@ -180,7 +182,7 @@ case class UpdateEntityScenario(
   override def getSchema = Some(schema)
   val stateMachine = UpdateEntityScenario.stateMachine
   def withState(p: State) = copy(state = p)
-  def start(parcel: Parcel): Parcel = UpdateEntityScenario.start(parcel, entityType, schema, data)
+  override def start(parcel: Parcel): Parcel = UpdateEntityScenario.start(parcel, entityType, schema, data)
 
   override protected def adjust_Intent(p: Intent): Intent =
     p.withDomainEntityType(entityType)
@@ -218,7 +220,7 @@ object UpdateEntityScenario extends ScenarioClass {
     )
   }
 
-  def launch(p: Parcel, cmd: ScenarioCandidateCommand): Option[Scenario] = {
+  override def launch(p: Parcel, cmd: ScenarioCandidateCommand): Option[Scenario] = {
     val parcel = p.withUsageKind(CreateUsage)
     def entitytype = cmd.entityType
     def resolveschema(p: Schema): Schema =
@@ -269,7 +271,7 @@ case class DeleteEntityScenario(
   override def getSchema = Some(schema)
   val stateMachine = DeleteEntityScenario.stateMachine
   def withState(p: State) = copy(state = p)
-  def start(parcel: Parcel): Parcel = DeleteEntityScenario.start(parcel, entityType, schema, data)
+  override def start(parcel: Parcel): Parcel = DeleteEntityScenario.start(parcel, entityType, schema, data)
 
   override protected def adjust_Intent(p: Intent): Intent =
     p.withDomainEntityType(entityType)
@@ -307,7 +309,7 @@ object DeleteEntityScenario extends ScenarioClass {
     )
   }
 
-  def launch(p: Parcel, cmd: ScenarioCandidateCommand): Option[Scenario] = {
+  override def launch(p: Parcel, cmd: ScenarioCandidateCommand): Option[Scenario] = {
     val parcel = p.withUsageKind(CreateUsage)
     def entitytype = cmd.entityType
     def resolveschema(p: Schema): Schema =
@@ -385,7 +387,6 @@ case class InvokeOperationScenario(
   }
 
   def withState(p: State) = copy(state = p)
-  def start(parcel: Parcel): Parcel = RAISE.unsupportedOperationFault // InvokeOperationScenario.start(parcel, schema, data)
 
   override def getSchema = Some(schema)
   override protected def adjust_Intent(p: Intent): Intent = p
@@ -423,8 +424,6 @@ case class InvokeOperationScenario(
   ).toJsonString
 }
 object InvokeOperationScenario extends ScenarioClass {
-  def launch(p: Parcel, cmd: ScenarioCandidateCommand): Option[Scenario] = RAISE.unsupportedOperationFault
-
   // def launch(p: Parcel, cmd: ScenarioCommand): Option[Scenario] = {
   //   val parcel = p.withUsageKind(CreateUsage)
   //   def entitytype = cmd.entityType
@@ -580,7 +579,7 @@ case class LoginScenario(
     )
   }
 
-  val inputForm = PropertyInputFormModel(
+  protected lazy val default_input_form = PropertyInputFormModel(
     new URI(""),
     Post,
     schema,
@@ -589,10 +588,10 @@ case class LoginScenario(
     Submits(Submit(ExecuteSubmitKind, I18NString("Login")))
   )
 
+  def inputForm(p: Intent): FormModel = default_input_form
+
   def withState(p: State) = copy(state = p)
   def withData(p: IRecord) = copy(data = p)
-
-  def start(parcel: Parcel): Parcel = RAISE.unsupportedOperationFault // LoginScenario.start(parcel, schema, data)
 
   override protected def adjust_Intent(p: Intent): Intent = p
 
@@ -618,7 +617,7 @@ case class LoginScenario(
   }
 
   private def _error(p: Intent, c: Conclusion): Intent = {
-    val model = inputForm.setError(c)
+    val model = inputForm(p).setError(c)
     p.withModel(model)
   }
 
@@ -636,8 +635,6 @@ case class LoginScenario(
 object LoginScenario extends ScenarioClass {
   val PROP_USERNAME = "username"
   val PROP_PASSWORD = "password"
-
-  def launch(p: Parcel, cmd: ScenarioCandidateCommand): Option[Scenario] = RAISE.unsupportedOperationFault
 
   def launch(p: Parcel, action: LoginScenarioAction): Parcel = {
     implicit val strategy = p.toStrategy
@@ -1057,10 +1054,6 @@ case object InputAction extends SchemaActionBase {
     val method = scenario.method
     val schema = scenario.schema
     val data = p.inputFormParameters
-//    val uri = p.controllerUri
-    // val uri = new URI("")
-    // val m = model(scenario, schema, data, uri, method)
-    // p.withModel(m)
     model(p, scenario, schema, data)
   }
 
@@ -1087,7 +1080,14 @@ case object InputAction extends SchemaActionBase {
     val state = InputState
     val submits = Submits(input, cancel)
     val hidden = hidden_scenario(scenario, state)
-    val m = PropertyInputFormModel(formaction, method, schema, data, hidden, submits)
+    val m = PropertyInputFormModel(
+      formaction,
+      method,
+      schema,
+      data,
+      hidden,
+      submits
+    )
     (m, state)
   }
 }
