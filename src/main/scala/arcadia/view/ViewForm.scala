@@ -6,17 +6,18 @@ import arcadia.model._
 
 /*
  * @since   Mar. 21, 2020
- * @version Apr. 18, 2020
+ *  version Apr. 18, 2020
+ * @version May. 28, 2020
  * @author  ASAMI, Tomoharu
  */
-case class ViewForm(model: IFormModel, strategy: RenderStrategy) extends Dynamic {
+case class ViewForm(model: FormModel, strategy: RenderStrategy) extends Dynamic {
   def locale = strategy.locale
   def action: String = model.action.toString
   def method: String = model.method.name
   def scenario: String = _get(ScenarioCommand.PROP_SCENARIO)
   def selectDynamic(name: String): String = _get(name)
-
   private def _get(name: String): String = model.get(name).map(strategy.format) getOrElse ""
+  def placeholder(name: String): String = model.getPlaceholder(name) getOrElse ""
 
   def isError: Boolean = model.conclusion.isError
   def isGeneralError: Boolean = model.conclusion.isGeneralError

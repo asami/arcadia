@@ -12,7 +12,8 @@ import arcadia.model._
  * @since   Apr. 25, 2019
  *  version Apr. 30, 2019
  *  version May.  1, 2019
- * @version Apr. 18, 2020
+ *  version Apr. 18, 2020
+ * @version May. 28, 2020
  * @author  ASAMI, Tomoharu
  */
 case class ResetPasswordRule(
@@ -52,7 +53,7 @@ case class ResetPasswordRule(
     uri: URI,
     okLabel: Option[I18NElement],
     arguments: IRecord,
-    conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty
+    conclusion: FormModel.Conclusion = FormModel.Conclusion.empty
   ): InvokeDirectiveFormModel = {
     val title = mainTitleText.map(I18NElement(_))
     val description = mainText.map(I18NElement(_))

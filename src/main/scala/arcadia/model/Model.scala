@@ -9,6 +9,7 @@ import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.{Record => _, Conclusion => RConclusion, _}
 import org.goldenport.record.v2.util.RecordUtils
 import org.goldenport.i18n.{I18NString, I18NElement}
+import org.goldenport.value._
 import org.goldenport.trace.TraceContext
 import org.goldenport.util.StringUtils
 import arcadia._
@@ -38,7 +39,9 @@ import arcadia.domain._
  *  version May.  1, 2019
  *  version Aug.  5, 2019
  *  version Mar. 21, 2020
- * @version Apr. 18, 2020
+ *  version Apr. 18, 2020
+ *  version May. 28, 2020
+ * @version Jun.  1, 2020
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -189,13 +192,136 @@ trait IQueueDashboardSetModel extends IDashboardModel { self: Model =>
 trait IQueueSetModel { self: Model =>
 }
 
-trait IFormModel { self: Model =>
+trait FormModel { self: Model =>
   def action: URI
   def method: Method
   def get(name: String): Option[Any]
-  def conclusion: IFormModel.Conclusion
+  def getPlaceholder(name: String): Option[String]
+  def conclusion: FormModel.Conclusion
+  def setError(p: RConclusion): Model
 }
-object IFormModel {
+object FormModel {
+  sealed trait InputType extends NamedValueInstance {
+  }
+  object InputType extends EnumerationClass[InputType] {
+    val elements = Vector(
+      ButtonInput,
+      CheckboxInput,
+      ColorInput,
+      DateInput,
+      DatetimeLocalInput,
+      EmailInput,
+      FileInput,
+      HiddenInput,
+      ImageInput,
+      MonthInput,
+      NumberInput,
+      PasswordInput,
+      RadioInput,
+      RangeInput,
+      ResetInput,
+      SearchInput,
+      SubmitInput,
+      TelInput,
+      TextInput,
+      TimeInput,
+      UrlInput,
+      WeekInput
+    )
+  }
+  case object ButtonInput extends InputType {
+    val name = "button"
+  }
+  case object CheckboxInput extends InputType {
+    val name = "checkbox"
+  }
+  case object ColorInput extends InputType {
+    val name = "color"
+  }
+  case object DateInput extends InputType {
+    val name = "date"
+  }
+  case object DatetimeLocalInput extends InputType {
+    val name = "datetime-local"
+  }
+  case object EmailInput extends InputType {
+    val name = "email"
+  }
+  case object FileInput extends InputType {
+    val name = "file"
+  }
+  case object HiddenInput extends InputType {
+    val name = "hidden"
+  }
+  case object ImageInput extends InputType {
+    val name = "image"
+  }
+  case object MonthInput extends InputType {
+    val name = "month"
+  }
+  case object NumberInput extends InputType {
+    val name = "number"
+  }
+  case object PasswordInput extends InputType {
+    val name = "password"
+  }
+  case object RadioInput extends InputType {
+    val name = "radio"
+  }
+  case object RangeInput extends InputType {
+    val name = "range"
+  }
+  case object ResetInput extends InputType {
+    val name = "reset"
+  }
+  case object SearchInput extends InputType {
+    val name = "search"
+  }
+  case object SubmitInput extends InputType {
+    val name = "submit"
+  }
+  case object TelInput extends InputType {
+    val name = "tel"
+  }
+  case object TextInput extends InputType {
+    val name = "text"
+  }
+  case object TimeInput extends InputType {
+    val name = "time"
+  }
+  case object UrlInput extends InputType {
+    val name = "url"
+  }
+  case object WeekInput extends InputType {
+    val name = "week"
+  }
+
+  case class Field(
+    name: String,
+    label: Option[String] = None,
+    inputType: Option[InputType] = None,
+    id: Option[String] = None,
+    value: Option[String] = None,
+    placeholder: Option[String] = None,
+    datatype: DataType = XString,
+    constraints: List[Constraint] = Nil
+  ) {
+    def withValue(p: String) = copy(value = Some(p))
+    def withPlaceholder(p: String) = copy(placeholder = Some(p))
+
+    def toColumn: Column = Column(
+      name,
+      datatype,
+      label = label,
+      form = Column.Form.create(placeholder, value)
+    )
+  }
+  object Field {
+    def hidden(name: String, value: String): Field = Field(name, inputType = Some(HiddenInput), value = Some(value))
+    def password(name: String, label: Option[String]): Field = Field(name, label, Some(PasswordInput))
+    def submit(label: Option[String]): Field = Field("submit", label, Some(SubmitInput))
+  }
+
   case class Conclusion(
     warnings: Option[NonEmptyVector[I18NString]] = None,
     errors: Option[NonEmptyVector[I18NString]] = None,
@@ -974,13 +1100,16 @@ object TableCardModel {
 
 case class SearchBoxModel(
   searchbox: Renderer.SearchBox,
-  conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty
-) extends Model with IFormModel with IComponentModel {
+  conclusion: FormModel.Conclusion = FormModel.Conclusion.empty
+) extends Model with FormModel with IComponentModel {
   val expiresKind: Option[ExpiresKind] = None
   def toRecord: IRecord = RAISE.notImplementedYetDefect
   def action = searchbox.input.action
   def method = searchbox.input.method
   def get(name: String): Option[Any] = None
+  def getPlaceholder(name: String): Option[String] = None
+
+  def setError(p: RConclusion) = copy(conclusion = FormModel.Conclusion(p))
 
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(strategy) {
     protected def render_Content: NodeSeq = searchbox_form(searchbox)
@@ -999,13 +1128,15 @@ case class PropertyInputFormModel(
   hiddens: Hiddens,
   submit: Submits,
   expiresKind: Option[ExpiresKind] = Some(NoCacheExpires),
-  conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty
-) extends Model with IFormModel with IComponentModel {
+  conclusion: FormModel.Conclusion = FormModel.Conclusion.empty
+) extends Model with FormModel with IComponentModel {
   lazy val toRecord: IRecord = hiddens.hiddens.complement(data)
 
   def get(name: String): Option[Any] = toRecord.get(name)
 
-  def setError(p: RConclusion): PropertyInputFormModel = copy(conclusion = IFormModel.Conclusion(p))
+  def getPlaceholder(name: String): Option[String] = schema.getColumn(name).flatMap(_.form.placeholder).map(_.c)
+
+  def setError(p: RConclusion): PropertyInputFormModel = copy(conclusion = FormModel.Conclusion(p))
 
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
@@ -1023,10 +1154,14 @@ case class PropertyConfirmFormModel(
   hiddens: Hiddens,
   submit: Submits,
   expiresKind: Option[ExpiresKind] = Some(NoCacheExpires),
-  conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty
-) extends Model with IFormModel with IComponentModel {
+  conclusion: FormModel.Conclusion = FormModel.Conclusion.empty
+) extends Model with FormModel with IComponentModel {
   def toRecord: IRecord = data // TODO hiddens
   def get(name: String): Option[Any] = data.get(name)
+
+  def getPlaceholder(name: String): Option[String] = schema.getColumn(name).flatMap(_.form.placeholder).map(_.c)
+
+  def setError(p: RConclusion) = copy(conclusion = FormModel.Conclusion(p))
 
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
@@ -1042,12 +1177,16 @@ case class UpdateEntityDirectiveFormModel(
   id: DomainEntityId,
   properties: IRecord,
   isActive: Boolean,
-  conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty
-) extends Model with IFormModel with IComponentModel {
+  conclusion: FormModel.Conclusion = FormModel.Conclusion.empty,
+  placeholders: IRecord = Record.empty
+) extends Model with FormModel with IComponentModel {
   val expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
   def toRecord: IRecord = properties
   def method = Put
   def get(name: String): Option[Any] = properties.get(name)
+  def getPlaceholder(name: String): Option[String] = placeholders.getString(name)
+
+  def setError(p: RConclusion) = copy(conclusion = FormModel.Conclusion(p))
 
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
@@ -1066,11 +1205,15 @@ case class InvokeDirectiveFormModel(
   arguments: IRecord,
   isActive: Boolean,
   // error: Option[Invalid] = None
-  conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty
-) extends Model with IFormModel with IComponentModel {
+  conclusion: FormModel.Conclusion = FormModel.Conclusion.empty,
+  placeholders: IRecord = Record.empty
+) extends Model with FormModel with IComponentModel {
   val expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
   def toRecord: IRecord = arguments
   def get(name: String): Option[Any] = arguments.get(name)
+  def getPlaceholder(name: String): Option[String] = placeholders.getString(name)
+
+  def setError(p: RConclusion) = copy(conclusion = FormModel.Conclusion(p))
 
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
@@ -1087,11 +1230,15 @@ case class InvokeWithIdDirectiveFormModel(
   properties: IRecord,
   isActive: Boolean,
   idPropertyName: Option[String],
-  conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty
-) extends Model with IFormModel with IComponentModel {
+  conclusion: FormModel.Conclusion = FormModel.Conclusion.empty,
+  placeholders: IRecord = Record.empty
+) extends Model with FormModel with IComponentModel {
   val expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
   def toRecord: IRecord = properties
   def get(name: String): Option[Any] = properties.get(name)
+  def getPlaceholder(name: String): Option[String] = placeholders.getString(name)
+
+  def setError(p: RConclusion) = copy(conclusion = FormModel.Conclusion(p))
 
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
@@ -1100,13 +1247,16 @@ case class InvokeWithIdDirectiveFormModel(
   }.apply
 }
 
-case object UndefinedFormModel extends Model with IFormModel {
+case object UndefinedFormModel extends Model with FormModel {
   val expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
-  val conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty // TODO
+  val conclusion: FormModel.Conclusion = FormModel.Conclusion.empty // TODO
   def toRecord: IRecord = throw new UnsupportedOperationException()
   def action: URI = new URI("Undefined")
   def method: Method = Get
   def get(name: String): Option[Any] = None
+  def getPlaceholder(name: String): Option[String] = None
+
+  def setError(p: RConclusion) = this
 
   def render(strategy: RenderStrategy): NodeSeq = throw new UnsupportedOperationException()
 }

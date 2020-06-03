@@ -27,7 +27,8 @@ import arcadia.rule._
  *  version Sep.  5, 2018
  *  version Apr. 29, 2019
  *  version Mar. 23, 2020
- * @version Apr. 17, 2020
+ *  version Apr. 17, 2020
+ * @version May. 29, 2020
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -75,6 +76,7 @@ case class ExecutionContext(
   def deleteEntity(klass: DomainEntityType, id: DomainObjectId): Unit = platformExecutionContext.deleteEntity(klass, id)
 
   def login(username: String, password: String): Either[Conclusion, Session] = platformExecutionContext.login(username, password)
+  def resetPassword(token: String, password: String, confirmpassword: Option[String]): Either[Conclusion, Unit] = platformExecutionContext.resetPassword(token, password, confirmpassword)
 
   def fetchString(urn: UrnSource): Option[String] = platformExecutionContext.fetchString(urn)
   def fetchBadge(urn: UrnSource): Option[Badge] = platformExecutionContext.fetchBadge(urn)

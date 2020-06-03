@@ -24,7 +24,8 @@ import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL, PROP_VIEW_FORM}
  *  version Nov. 14, 2017
  *  version Mar. 18, 2018
  *  version Jul. 21, 2019
- * @version Mar. 21, 2020
+ *  version Mar. 21, 2020
+ * @version May. 28, 2020
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -97,7 +98,7 @@ abstract class TemplateViewBase(template: TemplateSource) extends View() {
 
   private def _form_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] = {
     val x = parcel.getEffectiveModel.collect {
-      case m: IFormModel => ViewForm(m, strategy)
+      case m: FormModel => ViewForm(m, strategy)
     }.getOrElse(ViewForm.undefined(strategy))
     Map(PROP_VIEW_FORM -> x)
   }

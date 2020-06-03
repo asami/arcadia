@@ -17,7 +17,8 @@ import arcadia.scenario.ScenarioEngine
  *  version Jan. 14, 2018
  *  version Mar. 26, 2018
  *  version Jul. 21, 2019
- * @version Mar. 23, 2020
+ *  version Mar. 23, 2020
+ * @version May. 29, 2020
  * @author  ASAMI, Tomoharu
  */
 abstract class Controller(rule: Controller.Rule) {
@@ -28,10 +29,14 @@ abstract class Controller(rule: Controller.Rule) {
         case _ => false
       }.getOrElse(false)
     }
-    if (ajaxp)
-      _apply_ajax(parcel)
-    else
-      _apply_plain(parcel)
+    try {
+      if (ajaxp)
+        _apply_ajax(parcel)
+      else
+        _apply_plain(parcel)
+    } catch {
+      case e: Throwable => Result(parcel.goError(e), s"Web Controller: $e")
+    }
   }
 
   private def _apply_plain(parcel: Parcel) = {
