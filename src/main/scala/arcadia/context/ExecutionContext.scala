@@ -6,6 +6,7 @@ import play.api.libs.json.JsValue
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.{Schema, Column}
+import org.goldenport.record.v2.{Invalid, Conclusion}
 import org.goldenport.record.v2.util.SchemaBuilder
 import org.goldenport.values.PathName
 import arcadia._
@@ -24,7 +25,9 @@ import arcadia.rule._
  *  version Jul. 17, 2018
  *  version Aug. 31, 2018
  *  version Sep.  5, 2018
- * @version Apr. 29, 2019
+ *  version Apr. 29, 2019
+ *  version Mar. 23, 2020
+ * @version Apr. 17, 2020
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -55,7 +58,8 @@ case class ExecutionContext(
   def put(uri: String, query: Map[String, Any], form: Map[String, Any]): Response = platformExecutionContext.put(uri, query, form)
   def delete(uri: String, query: Option[Map[String, Any]], form: Option[Map[String, Any]]): Response = platformExecutionContext.delete(uri, query.getOrElse(Map.empty), form.getOrElse(Map.empty))
   def delete(uri: String, query: Map[String, Any], form: Map[String, Any]): Response = platformExecutionContext.delete(uri, query, form)
-  def invoke(op: InvokeCommand): Response = platformExecutionContext.invoke(op)
+  def invoke(op: InvokePlatformCommand): Response = platformExecutionContext.invoke(op)
+  def invoke(op: InvokeOperationCommand): Response = platformExecutionContext.invoke(op)
   def getEntitySchema(name: String): Option[Schema] = {
     // TODO config
     platformExecutionContext.getEntitySchema(name)
@@ -69,9 +73,13 @@ case class ExecutionContext(
   def createEntity(klass: DomainEntityType, data: IRecord): DomainObjectId = platformExecutionContext.createEntity(klass, data)
   def updateEntity(klass: DomainEntityType, id: DomainObjectId, data: IRecord): Unit = platformExecutionContext.updateEntity(klass, id, data)
   def deleteEntity(klass: DomainEntityType, id: DomainObjectId): Unit = platformExecutionContext.deleteEntity(klass, id)
+
+  def login(username: String, password: String): Either[Conclusion, Session] = platformExecutionContext.login(username, password)
+
   def fetchString(urn: UrnSource): Option[String] = platformExecutionContext.fetchString(urn)
   def fetchBadge(urn: UrnSource): Option[Badge] = platformExecutionContext.fetchBadge(urn)
   def fetchCandidates(name: String): Option[CandidatesModel] = platformExecutionContext.fetchCandidates(name)
+
   def controllerUri: URI = platformExecutionContext.controllerUri
   def getIdInRequest: Option[DomainObjectId] = platformExecutionContext.getIdInRequest
   lazy val inputQueryParameters: IRecord = platformExecutionContext.inputQueryParameters.toRecord.http.request.normalize

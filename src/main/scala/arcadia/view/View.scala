@@ -14,7 +14,7 @@ import com.asamioffice.goldenport.io.UURL
 import arcadia._
 import arcadia.context._
 import arcadia.model._
-import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL}
+import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL, PROP_VIEW_FORM}
 
 /*
  * @since   Jul. 15, 2017
@@ -22,7 +22,9 @@ import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL}
  *  version Sep. 30, 2017
  *  version Oct. 27, 2017
  *  version Nov. 14, 2017
- * @version Mar. 18, 2018
+ *  version Mar. 18, 2018
+ *  version Jul. 21, 2019
+ * @version Mar. 21, 2020
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -79,13 +81,11 @@ abstract class TemplateViewBase(template: TemplateSource) extends View() {
   private def _build_bindings(engine: ViewEngine, parcel: Parcel): Map[String, AnyRef] = {
     val strategy0 = parcel.render getOrElse PlainHtml
     val strategy = strategy0.withViewContext(engine, parcel)
-    _model_bindings(strategy, parcel) ++ property_Bindings(strategy) ++ _service_bindings(strategy, parcel)
+    _model_bindings(strategy, parcel) ++
+    _form_bindings(strategy, parcel) ++
+    property_Bindings(strategy) ++
+    _service_bindings(strategy, parcel)
   }
-
-  private def _service_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
-    (parcel.context orElse strategy.viewContext.flatMap(_.parcel.context)).
-      map(x => Map(PROP_VIEW_SERVICE -> ViewService(x, strategy))).
-      getOrElse(Map.empty)
 
   private def _model_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
     parcel.getEffectiveModel.map(model_bindings(strategy, _)) getOrElse {
@@ -95,7 +95,20 @@ abstract class TemplateViewBase(template: TemplateSource) extends View() {
   protected def model_bindings(strategy: RenderStrategy, model: Model): Map[String, AnyRef] =
     model.viewBindings(strategy)
 
+  private def _form_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] = {
+    val x = parcel.getEffectiveModel.collect {
+      case m: IFormModel => ViewForm(m, strategy)
+    }.getOrElse(ViewForm.undefined(strategy))
+    Map(PROP_VIEW_FORM -> x)
+  }
+
   protected def property_Bindings(strategy: RenderStrategy): Map[String, AnyRef] = Map.empty
+
+  private def _service_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
+    (parcel.context orElse strategy.viewContext.flatMap(_.parcel.context)).
+      map(x => Map(PROP_VIEW_SERVICE -> ViewService(x, strategy))).
+      getOrElse(Map.empty)
+
 }
 
 case class TemplateView(
@@ -106,7 +119,7 @@ case class TemplateView(
 }
 
 case class IndexView(template: TemplateSource) extends TemplateViewBase(template) {
-  val guard = CommandGuard(classOf[IndexCommand])
+  val guard = IndexGuard
 }
 
 case class EntityDetailView(template: TemplateSource) extends TemplateViewBase(template) {

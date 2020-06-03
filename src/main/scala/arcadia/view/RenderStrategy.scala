@@ -36,14 +36,17 @@ import arcadia.view.ViewEngine._
  *  version Aug.  5, 2018
  *  version Sep.  1, 2018
  *  version Oct. 24, 2018
- * @version Nov.  7, 2018
+ *  version Nov.  7, 2018
+ *  version Aug.  5, 2019
+ *  version Mar. 31, 2020
+ * @version Apr.  1, 2020
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
   locale: Locale,
   theme: RenderTheme,
   schema: SchemaRule,
-  application: WebApplicationRule,
+  applicationRule: WebApplicationRule,
   partials: Partials,
   components: Components,
   renderContext: RenderContext,
@@ -63,7 +66,7 @@ case class RenderStrategy(
   lazy val noImagePicture: Picture = Picture.create(theme.default.noImagePicture)
   lazy val formatter = renderContext.formatter.withLocale(locale)
 
-  lazy val getWebApplicationRule: Option[WebApplicationRule] = viewContext.flatMap(_.parcel.render.map(_.application))
+  lazy val getWebApplicationRule: Option[WebApplicationRule] = viewContext.flatMap(_.parcel.render.map(_.applicationRule))
   lazy val getView: Option[View] = viewContext.flatMap(_.parcel.view)
   lazy val getPage: Option[WebApplicationRule.Page] = for {
     rule <- getWebApplicationRule
@@ -100,7 +103,7 @@ case class RenderStrategy(
     theme = t,
     partials = p
   )
-  def withApplicationRule(p: WebApplicationRule) = copy(application = p)
+  def complementApplicationRule(p: WebApplicationRule) = copy(applicationRule = applicationRule.complement(p))
 
   def forComponent(engine: ViewEngine, parcel: Parcel) = forView(engine, parcel)
   def forView(engine: ViewEngine, parcel: Parcel) =
@@ -111,7 +114,7 @@ case class RenderStrategy(
 
   def addJavaScriptInFooter(p: String): Unit = renderContext.addJavaScriptInFooter(p)
 
-  def getConfigString(p: String): Option[String] = application.getString(p)
+  def getConfigString(p: String): Option[String] = applicationRule.getString(p)
 
   def getEntityType = renderContext.entityType
 
@@ -346,7 +349,7 @@ sealed trait RenderTheme extends ClassNamedValueInstance {
         val xs = p.page.map(sidebar_Feature_Item(view, _))
         Group(xs)
       }
-      view.strategy.application.feature_list.
+      view.strategy.applicationRule.feature_list.
         map(features).
         getOrElse(Group(Nil))
     }
@@ -820,6 +823,7 @@ case object DetailUsage extends UsageKind
 case object CreateUsage extends UsageKind
 case object UpdateUsage extends UsageKind
 case object DeleteUsage extends UsageKind
+case object InvokeUsage extends UsageKind
 
 case class OperationScreenEntityUsageSchemaRule(
   rules: Map[OperationMode, ScreenEntityUsageSchemaRule],
@@ -901,7 +905,7 @@ case class SchemaRule(
   def resolve(p: RenderStrategy, t: Renderer.TableOrder): Schema = {
     val ctx = p.renderContext
     ctx.schema getOrElse {
-      val schema = t.schema.getOrElse(Record.buildSchema(t.records.getOrElse(Nil)))
+      val schema = t.schema.getOrElse(IRecord.makeSchema(t.records.getOrElse(Nil)))
       (ctx.entityType orElse t.entityType).fold(schema)(resolve(p, _, schema))
     }
   }

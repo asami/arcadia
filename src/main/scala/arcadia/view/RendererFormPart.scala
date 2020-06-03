@@ -22,7 +22,8 @@ import Renderer._
  *  version Jul. 23, 2018
  *  version Sep.  1, 2018
  *  version Apr. 30, 2019
- * @version May.  1, 2019
+ *  version May.  1, 2019
+ * @version Apr. 18, 2020
  * @author  ASAMI, Tomoharu
  */
 trait RendererFormPart { self: Renderer =>
@@ -492,8 +493,8 @@ trait RendererFormPart { self: Renderer =>
     arguments: IRecord,
     isactive: Boolean,
     isreturnback: Boolean,
-    warnings: Option[NonEmptyVector[Warning]],
-    errors: Option[NonEmptyVector[Invalid]]
+    warnings: Option[NonEmptyVector[I18NString]],
+    errors: Option[NonEmptyVector[I18NString]]
   ): Elem = {
     val buttonclass = "btn btn-primary btn-block"
     def returnback: IRecord =
@@ -590,14 +591,14 @@ trait RendererFormPart { self: Renderer =>
       val ws: Seq[Elem] = warnings.map(xs =>
         List(
           <div class="row"> {
-            xs.map(x => <div class="col-auto arcaida-warning">{x.message(locale)}</div>)
+            xs.map(x => <div class="col-auto arcaida-warning">{x.as(locale)}</div>)
           } </div>
         )
       ).getOrElse(Nil)
       val es: Seq[Elem] = errors.map(xs =>
         List(
           <div class="row"> {
-            xs.map(x => <div class="col-auto arcadia-error">{x.message(locale)}</div>)
+            xs.map(x => <div class="col-auto arcadia-error">{x.as(locale)}</div>)
           } </div>
         )
       ).getOrElse(Nil)

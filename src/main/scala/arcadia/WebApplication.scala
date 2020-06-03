@@ -27,7 +27,9 @@ import arcadia.scenario._
  *  version Oct. 27, 2017
  *  version Nov.  6, 2017
  *  version Jan.  6, 2018
- * @version Apr. 28, 2019
+ *  version Apr. 28, 2019
+ *  version Mar. 18, 2020
+ * @version Apr. 13, 2020
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -39,6 +41,7 @@ case class WebApplication(
 ) {
   def getLocale = config.getLocale
   def extend: List[String] = config.extend getOrElse Nil
+  def basePath: String = config.base_path getOrElse name
 }
 
 object WebApplication {
@@ -93,8 +96,10 @@ object WebApplication {
     //     fold(false)(x => materialSuffixes.contains(x.toLowerCase))
     protected def is_web_info(p: T): Boolean = name(p) == "WEB-INF"
     protected def is_assets(p: T): Boolean = name(p) == "assets"
+    protected def path(p: T): String
     protected def name(p: T): String
     protected def namebody(p: T): String = StringUtils.pathLastComponentBody(name(p))
+    protected def relativePathBody(root: T, p: T): String = StringUtils.pathRelativeBody(path(root), path(p))
     protected def getNameSuffix(p: T): Option[String] = StringUtils.getSuffix(name(p))
     protected def to_url(p: T): URL
     protected def to_template_source(p: T): TemplateSource
@@ -118,6 +123,7 @@ object WebApplication {
     protected def to_children(path: PathName): List[T] = {
       get_pathnode(root_node, path).map(to_children).orZero
     }
+    protected def to_descendants(p: T): List[T]
 
     def apply(platform: PlatformContext): WebApplication = {
       case class Z(views: Vector[(Guard, View)] = Vector.empty) {
@@ -335,21 +341,24 @@ object WebApplication {
     }
 
     protected def build_controllers: Vector[ControllerEngine.Slot] = {
-      case class Z(cs: Vector[ControllerEngine.Slot] = Vector.empty) {
+      case class Z(
+        root: T,
+        cs: Vector[ControllerEngine.Slot] = Vector.empty
+      ) {
         def r = cs
         def +(rhs: T) = {
           getNameSuffix(rhs).map {
-            case "json" => copy(cs = cs :+ _json_controller(rhs))
+            case "json" => copy(cs = cs :+ _json_controller(root, rhs))
             case _ => this
           }.getOrElse(this)
         }
       }
       get_pathnode(PathName("WEB-INF/controllers")).
-        map(x => to_children(x)./:(Z())(_+_).r).getOrElse(Vector.empty)
+        map(x => to_descendants(x)./:(Z(x))(_+_).r).getOrElse(Vector.empty)
     }
 
-    private def _json_controller(rhs: T): ControllerEngine.Slot = {
-      val name = namebody(rhs)
+    private def _json_controller(root: T, rhs: T): ControllerEngine.Slot = {
+      val name = relativePathBody(root, rhs)
       val json = to_content_json(rhs)
       OperationController.get(name, json).map(x => ControllerEngine.Slot(x.gc)) getOrElse {
         RAISE.notImplementedYetDefect

@@ -9,7 +9,8 @@ import arcadia.view.RenderStrategy
 
 /*
  * @since   Apr. 25, 2019
- * @version May.  8, 2019
+ *  version May.  8, 2019
+ * @version Mar. 20, 2020
  * @author  ASAMI, Tomoharu
  */
 case class Parameters(
@@ -23,6 +24,8 @@ case class Parameters(
     val schema = Schema(columns, validators = validators) // TODO validator
     schema.validate(p)
   }
+
+  def toSchema(implicit ctx: RenderStrategy): Schema = Schema(parameters.map(_.toColumn))
 }
 
 object Parameters {

@@ -5,6 +5,7 @@ import java.util.Locale
 import java.net.URI
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v3.{IRecord, Record}
+import org.goldenport.record.v2.Invalid
 import org.goldenport.trace.{TraceContext, Result}
 import org.goldenport.values.PathName
 import org.goldenport.util.{SeqUtils, MapUtils, StringUtils}
@@ -28,7 +29,9 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Aug. 31, 2018
  *  version Sep.  5, 2018
  *  version Apr. 30, 2019
- * @version May.  1, 2019
+ *  version May.  1, 2019
+ *  version Mar. 31, 2020
+ * @version Apr. 20, 2020
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -38,20 +41,28 @@ case class Parcel(
   view: Option[View],
   content: Option[Content],
   render: Option[RenderStrategy],
-  platformContext: Option[PlatformExecutionContext],
+  session: Option[Session],
+  platformExecutionContextOption: Option[PlatformExecutionContext],
   context: Option[ExecutionContext],
   trace: Option[TraceContext]
 ) {
+  def getPlatformExecutionContext: Option[PlatformExecutionContext] =
+    platformExecutionContextOption orElse context.map(_.platformExecutionContext)
+  def getPlatformContext: Option[PlatformContext] = getPlatformExecutionContext.map(_.platformContext)
+
   def withCommand(p: Command) = copy(command = Some(p))
   def withModel(model: Model) = copy(model = Some(model))
+  def withCommandModel(c: Command, m: Model) = copy(command = Some(c), model = Some(m))
+  def withViewModel(v: String, m: Model) = copy(command = Some(ViewCommand(v)), model = Some(m))
   def withView(view: View) = copy(view = Some(view))
   def withContent(p: Content) = copy(content = Some(p))
   def withRenderStrategy(render: RenderStrategy) = copy(render = Some(render))
 
   // def withPartials(p: Partials) = render.fold(this)(r => copy(render = Some(r.copy(partials = p))))
 
-  def withApplicationRule(p: WebApplicationRule) = copy(render = render.map(_.withApplicationRule(p)))
-  def withApplication(p: WebApplication) = platformContext.
+  // def withApplicationRule(p: WebApplicationRule) = copy(render = render.map(_.withApplicationRule(p)))
+  def complementApplicationRule(p: WebApplicationRule) = copy(render = render.map(_.complementApplicationRule(p)))
+  def withApplication(p: WebApplication) = getPlatformExecutionContext.
     map(x => copy(context = Some(ExecutionContext(x, p)))).
     getOrElse(RAISE.noReachDefect)
   def withTrace(p: TraceContext) = copy(trace = Some(p))
@@ -64,6 +75,8 @@ case class Parcel(
   //   fold(RAISE.noReachDefect)(x => withRenderStrategy(x.withCardKind(p)))
   def withCardKindInGrid(p: CardKind) = render.
     fold(RAISE.noReachDefect)(x => withRenderStrategy(x.withCardKindInGrid(p)))
+
+  def withSession(p: Session) = copy(session = Some(p))
 
   def forComponent(model: Model) = withModel(model).copy(command = None).componentScope
   def forView(engine: ViewEngine) =
@@ -79,7 +92,18 @@ case class Parcel(
       RAISE.noReachDefect
     }
 
-  // lazy val show: String = {
+  def setRedirect(p: String): Parcel = {
+    val pn = command.collect {
+      case MaterialCommand(pathname) => pathname.components.length match {
+        case 0 => p
+        case 1 => p
+        case n => StringUtils.concatPath(List.fill(n - 1)("..").mkString("/"), p)
+      }
+    }.getOrElse(p)
+    withContent(RedirectContent(pn, session))
+  }
+
+  // Lazy val show: String = {
   //   val a = SeqUtils.buildTupleVector(
   //     "command" -> command.map(_.show),
   //     "model" -> model.map(_.show),
@@ -188,19 +212,22 @@ case class Parcel(
     context.flatMap(_.fetchCandidates(p)).getOrElse(RAISE.noReachDefect)
   }
   def goOrigin: Parcel = RAISE.notImplementedYetDefect
-  def goError(e: Throwable): Parcel = withModel(ErrorModel.create(this, e))
-  def goError(s: String): Parcel = withModel(ErrorModel.create(this, s))
-  def goNotFound(s: String): Parcel = withModel(ErrorModel.notFound(this, s))
-  def goUnknownEvent(p: scenario.Event): Parcel = withModel(ErrorModel.create(this, p))
+  def goError(e: Throwable): Parcel = goError(ErrorModel.create(this, e))
+  def goError(p: Invalid): Parcel = goError(ErrorModel.create(this, p))
+  def goError(s: String): Parcel = goError(ErrorModel.create(this, s))
+  def goError(m: ErrorModel): Parcel = withCommandModel(ErrorCommand(m), m)
+  def goNotFound(s: String): Parcel = goError(ErrorModel.notFound(this, s))
+  def goUnknownEvent(p: scenario.Event): Parcel = goError(ErrorModel.create(this, p))
 
   def inputQueryParameters: IRecord = context.map(_.inputQueryParameters) getOrElse Record.empty
   def inputFormParameters: IRecord = context.map(_.inputFormParameters) getOrElse Record.empty
+  def inputQueryFormParameters: IRecord = inputQueryParameters + inputFormParameters
   def controllerUri: URI = context.map(_.controllerUri) getOrElse RAISE.noReachDefect
 
   def webMeta: List[String] = inputQueryParameters.takeStringList("_web")
   def isShowTrace: Boolean = webMeta.contains("show.trace")
 
-  def locale: Locale = context.map(_.locale) orElse platformContext.map(_.locale) getOrElse Locale.US
+  def locale: Locale = context.map(_.locale) orElse getPlatformExecutionContext.map(_.locale) getOrElse Locale.US
 
 //  def eventName: String = context.flatMap(_.getFormParameter("Submit")) getOrElse RAISE.notImplementedYetDefect
 //  def exception: Throwable = RAISE.notImplementedYetDefect
@@ -247,7 +274,7 @@ case class Parcel(
 
 object Parcel {
   def apply(model: Model, strategy: RenderStrategy): Parcel = Parcel(
-    None, Some(model), Map.empty, None, None, Some(strategy), None, None, None
+    None, Some(model), Map.empty, None, None, Some(strategy), None, None, None, None
   )
 
   // def apply(command: Command, req: ServiceRequest): Parcel = Parcel(

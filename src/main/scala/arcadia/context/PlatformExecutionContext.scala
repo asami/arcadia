@@ -7,6 +7,7 @@ import play.api.libs.json.JsValue
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v3.IRecord
 import org.goldenport.record.v2.{Schema, Column}
+import org.goldenport.record.v2.{Invalid, Conclusion}
 import org.goldenport.values.PathName
 import arcadia._
 import arcadia.model._
@@ -24,10 +25,13 @@ import arcadia.rule._
  *  version Mar. 18, 2018
  *  version Jul. 17, 2018
  *  version Aug. 31, 2018
- * @version Apr. 29, 2019
+ *  version Apr. 29, 2019
+ *  version Mar. 23, 2020
+ * @version Apr. 17, 2020
  * @author  ASAMI, Tomoharu
  */
 trait PlatformExecutionContext {
+  def platformContext: PlatformContext
   def locale: Locale
   def isLogined: Boolean
   def getOperationName: Option[String]
@@ -41,7 +45,8 @@ trait PlatformExecutionContext {
   def post(uri: String, query: IRecord, form: IRecord): Response = post(uri, query.toMap, form.toMap)
   def put(uri: String, query: Map[String, Any], form: Map[String, Any]): Response
   def delete(uri: String, query: Map[String, Any], form: Map[String, Any]): Response
-  def invoke(op: InvokeCommand): Response
+  def invoke(op: InvokePlatformCommand): Response
+  def invoke(op: InvokeOperationCommand): Response
   def getEntitySchema(name: String): Option[Schema]
   def getDefaultPropertyColumn(name: String): Option[Column]
   def getEntity(entitytype: DomainEntityType, id: DomainObjectId): Option[EntityDetailModel]
@@ -49,6 +54,7 @@ trait PlatformExecutionContext {
   def createEntity(klass: DomainEntityType, data: IRecord): DomainObjectId
   def updateEntity(klass: DomainEntityType, id: DomainObjectId, data: IRecord): Unit 
   def deleteEntity(klass: DomainEntityType, id: DomainObjectId): Unit
+  def login(username: String, password: String): Either[Conclusion, Session]
   def fetchString(urn: UrnSource): Option[String]
   def fetchBadge(urn: UrnSource): Option[Badge]
   def fetchCandidates(name: String): Option[CandidatesModel] = name match {

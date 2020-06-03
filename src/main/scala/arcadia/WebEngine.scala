@@ -22,21 +22,25 @@ import arcadia.scenario._
  *  version Jan.  8, 2018
  *  version Mar. 13, 2018
  *  version Apr. 30, 2019
- * @version May.  1, 2019
+ *  version May.  1, 2019
+ *  version Jul. 20, 2019
+ *  version Mar. 31, 2020
+ * @version Apr.  1, 2020
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
   val platform: PlatformContext,
   val application: WebApplication,
-  val extend: List[WebEngine]
+  val extend: List[WebEngine],
+  val config: WebApplicationConfig = WebApplicationConfig.empty
 ) {
-  val rule: WebApplicationRule = extend./:(application.config.toRule)(_ complement _.application.config.toRule)
+  val rule: WebApplicationRule = extend./:(application.config.toRule)(_ complement _.application.config.toRule).complement(config.toRule)
   val view: ViewEngine = new ViewEngine(platform, application.view, extend.map(_.view))
   val scenariorule = ScenarioEngine.Rule.create() // TODO
   val scenario = new ScenarioEngine(platform, scenariorule)
   val prologuecontroller = {
     val route =
-      if (true)
+      if (false)
         Route.empty
       else
         Route.prologue
@@ -57,17 +61,19 @@ class WebEngine(
 
   def apply(p: Parcel): Content = {
     val parcel0 =
-      p.withApplicationRule(rule).withApplication(application)
+      p.complementApplicationRule(rule).withApplication(application)
+    val parcel1 = _normalize_auth(parcel0)
     val parcel =
       if (isTrace)
-        parcel0.withTrace(new TraceContext)
+        parcel1.withTrace(new TraceContext)
       else
-        parcel0
+        parcel1
     try {
       val r = parcel.executeWithTrace("WebEngine#apply", p.show) {
-        val a: Parcel = controller.applyRerun(parcel, 1)
-        val c: Content = a.content getOrElse {
-          view.applyOption(a).map {
+        val aftercontroller: Parcel = controller.applyRerun(parcel, 1)
+        val afterpage: Parcel = _normalize_page(aftercontroller)
+        val c: Content = afterpage.content getOrElse {
+          view.applyOption(afterpage).map {
             case m: ErrorContent => m
             case m =>
               if (m.expiresPeriod.isDefined)
@@ -77,10 +83,10 @@ class WebEngine(
                   application.config.getExpiresPeriod(x).fold(m)(m.withExpiresPeriod)
                 }
           }.getOrElse {
-            a.model.collect {
+            afterpage.model.collect {
               case m: ErrorModel => ErrorModelContent(m)
             }.getOrElse(
-              view.error(a, 404)
+              view.error(afterpage, 404)
             )
           }
         }
@@ -103,6 +109,16 @@ class WebEngine(
       case NonFatal(e) => view.error(parcel, e)
     }
   }
+
+  private def _normalize_auth(p: Parcel) =
+    p.command.collect {
+      case UnauthorizedCommand(req, Some(cmd)) => p.withCommand(cmd) // TODO security
+    }.getOrElse(p)
+
+  private def _normalize_page(p: Parcel) =
+    p.command.collect {
+      case ViewCommand(pathname) => p
+    }.getOrElse(p)
 
   def render(p: Parcel): String = {
     apply(p) match {

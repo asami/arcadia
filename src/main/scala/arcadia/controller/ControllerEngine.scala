@@ -12,7 +12,8 @@ import arcadia._
  *  version Nov. 13, 2017
  *  version Dec. 21, 2017
  *  version Jan.  7, 2018
- * @version Mar. 13, 2018
+ *  version Mar. 13, 2018
+ * @version Mar. 23, 2020
  * @author  ASAMI, Tomoharu
  */
 class ControllerEngine(
@@ -42,8 +43,10 @@ class ControllerEngine(
   }
 
   private def _invoke(p: Parcel): Parcel =
-    if (InvokeController.guard.isAccept(p))
-      InvokeController.apply(p)
+    if (InvokePlatformController.guard.isAccept(p))
+      InvokePlatformController.apply(p)
+    else if (InvokeOperationController.guard.isAccept(p))
+      InvokeOperationController.apply(p)
     else
       p
 

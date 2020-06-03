@@ -9,6 +9,7 @@ import com.asamioffice.goldenport.io.UURL
 import org.goldenport.exception.RAISE
 import org.goldenport.values.PathName
 import org.goldenport.bag.ProjectVersionDirectoryBag
+import org.goldenport.io.IoUtils
 import org.goldenport.util.StringUtils
 import arcadia.context._
 import arcadia.controller._
@@ -18,7 +19,8 @@ import arcadia.view._
  * @since   Jul. 23, 2017
  *  version Aug. 29, 2017
  *  version Sep. 17, 2017
- * @version Nov. 10, 2017
+ *  version Nov. 10, 2017
+ * @version Mar. 18, 2020
  * @author  ASAMI, Tomoharu
  */
 abstract class WebModule() {
@@ -62,11 +64,13 @@ class DirectoryWebModule(base: File) extends WebModule {
       protected def is_html(p: File): Boolean = DirectoryWebModule.this.is_html(p)
       protected def is_template(p: File): Boolean = DirectoryWebModule.this.is_template(p)
       protected def is_directory(p: File): Boolean = p.isDirectory
+      protected def path(p: File): String = p.getPath
       protected def name(p: File): String = p.getName
       protected def to_url(p: File): URL = p.toURI.toURL
       protected def to_template_source(p: File): TemplateSource = TemplateSource.fromFile(p)
       protected def root_node: File = base
       protected def to_children(p: File): List[File] = p.listFiles.toList
+      protected def to_descendants(p: File): List[File] = IoUtils.descendants(p).toList
     }
     builder.apply(platform)
   }

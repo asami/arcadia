@@ -9,7 +9,7 @@ import org.goldenport.collection.NonEmptyVector
 import org.goldenport.xml.XmlUtils
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.{Schema, Column, Invalid, Warning}
-import org.goldenport.i18n.I18NElement
+import org.goldenport.i18n.{I18NElement, I18NString}
 import org.goldenport.trace.Result
 import org.goldenport.values.PathName
 import arcadia._
@@ -30,7 +30,9 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Sep.  1, 2018
  *  version Nov.  7, 2018
  *  version Apr. 28, 2019
- * @version May.  1, 2019
+ *  version May.  1, 2019
+ *  version Mar. 21, 2020
+ * @version Apr. 18, 2020
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -258,7 +260,7 @@ case object ButtonTag extends Tag with SelectByName {
   // }
 
   private def _button(expr: Expression, p: UpdateEntityDirectiveFormModel): XmlContent = {
-    val op = resolve_action(expr, p.uri)
+    val op = resolve_action(expr, p.action)
     val id = p.id.v
     val action: String = s"$op/$id"
     val buttonname: String = expr.format(p.label)
@@ -267,7 +269,7 @@ case object ButtonTag extends Tag with SelectByName {
   }
 
   private def _button(expr: Expression, p: InvokeWithIdDirectiveFormModel): XmlContent = {
-    val op = resolve_action(expr, p.uri)
+    val op = resolve_action(expr, p.action)
     val id = p.id.v
     val idname = p.idPropertyName getOrElse "id"
     val action: String = s"$op?$idname=$id"
@@ -321,7 +323,7 @@ case object CommandTag extends Tag with SelectByName {
   }
 
   private def _command(expr: Expression, p: InvokeDirectiveFormModel): XmlContent = {
-    val op = resolve_action(expr, p.uri)
+    val op = resolve_action(expr, p.action)
     val action: String = s"$op"
     val method = p.method
     val title = p.title
@@ -329,8 +331,8 @@ case object CommandTag extends Tag with SelectByName {
     val submitlabel: String = command_submit_label(expr, p.submitLabel)
     val parameters = p.parameters
     val arguments = p.arguments
-    val warnings = p.error.flatMap(_.displayWarnings)
-    val errors = p.error.map(_.displayErrors)
+    val warnings = p.conclusion.getWarnings
+    val errors = p.conclusion.getErrors
     _command(expr, method, action, title, description, submitlabel, parameters, arguments, p.isActive, false, warnings, errors)
   }
 
@@ -345,8 +347,8 @@ case object CommandTag extends Tag with SelectByName {
     arguments: IRecord,
     isactive: Boolean,
     isreturnback: Boolean,
-    warnings: Option[NonEmptyVector[Warning]],
-    errors: Option[NonEmptyVector[Invalid]]
+    warnings: Option[NonEmptyVector[I18NString]],
+    errors: Option[NonEmptyVector[I18NString]]
   ): XmlContent = {
     val strategy = expr.strategy
     val r = new Renderer(strategy) {

@@ -2,13 +2,14 @@ package arcadia.rule
 
 import java.util.Locale
 import org.goldenport.util.StringUtils
-import org.goldenport.i18n.I18NString
+import org.goldenport.i18n.{I18NString, I18NMessage}
 import org.goldenport.record.v2._
 
 /*
  * @since   Apr. 25, 2019
  *  version Apr. 30, 2019
- * @version May.  1, 2019
+ *  version May.  1, 2019
+ * @version Apr. 17, 2020
  * @author  ASAMI, Tomoharu
  */
 case class PasswordRule(
@@ -43,7 +44,7 @@ case class PasswordRule(
 
   // def placeholder(locale: String) = s"""パスワード ※${label(locale)}(必須)"""
 
-  def placeholder: I18NString = I18NString(s"""パスワード ※{0}(必須)""", Vector(labelI18N)) // TODO
+  def placeholder: I18NMessage = I18NMessage(s"""パスワード ※{0}(必須)""", Vector(labelI18N))
 
   def toConstraints: List[Constraint] = List(this)
 

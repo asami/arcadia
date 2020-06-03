@@ -4,9 +4,9 @@ import scala.xml.{NodeSeq, Group, Text}
 import java.net.URI
 import java.util.Locale
 import org.goldenport.exception.RAISE
-import org.goldenport.collection.NonEmptyVector
+import org.goldenport.collection.{NonEmptyVector, VectorMap}
 import org.goldenport.record.v3.{IRecord, Record}
-import org.goldenport.record.v2.{Record => _, _}
+import org.goldenport.record.v2.{Record => _, Conclusion => RConclusion, _}
 import org.goldenport.record.v2.util.RecordUtils
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.trace.TraceContext
@@ -35,7 +35,10 @@ import arcadia.domain._
  *  version Sep.  1, 2018
  *  version Nov.  7, 2018
  *  version Apr. 30, 2019
- * @version May.  1, 2019
+ *  version May.  1, 2019
+ *  version Aug.  5, 2019
+ *  version Mar. 21, 2020
+ * @version Apr. 18, 2020
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -187,6 +190,57 @@ trait IQueueSetModel { self: Model =>
 }
 
 trait IFormModel { self: Model =>
+  def action: URI
+  def method: Method
+  def get(name: String): Option[Any]
+  def conclusion: IFormModel.Conclusion
+}
+object IFormModel {
+  case class Conclusion(
+    warnings: Option[NonEmptyVector[I18NString]] = None,
+    errors: Option[NonEmptyVector[I18NString]] = None,
+    warningsForProperty: VectorMap[String, I18NString] = VectorMap.empty,
+    errorsForProperty: VectorMap[String, I18NString] = VectorMap.empty
+  ) {
+    lazy val allWarnings: Vector[I18NString] = warnings.map(_.vector).getOrElse(Vector.empty) ++ warningsForProperty.values
+    lazy val allErrors: Vector[I18NString] = errors.map(_.vector).getOrElse(Vector.empty) ++ errorsForProperty.values
+
+    def getAllWarnings: Option[NonEmptyVector[I18NString]] = NonEmptyVector.createOption(allWarnings)
+    def getAllErrors: Option[NonEmptyVector[I18NString]] = NonEmptyVector.createOption(allErrors)
+    def getWarnings: Option[NonEmptyVector[I18NString]] = warnings
+    def getErrors: Option[NonEmptyVector[I18NString]] = errors
+    def isError: Boolean = errors.nonEmpty || errorsForProperty.nonEmpty
+    def isGeneralError: Boolean = errors.nonEmpty
+    def getGeneralErrorMessage(locale: Locale): Option[String] = getErrors.map(_.map(_.as(locale)).mkString(";"))
+    def isGeneralWarning: Boolean = warnings.nonEmpty
+    def getGeneralWarningMessage(locale: Locale): Option[String] = getWarnings.map(_.map(_.as(locale)).mkString(";"))
+    def isError(name: String): Boolean = errorsForProperty.contains(name)
+    def getErrorMessage(locale: Locale, name: String): Option[String] = errorsForProperty.get(name).map(_.as(locale))
+    def isWarning(name: String): Boolean = warningsForProperty.contains(name)
+    def getWarningMessage(locale: Locale, name: String): Option[String] = warningsForProperty.get(name).map(_.as(locale))
+  }
+  object Conclusion {
+    val empty = Conclusion()
+
+    def apply(p: Invalid): Conclusion = Conclusion(errors = Some(NonEmptyVector(p.i18nMessage)))
+
+    def apply(p: RConclusion): Conclusion = {
+      Conclusion(
+        p.warnings,
+        p.errors,
+        VectorMap(
+          p.warningForProperty.map {
+            case (k, v) => (k.name, v.i18nMessage)
+          }
+        ),
+        VectorMap(
+          p.errorForProperty.map {
+            case (k, v) => (k.name, v.i18nMessage)
+          }
+        )
+      )
+    }
+  }
 }
 
 case object EmptyModel extends Model {
@@ -204,6 +258,7 @@ case class ErrorModel(
   code: Int,
   message: Option[I18NElement],
   exception: Option[Throwable],
+  invalid: Option[Invalid],
   topUri: Option[URI],
   backUri: Option[URI],
   trace: Option[TraceContext]
@@ -213,17 +268,17 @@ case class ErrorModel(
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, None
   ) {
-    protected def render_Content: NodeSeq = error(code, message, exception, topUri, backUri, trace)
+    protected def render_Content: NodeSeq = error(code, message, exception, invalid, topUri, backUri, trace)
   }.apply
 }
 object ErrorModel extends ModelClass {
   def create(parcel: Parcel, code: Int): ErrorModel = {
     val backuri = _back_uri(parcel)
-    ErrorModel(code, None, None, None, backuri, parcel.trace)
+    ErrorModel(code, None, None, None, None, backuri, parcel.trace)
   }
   def create(parcel: Parcel, code: Int, e: Throwable): ErrorModel = {
     val backuri = _back_uri(parcel)
-    ErrorModel(code, None, Some(e), None, backuri, parcel.trace)
+    ErrorModel(code, None, Some(e), None, None, backuri, parcel.trace)
   }
   def create(parcel: Parcel, e: Throwable): ErrorModel = {
     val code = parcel.context.fold {
@@ -232,25 +287,29 @@ object ErrorModel extends ModelClass {
       ctx.toCode(e)
     }
     val backuri = _back_uri(parcel)
-    ErrorModel(code, None, Some(e), None, backuri, parcel.trace)
+    ErrorModel(code, None, Some(e), None, None, backuri, parcel.trace)
+  }
+  def create(parcel: Parcel, m: Invalid): ErrorModel = {
+    val backuri = _back_uri(parcel)
+    ErrorModel(400, None, None, Some(m), None, backuri, parcel.trace)
   }
   def create(parcel: Parcel, m: String): ErrorModel = {
     val backuri = _back_uri(parcel)
-    ErrorModel(500, Some(I18NElement(m)), None, None, backuri, parcel.trace)
+    ErrorModel(500, Some(I18NElement(m)), None, None, None, backuri, parcel.trace)
   }
   def create(parcel: Parcel, evt: scenario.Event): ErrorModel = RAISE.notImplementedYetDefect
   def create(code: Int, message: Option[String], exception: Option[Throwable]): ErrorModel =
-    ErrorModel(code, message.map(I18NElement(_)), exception, None, None, None)
+    ErrorModel(code, message.map(I18NElement(_)), exception, None, None, None, None)
   def create(res: Response): ErrorModel =
-    ErrorModel(res.code, None, None, None, None, None)
+    ErrorModel(res.code, None, None, None, None, None, None)
   def notFound(parcel: Parcel, m: String): ErrorModel = {
     val backuri = _back_uri(parcel)
     val msg = I18NElement(m)
-    ErrorModel(404, Some(msg), None, None, backuri, parcel.trace)
+    ErrorModel(404, Some(msg), None, None, None, backuri, parcel.trace)
   }
   def unauthorized(parcel: Parcel): ErrorModel = {
     val backuri = _back_uri(parcel)
-    ErrorModel(401, None, None, None, backuri, parcel.trace)
+    ErrorModel(401, None, None, None, None, backuri, parcel.trace)
   }
 
   private def _back_uri(parcel: Parcel): Option[URI] = None // TODO
@@ -516,7 +575,7 @@ case class EntityListModel(
   ){
     protected def render_Content: NodeSeq = table(Renderer.TableOrder(tableKind, getSchema, getEntityType, dataHref, records))
   }.apply
-  lazy val effectiveSchema = getSchema.getOrElse(Record.buildSchema(records))
+  lazy val effectiveSchema = getSchema.getOrElse(IRecord.makeSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
   lazy val tbody: TableBodyModel = TableBodyModel(Some(effectiveSchema), records, tableKind)
 }
@@ -629,7 +688,7 @@ case class PropertyTableModel(
   ){
     protected def render_Content: NodeSeq = property_table(getSchema, records, dataHref)
   }.apply
-  lazy val effectiveSchema = getSchema.getOrElse(Record.buildSchema(records))
+  lazy val effectiveSchema = getSchema.getOrElse(IRecord.makeSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
   lazy val tbody: TableBodyModel = TableBodyModel(Some(effectiveSchema), records, tableKind)
 }
@@ -693,7 +752,7 @@ case class TableModel(
     protected def render_Content: NodeSeq = table(strategy.tableKind(tableKind), getSchema, records, dataHref)
   }.apply
 
-  lazy val effectiveSchema = getSchema.getOrElse(Record.buildSchema(records))
+  lazy val effectiveSchema = getSchema.getOrElse(IRecord.makeSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
   lazy val tbody: TableBodyModel = TableBodyModel(Some(effectiveSchema), records, tableKind)
 }
@@ -747,7 +806,7 @@ case class TableBodyModel(
     strategy, None, None, None, None
   ){
     protected def render_Content: NodeSeq = {
-      val s = getSchema.getOrElse(Record.buildSchema(records))
+      val s = getSchema.getOrElse(IRecord.makeSchema(records))
       table_body(strategy.tableKind(tableKind), s, records)
     }
   }.apply
@@ -782,7 +841,7 @@ case class TableBodyRecordModel(
     strategy, None, None, None, None
   ){
     protected def render_Content: NodeSeq = {
-      val s = getSchema.getOrElse(Record.buildSchema(record))
+      val s = getSchema.getOrElse(IRecord.makeSchema(record))
       table_body_record(tableKind, s, record)
     }
   }.apply
@@ -914,10 +973,15 @@ object TableCardModel {
 }
 
 case class SearchBoxModel(
-  searchbox: Renderer.SearchBox
+  searchbox: Renderer.SearchBox,
+  conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty
 ) extends Model with IFormModel with IComponentModel {
   val expiresKind: Option[ExpiresKind] = None
   def toRecord: IRecord = RAISE.notImplementedYetDefect
+  def action = searchbox.input.action
+  def method = searchbox.input.method
+  def get(name: String): Option[Any] = None
+
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(strategy) {
     protected def render_Content: NodeSeq = searchbox_form(searchbox)
   }.apply
@@ -928,59 +992,72 @@ object SearchBoxModel {
 }
 
 case class PropertyInputFormModel(
-  uri: URI,
+  action: URI,
   method: Method,
   schema: Schema,
-  record: IRecord,
+  data: IRecord,
   hiddens: Hiddens,
   submit: Submits,
-  expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
+  expiresKind: Option[ExpiresKind] = Some(NoCacheExpires),
+  conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty
 ) extends Model with IFormModel with IComponentModel {
-  def toRecord: IRecord = throw new UnsupportedOperationException()
+  lazy val toRecord: IRecord = hiddens.hiddens.complement(data)
+
+  def get(name: String): Option[Any] = toRecord.get(name)
+
+  def setError(p: RConclusion): PropertyInputFormModel = copy(conclusion = IFormModel.Conclusion(p))
+
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ) {
     protected def render_Content: NodeSeq =
-      property_input_form(uri, method, schema, record, hiddens, submit)
+      property_input_form(action, method, schema, data, hiddens, submit)
   }.apply
 }
 
 case class PropertyConfirmFormModel(
-  uri: URI,
+  action: URI,
   method: Method,
   schema: Schema,
-  record: IRecord,
+  data: IRecord,
   hiddens: Hiddens,
   submit: Submits,
-  expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
+  expiresKind: Option[ExpiresKind] = Some(NoCacheExpires),
+  conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty
 ) extends Model with IFormModel with IComponentModel {
-  def toRecord: IRecord = throw new UnsupportedOperationException()
+  def toRecord: IRecord = data // TODO hiddens
+  def get(name: String): Option[Any] = data.get(name)
+
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ) {
     protected def render_Content: NodeSeq =
-      property_confirm_form(uri, method, schema, record, hiddens, submit)
+      property_confirm_form(action, method, schema, data, hiddens, submit)
   }.apply
 }
 
 case class UpdateEntityDirectiveFormModel(
-  uri: URI,
+  action: URI,
   label: I18NString,
   id: DomainEntityId,
   properties: IRecord,
-  isActive: Boolean
+  isActive: Boolean,
+  conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty
 ) extends Model with IFormModel with IComponentModel {
   val expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
-  def toRecord: IRecord = throw new UnsupportedOperationException()
+  def toRecord: IRecord = properties
+  def method = Put
+  def get(name: String): Option[Any] = properties.get(name)
+
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ) {
-    protected def render_Content: NodeSeq = update_entity_directive_form(uri, properties)
+    protected def render_Content: NodeSeq = update_entity_directive_form(action, properties)
   }.apply
 }
 
 case class InvokeDirectiveFormModel(
-  uri: URI,
+  action: URI,
   method: Method,
   title: Option[I18NElement],
   description: Option[I18NElement],
@@ -988,10 +1065,13 @@ case class InvokeDirectiveFormModel(
   parameters: Parameters,
   arguments: IRecord,
   isActive: Boolean,
-  error: Option[Invalid] = None
+  // error: Option[Invalid] = None
+  conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty
 ) extends Model with IFormModel with IComponentModel {
   val expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
-  def toRecord: IRecord = throw new UnsupportedOperationException()
+  def toRecord: IRecord = arguments
+  def get(name: String): Option[Any] = arguments.get(name)
+
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ) {
@@ -1000,21 +1080,35 @@ case class InvokeDirectiveFormModel(
 }
 
 case class InvokeWithIdDirectiveFormModel(
-  uri: URI,
+  action: URI,
   method: Method,
   label: I18NString,
   id: DomainObjectId,
   properties: IRecord,
   isActive: Boolean,
-  idPropertyName: Option[String]
+  idPropertyName: Option[String],
+  conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty
 ) extends Model with IFormModel with IComponentModel {
   val expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
-  def toRecord: IRecord = throw new UnsupportedOperationException()
+  def toRecord: IRecord = properties
+  def get(name: String): Option[Any] = properties.get(name)
+
   def render(strategy: RenderStrategy): NodeSeq = new Renderer(
     strategy, None, None, None, None
   ) {
-    protected def render_Content: NodeSeq = invoke_with_id_directive_form(uri, properties)
+    protected def render_Content: NodeSeq = invoke_with_id_directive_form(action, properties)
   }.apply
+}
+
+case object UndefinedFormModel extends Model with IFormModel {
+  val expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
+  val conclusion: IFormModel.Conclusion = IFormModel.Conclusion.empty // TODO
+  def toRecord: IRecord = throw new UnsupportedOperationException()
+  def action: URI = new URI("Undefined")
+  def method: Method = Get
+  def get(name: String): Option[Any] = None
+
+  def render(strategy: RenderStrategy): NodeSeq = throw new UnsupportedOperationException()
 }
 
 case class OperationOutcomeModel(

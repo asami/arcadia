@@ -10,7 +10,8 @@ import org.goldenport.exception.RAISE
  *  version Aug. 30, 2017
  *  version Dec. 17, 2017
  *  version Aug. 31, 2018
- * @version Nov.  7, 2018
+ *  version Nov.  7, 2018
+ * @version Mar. 21, 2020
  * @author  ASAMI, Tomoharu
  */
 case class ViewRecord(record: IRecord, strategy: RenderStrategy) extends Dynamic {
@@ -26,7 +27,7 @@ case class ViewRecord(record: IRecord, strategy: RenderStrategy) extends Dynamic
   def asDate(name: String): String = getDate(name) getOrElse ""
   def asTime(name: String): String = getTime(name) getOrElse ""
   def asXml(name: String): NodeSeq = getXml(name) getOrElse Group(Nil)
-  def selectDynamic(name: String): Any = record.get(name) getOrElse ""
+  def selectDynamic(name: String): String = get(name) getOrElse ""
 }
 
 object ViewRecord {
