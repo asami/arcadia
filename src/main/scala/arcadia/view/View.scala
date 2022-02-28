@@ -8,6 +8,7 @@ import org.goldenport.Strings
 import org.goldenport.record.v2._
 import org.goldenport.bag.{ChunkBag, UrlBag}
 import org.goldenport.io.UrlUtils
+import org.goldenport.io.IoUtils
 import org.goldenport.trace.Result
 import org.goldenport.util.StringUtils
 import com.asamioffice.goldenport.io.UURL
@@ -25,7 +26,8 @@ import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL, PROP_VIEW_FORM}
  *  version Mar. 18, 2018
  *  version Jul. 21, 2019
  *  version Mar. 21, 2020
- * @version May. 28, 2020
+ *  version May. 28, 2020
+ * @version Feb. 27, 2022
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -173,7 +175,15 @@ case class MaterialView(baseUrl: URL) extends View() {
     }
     _get_control_content(parcel, c.pathname.v) getOrElse {
       val url = new URL(baseUrl, c.pathname.v)
-      BinaryContent(mime, new UrlBag(url), AssetsExpires)
+      def loadedstring = parcel.context.map(_.loadString(url)).getOrElse(IoUtils.toText(url))
+      if (mime.isXml)
+        XmlContent.load(mime, url)
+      else if (mime.isHtml)
+        StringContent(mime, loadedstring)
+      else if (mime.isText)
+        StringContent(mime, loadedstring)
+      else
+        BinaryContent(mime, new UrlBag(url), AssetsExpires)
     }
   }
 

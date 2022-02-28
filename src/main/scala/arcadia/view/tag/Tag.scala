@@ -3,6 +3,7 @@ package arcadia.view.tag
 import scalaz.{Node => _, _}, Scalaz._
 import scala.xml._
 import java.net.URI
+import com.github.nscala_time.time.Imports._
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
 import org.goldenport.collection.NonEmptyVector
@@ -32,7 +33,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Apr. 28, 2019
  *  version May.  1, 2019
  *  version Mar. 21, 2020
- * @version Apr. 18, 2020
+ *  version Apr. 18, 2020
+ * @version Feb. 27, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -384,5 +386,14 @@ case object TabsTag extends Tag with SelectByName {
       protected def render_Content: NodeSeq = tabs(b)
     }.apply
     XmlContent(r)
+  }
+}
+
+case object DateTimeTag extends Tag with SelectByName {
+  val name = "datetime"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val dt = new DateTime()
+    XmlContent.text(dt.toString) // TODO
   }
 }

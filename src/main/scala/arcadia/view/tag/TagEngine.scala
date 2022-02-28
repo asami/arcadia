@@ -23,7 +23,8 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  *  version Feb. 17, 2018
  *  version Apr. 15, 2018
  *  version May.  3, 2018
- * @version Aug.  5, 2018
+ *  version Aug.  5, 2018
+ * @version Feb. 27, 2022
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -121,11 +122,14 @@ object Tags {
     CarouselTag,
     BadgeTag,
     ButtonTag,
-    CommandTag,
     TabsTag,
+    //
     ModelTag,
     ErrorTag,
-    WidgetTag
+    WidgetTag,
+    CommandTag,
+    //
+    DateTimeTag
   ))
 }
 

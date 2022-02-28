@@ -2,6 +2,7 @@ package arcadia.context
 
 import scala.xml._
 import java.net.URI
+import java.net.URL
 import play.api.libs.json.JsValue
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v3.{IRecord, Record}
@@ -28,7 +29,8 @@ import arcadia.rule._
  *  version Apr. 29, 2019
  *  version Mar. 23, 2020
  *  version Apr. 17, 2020
- * @version May. 29, 2020
+ *  version May. 29, 2020
+ * @version Feb. 27, 2022
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -49,6 +51,8 @@ case class ExecutionContext(
   )
   def getMimetypeBySuffix(p: Option[String]): Option[MimeType] = platformExecutionContext.getMimetypeBySuffix(p)
   def getMimetypeBySuffix(p: String): Option[MimeType] = platformExecutionContext.getMimetypeBySuffix(p)
+  def loadString(p: URL): String = platformExecutionContext.loadString(p)
+
   def get(uri: String, query: Option[Map[String, Any]], form: Option[Map[String, Any]]): Response = platformExecutionContext.get(uri, query.getOrElse(Map.empty), form.getOrElse(Map.empty))
   def get(uri: String, query: Map[String, Any], form: Map[String, Any]): Response = platformExecutionContext.get(uri, query, form)
   def post(uri: String, query: Option[Map[String, Any]], form: Option[Map[String, Any]]): Response = platformExecutionContext.post(uri, query.getOrElse(Map.empty), form.getOrElse(Map.empty))

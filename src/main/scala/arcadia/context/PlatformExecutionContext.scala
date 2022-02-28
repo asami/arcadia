@@ -1,14 +1,18 @@
 package arcadia.context
 
 import scala.xml._
+import java.nio.charset.Charset
 import java.util.Locale
 import java.net.URI
+import java.net.URL
 import play.api.libs.json.JsValue
+import org.goldenport.Platform
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v3.IRecord
 import org.goldenport.record.v2.{Schema, Column}
 import org.goldenport.record.v2.{Invalid, Conclusion}
 import org.goldenport.values.PathName
+import org.goldenport.io.IoUtils
 import arcadia._
 import arcadia.model._
 import arcadia.view._
@@ -28,7 +32,8 @@ import arcadia.rule._
  *  version Apr. 29, 2019
  *  version Mar. 23, 2020
  *  version Apr. 17, 2020
- * @version May. 29, 2020
+ *  version May. 29, 2020
+ * @version Feb. 28, 2022
  * @author  ASAMI, Tomoharu
  */
 trait PlatformExecutionContext {
@@ -40,7 +45,12 @@ trait PlatformExecutionContext {
   def getLogicalUri: Option[URI]
   def getImplicitIndexBase: Option[String]
   def getMimetypeBySuffix(p: Option[String]): Option[MimeType] = p.flatMap(getMimetypeBySuffix)
-  def getMimetypeBySuffix(p: String): Option[MimeType]
+  def getMimetypeBySuffix(p: String): Option[MimeType] = MimeType.suffixMimeMap.get(p)
+  def charsetInputFile: Charset // = Platform.charset.UTF8
+  def charsetOutputFile: Charset // = Platform.charset.UTF8
+  def charsetConsole: Charset // = Platform.charset.UTF8
+  def loadString(p: URL): String = IoUtils.toText(p, charsetInputFile)
+  def saveString(p: URL, s: String): Unit = IoUtils.save(p, s, charsetOutputFile)
   def get(uri: String, query: Map[String, Any], form: Map[String, Any]): Response
   def post(uri: String, query: Map[String, Any], form: Map[String, Any]): Response
   def post(uri: String, query: IRecord, form: IRecord): Response = post(uri, query.toMap, form.toMap)

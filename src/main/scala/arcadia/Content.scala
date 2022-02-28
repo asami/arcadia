@@ -5,9 +5,12 @@ import scala.util.control.NonFatal
 import scala.xml._
 import scala.concurrent.duration._
 import java.net.URI
+import java.net.URL
+import java.io.OutputStream
 import org.joda.time.DateTime
 import org.goldenport.exception.RAISE
 import org.goldenport.bag.ChunkBag
+import org.goldenport.io.IoUtils
 import org.goldenport.record.v2.Record
 import org.goldenport.xml.{XmlUtils, XmlPrinter}
 import org.goldenport.util.SeqUtils.mkStringOption
@@ -23,12 +26,15 @@ import arcadia.context.Session
  *  version Nov. 17, 2017
  *  version Dec. 21, 2017
  *  version Jan.  8, 2018
- * @version Apr. 20, 2020
+ *  version Apr. 20, 2020
+ * @version Feb. 27, 2022
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
+  def code: Int
   def mimetype: MimeType
   def contenttype: String = mimetype.name
+  def charset: Option[String]
   def expiresKind: Option[ExpiresKind]
   def expiresPeriod: Option[FiniteDuration]
   def proxyExpiresPeriod: Option[FiniteDuration]
@@ -64,6 +70,16 @@ sealed trait Content {
 
   def withCode(code: Int): Content
   def withExpiresPeriod(p: FiniteDuration): Content
+
+  def write(out: OutputStream): Unit
+  def writeClose(out: OutputStream): Unit = try {
+    write(out)
+  } finally {
+    out.close()
+  }
+
+  protected final def write_string(out: OutputStream, p: String): Unit =
+    charset.map(IoUtils.write(out, p, _)).getOrElse(IoUtils.write(out, p))
 
   def addCallTree(p: String): Content = this
 
@@ -114,6 +130,8 @@ case class StringContent(
     code
   )
 
+  def write(out: OutputStream): Unit = write_string(out, string)
+
   override def addCallTree(p: String) = copy(string = string + "\n===== Call Tree (StringContent) =====\n" + p)
 }
 object StringContent {
@@ -121,6 +139,9 @@ object StringContent {
     StringContent(MimeType.text_html, None, s, None, None, None, None, None)
   def apply(s: String, expireskind: ExpiresKind): StringContent =
     StringContent(MimeType.text_html, None, s, Some(expireskind), None, None, None, None)
+
+  def apply(mime: MimeType, s: String): StringContent =
+    StringContent(mime, None, s, None, None, None, None, None)
 }
 
 case class XmlContent(
@@ -134,9 +155,10 @@ case class XmlContent(
   code: Int = 200
 ) extends Content {
   val session = None
+  val charset = Some("utf-8") // TODO
   override def asXml: NodeSeq = xml
   override def asXmlContent: XmlContent = this
-  override lazy val contenttype = to_contenttype("utf-8")
+  override lazy val contenttype = to_contenttype(charset)
 
   lazy val toHtmlString: String = XmlPrinter.html(xml)
 
@@ -151,6 +173,8 @@ case class XmlContent(
     val ek: Option[ExpiresKind] = expiresKind |+| rhs.expiresKind
     copy(xml = XmlUtils.concat(xml, rhs.xml), expiresKind = ek)
   }
+
+  def write(out: OutputStream): Unit = write_string(out, toHtmlString)
 
   override def addCallTree(p: String) = copy(xml = XmlUtils.concat(
     xml,
@@ -196,6 +220,8 @@ object XmlContent {
     }
   }
 
+  def text(p: String): XmlContent = XmlContent(MimeType.text_html, Text(p), None, None, None, None, None)
+
   def staticPage(xml: NodeSeq) = XmlContent(MimeType.text_html, xml, Some(StaticPageExpires), None, None, None, None)
   def stablePage(xml: NodeSeq) = XmlContent(MimeType.text_html, xml, Some(StablePageExpires), None, None, None, None)
   def agilePage(xml: NodeSeq) = XmlContent(MimeType.text_html, xml, Some(AgilePageExpires), None, None, None, None)
@@ -203,6 +229,10 @@ object XmlContent {
   def dynamicPage(xml: NodeSeq) = XmlContent(MimeType.text_html, xml, Some(DynamicPageExpires), None, None, None, None)
   def privatePage(xml: NodeSeq) = XmlContent(MimeType.text_html, xml, Some(PrivatePageExpires), None, None, None, None)
   def noCachePage(xml: NodeSeq) = XmlContent(MimeType.text_html, xml, Some(NoCacheExpires), None, None, None, None)
+
+  def load(mime: MimeType, url: URL): XmlContent = {
+    XmlContent(mime, XML.load(url), None, None, None, None, None) // TODO parse encoding
+  }
 }
 
 case class BinaryContent(
@@ -216,8 +246,12 @@ case class BinaryContent(
   code: Int = 200
 ) extends Content {
   val session = None
+  val charset = None
+
   def withCode(p: Int) = copy(code = p)
   def withExpiresPeriod(p: FiniteDuration): BinaryContent = copy(expiresPeriod = Some(p))
+
+  def write(out: OutputStream): Unit = binary.copyTo(out)
 
   lazy val show = "BinaryContent"
 }
@@ -232,6 +266,7 @@ case class RedirectContent(
   code: Int = 303
 ) extends Content {
   def mimetype: MimeType = MimeType.text_html
+  val charset = None
   lazy val xml: NodeSeq = Group(Nil)
   def expiresKind: Option[ExpiresKind] = Some(NoCacheExpires)
   def expiresPeriod: Option[FiniteDuration] = None
@@ -244,6 +279,8 @@ case class RedirectContent(
   def withCode(p: Int) = copy(code = p)
 
   lazy val show = "RedirectContent"
+
+  def write(out: OutputStream): Unit = write_string(out, show)
 }
 object RedirectContent {
   def apply(p: String): RedirectContent = RedirectContent(new URI(p))
@@ -262,15 +299,20 @@ trait ErrorContent extends Content {
   def withExpiresPeriod(p: FiniteDuration): Content = this
   def withCode(p: Int) = this
   def session = None
+  def show: String
+
+  def write(out: OutputStream): Unit = write_string(out, show)
 }
 
 case class ErrorModelContent(model: ErrorModel) extends ErrorContent {
   def code = model.code
+  val charset = None
   lazy val show = s"ErrorModelContent: $code"
 }
 
 case class NotFoundContent(pathname: String) extends ErrorContent {
   def code = 404
+  val charset = None
   lazy val show = s"NotFoundContent: $pathname"
 }
 

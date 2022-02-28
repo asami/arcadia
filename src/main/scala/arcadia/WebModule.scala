@@ -21,7 +21,8 @@ import arcadia.view._
  *  version Sep. 17, 2017
  *  version Nov. 10, 2017
  *  version Mar. 18, 2020
- * @version Jun.  2, 2020
+ *  version Jun.  2, 2020
+ * @version Feb. 28, 2022
  * @author  ASAMI, Tomoharu
  */
 abstract class WebModule() {
@@ -55,6 +56,17 @@ object WebModule {
       DirectoryWebModule(url)
     else
       RAISE.invalidArgumentFault(s"$url")
+  }
+
+  def createOption(file: File, basedir: File): Option[WebModule] = {
+    val f = file.getCanonicalFile
+    val name = f.getName
+    if (StringUtils.isSuffix(name, warSuffixes))
+      Some(new WarWebModule(file.toURI.toURL, basedir, None, None))
+    else if (f.isDirectory)
+      Some(DirectoryWebModule(f))
+    else
+      None
   }
 }
 
@@ -123,6 +135,7 @@ object DirectoryWebModule {
     new DirectoryWebModule(new File(dirname))
   }
 
+  def apply(file: File): DirectoryWebModule = new DirectoryWebModule(file)
   def apply(url: URL): DirectoryWebModule = fromPathname(url.getFile)
 }
 

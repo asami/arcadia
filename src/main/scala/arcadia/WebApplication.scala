@@ -29,7 +29,8 @@ import arcadia.scenario._
  *  version Jan.  6, 2018
  *  version Apr. 28, 2019
  *  version Mar. 18, 2020
- * @version Apr. 13, 2020
+ *  version Apr. 13, 2020
+ * @version Apr. 15, 2021
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -55,7 +56,7 @@ object WebApplication {
 
   lazy val empty = plain(PlatformContext.empty)
 
-  val materialSuffixes = Set("html", "png", "jpg", "jpeg", "gif", "css", "js")
+  val materialSuffixes = Set("html", "png", "jpg", "jpeg", "gif", "apng", "webp", "avif", "css", "js")
 
   def plain(platform: PlatformContext) = {
     val basedir = platform.getDevelopDirectory
