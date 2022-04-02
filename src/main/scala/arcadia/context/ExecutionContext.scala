@@ -16,6 +16,7 @@ import arcadia.view._
 import arcadia.controller.UrnSource
 import arcadia.domain._
 import arcadia.rule._
+import arcadia.service.ServiceFacility
 
 /*
  * @since   Aug. 29, 2017
@@ -30,11 +31,13 @@ import arcadia.rule._
  *  version Mar. 23, 2020
  *  version Apr. 17, 2020
  *  version May. 29, 2020
- * @version Feb. 27, 2022
+ *  version Feb. 27, 2022
+ * @version Mar. 21, 2022
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
   platformExecutionContext: PlatformExecutionContext,
+  services: ServiceFacility,
   webapp: WebApplication
 ) {
   def config = webapp.config
@@ -63,8 +66,12 @@ case class ExecutionContext(
   def put(uri: String, query: Map[String, Any], form: Map[String, Any]): Response = platformExecutionContext.put(uri, query, form)
   def delete(uri: String, query: Option[Map[String, Any]], form: Option[Map[String, Any]]): Response = platformExecutionContext.delete(uri, query.getOrElse(Map.empty), form.getOrElse(Map.empty))
   def delete(uri: String, query: Map[String, Any], form: Map[String, Any]): Response = platformExecutionContext.delete(uri, query, form)
+
   def invoke(op: InvokePlatformCommand): Response = platformExecutionContext.invoke(op)
-  def invoke(op: InvokeOperationCommand): Response = platformExecutionContext.invoke(op)
+
+  def invoke(op: InvokeOperationCommand): Response =
+    services.invokeOption(op) getOrElse platformExecutionContext.invoke(op)
+
   def getEntitySchema(name: String): Option[Schema] = {
     // TODO config
     platformExecutionContext.getEntitySchema(name)

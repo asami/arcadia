@@ -24,7 +24,8 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  *  version Apr. 15, 2018
  *  version May.  3, 2018
  *  version Aug.  5, 2018
- * @version Feb. 27, 2022
+ *  version Feb. 27, 2022
+ * @version Mar. 30, 2022
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -59,7 +60,31 @@ class TagEngine(
       case m => p
     }
 
-    private def _group(ps: Seq[XmlContent]): XmlContent = XmlContent(ps)
+    private def _group(ps: Seq[XmlContent]): XmlContent = {
+      val xs = ps.map(_apply)
+      val mimetype = _mimetype(xs)
+      val xml = _xml(xs)
+      val expireskind = _expires_kind(xs)
+      val expiresperiod = _expires_period(xs)
+      val proxyexpiresperiod = _proxy_expires_period(xs)
+      val etag = _etag(xs)
+      val lastmodified = _last_modified(xs)
+      XmlContent(mimetype, xml, expireskind, expiresperiod, proxyexpiresperiod, etag, lastmodified)
+    }
+
+    private def _mimetype(ps: Seq[XmlContent]) = ps.headOption.fold(MimeType.text_html)(_.mimetype)
+
+    private def _xml(ps: Seq[XmlContent]): NodeSeq = XmlUtils.concat(ps.map(_.xml))
+
+    private def _expires_kind(ps: Seq[XmlContent]) = ps.headOption.flatMap(_.expiresKind)
+
+    private def _expires_period(ps: Seq[XmlContent]) = ps.headOption.flatMap(_.expiresPeriod)
+
+    private def _proxy_expires_period(ps: Seq[XmlContent]) = ps.headOption.flatMap(_.proxyExpiresPeriod)
+
+    private def _etag(ps: Seq[XmlContent]) = ps.headOption.flatMap(_.etag)
+
+    private def _last_modified(ps: Seq[XmlContent]) = ps.headOption.flatMap(_.lastModified)
 
     // private def _eval_content(p: Content): Option[XmlContent] = ???
 
@@ -123,6 +148,7 @@ object Tags {
     BadgeTag,
     ButtonTag,
     TabsTag,
+    FormTag,
     //
     ModelTag,
     ErrorTag,

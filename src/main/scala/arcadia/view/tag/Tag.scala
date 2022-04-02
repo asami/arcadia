@@ -34,7 +34,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version May.  1, 2019
  *  version Mar. 21, 2020
  *  version Apr. 18, 2020
- * @version Feb. 27, 2022
+ *  version Feb. 27, 2022
+ * @version Mar. 30, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -386,6 +387,17 @@ case object TabsTag extends Tag with SelectByName {
       protected def render_Content: NodeSeq = tabs(b)
     }.apply
     XmlContent(r)
+  }
+}
+
+case object FormTag extends Tag with SelectByName {
+  val name = "form"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val model = p.effectiveModel match {
+      case m: FormModel => m
+    }
+    p.applyModel(model)
   }
 }
 

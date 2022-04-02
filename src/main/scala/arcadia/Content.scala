@@ -13,6 +13,7 @@ import org.goldenport.bag.ChunkBag
 import org.goldenport.io.IoUtils
 import org.goldenport.record.v2.Record
 import org.goldenport.xml.{XmlUtils, XmlPrinter}
+import org.goldenport.xml.XhtmlUtils
 import org.goldenport.util.SeqUtils.mkStringOption
 import org.goldenport.util.DateTimeUtils.httpDateTimeString
 import arcadia.model.ErrorModel
@@ -27,7 +28,8 @@ import arcadia.context.Session
  *  version Dec. 21, 2017
  *  version Jan.  8, 2018
  *  version Apr. 20, 2020
- * @version Feb. 27, 2022
+ *  version Feb. 27, 2022
+ * @version Mar. 28, 2022
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
@@ -231,8 +233,16 @@ object XmlContent {
   def noCachePage(xml: NodeSeq) = XmlContent(MimeType.text_html, xml, Some(NoCacheExpires), None, None, None, None)
 
   def load(mime: MimeType, url: URL): XmlContent = {
-    XmlContent(mime, XML.load(url), None, None, None, None, None) // TODO parse encoding
+    // XmlContent(mime, XML.load(url), None, None, None, None, None) // TODO parse encoding
+    val xml = mime match {
+      case m if m.isXml => XML.load(url)
+      case m if m.isHtml => XhtmlUtils.loadHtmlFragmentNode(url)
+      case m => Text(IoUtils.toText(url))
+    }
+    staticPage(xml)
   }
+
+  def loadHtml(url: URL): XmlContent = load(MimeType.text_html, url)
 }
 
 case class BinaryContent(

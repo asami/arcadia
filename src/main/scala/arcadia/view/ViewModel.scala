@@ -16,7 +16,8 @@ import arcadia.model._
  *  version Jan. 21, 2018
  *  version Aug.  5, 2018
  *  version Mar. 31, 2020
- * @version Apr. 11, 2020
+ *  version Apr. 11, 2020
+ * @version Mar.  5, 2022
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -86,9 +87,34 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   def navigation: NodeSeq = _render_partial(strategy.partials.navigation)
   def navigationContent: NodeSeq = strategy.theme.navigation.content(this)
   def contentHeader: NodeSeq = _render_partial(strategy.partials.contentHeader)
-  def content: NodeSeq = _render_partial(strategy.partials.content)
+  def content: NodeSeq = _render_partial(strategy.partials.content, contentContent)
+  def contentContent: NodeSeq = main
 
-  def contentContent: NodeSeq =
+  def main: NodeSeq = contentDocument.headOption.
+    flatMap(_to_body_content).
+    getOrElse(contentDocument)
+
+  def mainTitle: NodeSeq = contentDocument.headOption.
+    flatMap(_to_head_title).
+    getOrElse(NodeSeq.Empty)
+
+  private def _to_body_content(p: Node): Option[NodeSeq] =
+    p.label match {
+      case "html" => p.child.find(_.label == "body").
+          map(x => NodeSeq.fromSeq(x.child)).
+          orElse(Some(NodeSeq.Empty))
+      case "body" => Some(p.child)
+      case _ => None
+    }
+
+  private def _to_head_title(p: Node): Option[NodeSeq] =
+    p.label match {
+      case "html" => p.child.find(_.label == "head").map(_\\("title"))
+      case "body" => Some(p.child)
+      case _ => None
+    }
+
+  lazy val contentDocument: NodeSeq =
     strategy.viewContext.
       flatMap(_content_content_from_view).
       getOrElse(_content_content_from_model)
@@ -104,14 +130,25 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   }
   def partial(p: PartialKind): NodeSeq = _render_partial(strategy.partials.get(p))
 
-  private def _render_partial(p: Option[PartialView]): NodeSeq = 
-    p.map { view =>
-      strategy.viewContext.fold {
-        RAISE.noReachDefect
-      } { c =>
-        view.render(c.engine, c.parcel)
-      }
-    }.getOrElse(Group(Nil))
+  private def _render_partial(p: PartialView): NodeSeq = 
+    strategy.viewContext.fold {
+      RAISE.noReachDefect
+    } { c =>
+      p.render(c.engine, c.parcel)
+    }
+
+  private def _render_partial(p: Option[PartialView]): NodeSeq =
+    p.map(_render_partial).getOrElse(Group(Nil))
+    // p.map { view =>
+    //   strategy.viewContext.fold {
+    //     RAISE.noReachDefect
+    //   } { c =>
+    //     view.render(c.engine, c.parcel)
+    //   }
+    // }.getOrElse(Group(Nil))
+
+  private def _render_partial(p: Option[PartialView], default: => NodeSeq): NodeSeq = 
+    p.map(_render_partial).getOrElse(default)
 
   protected def render_view_section(p: ISectionModel with Model): NodeSeq = {
     val parcel = Parcel(p, strategy.withScopeContent)

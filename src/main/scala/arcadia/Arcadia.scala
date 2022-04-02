@@ -20,16 +20,19 @@ import org.goldenport.util.StringUtils
 // import org.goldenport.io.IoUtils
 // import org.goldenport.util.StringUtils
 import arcadia.context._
+import arcadia.service.{ServiceFacility, SystemService}
 // import arcadia.controller._
 // import arcadia.view._
 
 /*
  * @since   Jan. 24, 2022
- * @version Feb. 28, 2022
+ *  version Feb. 28, 2022
+ * @version Mar. 20, 2022
  * @author  ASAMI, Tomoharu
  */
 class Arcadia(
   platformContext: PlatformContext,
+  services: ServiceFacility,
   applications: Map[String, WebApplication],
   configs: Map[String, WebApplicationConfig]
 ) {
@@ -47,7 +50,7 @@ class Arcadia(
       } { app =>
         val extend = app.extend.map(_engine(_, name :: history))
         // TODO merge webRule
-        val r = new WebEngine(platformContext, app, extend, _web_config(app))
+        val r = new WebEngine(platformContext, services, app, extend, _web_config(app))
         _engines += (name -> r)
         r
       }
@@ -75,9 +78,15 @@ object Arcadia {
   // }
 
   def make(pc: PlatformContext, config: Hocon): Consequence[Arcadia] = for {
+    services <- _make_services(pc, config)
     apps <- _make_applications(pc, config)
     confs <- _make_configs(config)
-  } yield new Arcadia(pc, apps, confs)
+  } yield new Arcadia(pc, services, apps, confs)
+
+  private def _make_services(pc: PlatformContext, config: Hocon): Consequence[ServiceFacility] = Consequence {
+    val services = List(new SystemService(pc))
+    new ServiceFacility(pc, services)
+  }
 
   private def _make_applications(pc: PlatformContext, config: Hocon): Consequence[Map[String, WebApplication]] = {
     val tmpdir = config.getFileOption(PROP_TMP_DIRECTORY) getOrElse new File("target/war")

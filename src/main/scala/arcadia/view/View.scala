@@ -27,7 +27,8 @@ import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL, PROP_VIEW_FORM}
  *  version Jul. 21, 2019
  *  version Mar. 21, 2020
  *  version May. 28, 2020
- * @version Feb. 27, 2022
+ *  version Feb. 27, 2022
+ * @version Mar. 28, 2022
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -150,7 +151,10 @@ case class HtmlView(url: URL, pathname: Option[String] = None) extends View() {
   val guard = PathnameGuard(_pathname)
 
   protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content =
-    StringContent(new UrlBag(url).toText, StaticPageExpires) // UTF-8
+    if (true)
+      XmlContent.loadHtml(url)
+    else
+      StringContent(new UrlBag(url).toText, StaticPageExpires) // UTF-8
 }
 
 case class MaterialView(baseUrl: URL) extends View() {

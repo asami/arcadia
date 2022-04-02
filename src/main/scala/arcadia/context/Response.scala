@@ -1,8 +1,9 @@
 package arcadia.context
 
 import scala.xml._
-import play.api.libs.json.JsValue
+import play.api.libs.json.{JsValue, JsNull}
 import org.goldenport.exception.RAISE
+import org.goldenport.context.StatusCode
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.util.SchemaBuilder
 import arcadia._
@@ -15,7 +16,8 @@ import arcadia.domain._
  * @since   Oct.  8, 2017
  *  version Aug. 31, 2018
  *  version Nov.  7, 2018
- * @version Apr. 30, 2019
+ *  version Apr. 30, 2019
+ * @version Mar. 20, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Response {
@@ -29,6 +31,7 @@ trait Response {
   def json: JsValue
 
   def isSuccess: Boolean = code == 200
+  def isNotFound: Boolean = code == StatusCode.NotFound.code
 
   def render(strategy: RenderStrategy): NodeSeq = {
     import SchemaBuilder._
@@ -85,4 +88,21 @@ trait Response {
     } else {
       ErrorModel.create(this)
     }
+}
+
+object Response {
+  case class Standard(
+    code: Int = StatusCode.Ok.code,
+    mime: String = MimeType.APPLICATION_JSON.name,
+    entityType: Option[DomainEntityType] = None,
+    getString: Option[String] = None,
+    getRecord: Option[IRecord] = None,
+    getRecords: Option[List[IRecord]] = None,
+    transfer: Option[Transfer] = None,
+    json: JsValue = JsNull
+  ) extends Response {
+  }
+
+  def record(p: IRecord): Response = Standard(getRecord = Some(p))
+  def notFound(): Response = Standard(StatusCode.NotFound.code)
 }

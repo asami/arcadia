@@ -10,6 +10,7 @@ import org.goldenport.trace.{TraceContext, Result}
 import org.goldenport.values.PathName
 import org.goldenport.util.{SeqUtils, MapUtils, StringUtils}
 import arcadia.context._
+import arcadia.service.ServiceFacility
 import arcadia.domain._
 import arcadia.model.{Model, ErrorModel, Badge, IRecordModel, CandidatesModel}
 import arcadia.view.{ViewEngine, RenderStrategy, Partials, View,
@@ -32,7 +33,8 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version May.  1, 2019
  *  version Mar. 31, 2020
  *  version Apr. 20, 2020
- * @version Jun.  3, 2020
+ *  version Jun.  3, 2020
+ * @version Mar. 21, 2022
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -63,8 +65,8 @@ case class Parcel(
 
   // def withApplicationRule(p: WebApplicationRule) = copy(render = render.map(_.withApplicationRule(p)))
   def complementApplicationRule(p: WebApplicationRule) = copy(render = render.map(_.complementApplicationRule(p)))
-  def withApplication(p: WebApplication) = getPlatformExecutionContext.
-    map(x => copy(context = Some(ExecutionContext(x, p)))).
+  def withExecutionContext(service: ServiceFacility, app: WebApplication) = getPlatformExecutionContext.
+    map(x => copy(context = Some(ExecutionContext(x, service, app)))).
     getOrElse(RAISE.noReachDefect)
   def withTrace(p: TraceContext) = copy(trace = Some(p))
 
@@ -149,11 +151,15 @@ case class Parcel(
   def pathUri: URI = new URI(getPathName.map(_.v) getOrElse RAISE.noReachDefect) // XXX
   def getPathName: Option[PathName] = command.flatMap {
     case MaterialCommand(pathname) => Some(pathname)
+    case m: IndexCommand => Some(m.pathname)
+    case ViewCommand(pathname) => Some(pathname)
     case _ => None
   }.orElse(context.flatMap(_.getPathName))
   def getOperationName: Option[String] =
     command flatMap {
       case MaterialCommand(pathname) => Some(pathname.body)
+      case m: IndexCommand => Some(m.body)
+      case ViewCommand(pathname) => Some(pathname.body)
       case _ => context.flatMap(_.getOperationName)
     }
   def isOperationPathName(p: String): Boolean = {
@@ -162,6 +168,7 @@ case class Parcel(
     //   p == pathname.body || pathname.getParent.fold(false)(_.body == p)
     command.flatMap {
       case MaterialCommand(pathname) => Some(_is_operation_pathname(basename, pathname))
+      case m: IndexCommand => Some(_is_operation_pathname(basename, m.pathname))
       case ViewCommand(pathname) => Some(_is_operation_pathname(basename, pathname))
       case _ => None
     }.getOrElse(

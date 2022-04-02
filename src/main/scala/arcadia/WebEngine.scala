@@ -11,6 +11,7 @@ import arcadia.view.ViewEngine
 import arcadia.controller._
 import arcadia.model.ErrorModel
 import arcadia.scenario._
+import arcadia.service.ServiceFacility
 
 /*
  * @since   Jul. 15, 2017
@@ -26,11 +27,13 @@ import arcadia.scenario._
  *  version Jul. 20, 2019
  *  version Mar. 31, 2020
  *  version Apr.  1, 2020
- * @version May.  8, 2020
+ *  version May.  8, 2020
+ * @version Mar. 20, 2022
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
   val platform: PlatformContext,
+  val services: ServiceFacility,
   val application: WebApplication,
   val extend: List[WebEngine],
   val config: WebApplicationConfig = WebApplicationConfig.empty
@@ -63,8 +66,8 @@ class WebEngine(
   val isTrace = true
 
   def apply(p: Parcel): Content = {
-    val parcel0 =
-      p.complementApplicationRule(rule).withApplication(application)
+    val parcel0 = p.complementApplicationRule(rule).
+      withExecutionContext(services, application)
     val parcel1 = _normalize_auth(parcel0)
     val parcel =
       if (isTrace)

@@ -32,7 +32,8 @@ import arcadia.controller._
  *  version Jul. 29, 2019
  *  version Apr. 20, 2020
  *  version May. 28, 2020
- * @version Jun.  1, 2020
+ *  version Jun.  1, 2020
+ * @version Mar. 30, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Scenario {
@@ -394,9 +395,10 @@ case class InvokeOperationScenario(
   def execute(p: Intent): Intent = {
     p.context.map { ctx =>
       val pathname = "2.1/PalShopApp" // XXX
+      val d = data + p.event.getData.getOrElse(Record.empty)
       val (query, form) = operationMethod match {
-        case Get => (data, Record.empty)
-        case _ => (Record.empty, data)
+        case Get => (d, Record.empty)
+        case _ => (Record.empty, d)
       }
       val req = Request(pathname, operation.toString, operationMethod.name, query, form)
       val cmd = InvokeOperationCommand(ctx.platformExecutionContext, req)
@@ -487,6 +489,7 @@ object InvokeOperationScenario extends ScenarioClass {
 
   private def _pathname(p: Parcel): PathName = p.command.collect {
     case MaterialCommand(pn) => pn
+    case m: IndexCommand => m.pathname
   }.getOrElse(RAISE.noReachDefect)
 
   def unmarshallOption(p: String): Option[InvokeOperationScenario] = RAISE.unsupportedOperationFault
@@ -841,6 +844,7 @@ trait Event {
   def parcel: Parcel
 //  def withModel(p: Model): Event
   def withParcel(p: Parcel): Event
+  def getData: Option[IRecord]
 }
 object Event {
   val EVENT_INPUT = "input"
@@ -894,46 +898,57 @@ object Event {
 
 case class StartEvent(parcel: Parcel, data: IRecord) extends Event {
   def withParcel(p: Parcel) = copy(parcel = p)
+  def getData: Option[IRecord] = Some(data)
 }
 case class InputEvent(parcel: Parcel, data: IRecord) extends Event {
 //  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
   def withParcel(p: Parcel) = copy(parcel = p)
+  def getData: Option[IRecord] = Some(data)
 }
 case class OkEvent(parcel: Parcel, data: IRecord) extends Event {
 //  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
   def withParcel(p: Parcel) = copy(parcel = p)
+  def getData: Option[IRecord] = Some(data)
 }
 case class ExecuteEvent(parcel: Parcel) extends Event {
 //  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
   def withParcel(p: Parcel) = copy(parcel = p)
+  def getData: Option[IRecord] = None
 }
 case class CancelEvent(parcel: Parcel) extends Event {
 //  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
   def withParcel(p: Parcel) = copy(parcel = p)
+  def getData: Option[IRecord] = None
 }
 case class CreateEvent(parcel: Parcel) extends Event {
 //  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
   def withParcel(p: Parcel) = copy(parcel = p)
+  def getData: Option[IRecord] = None
 }
 case class UpdateEvent(parcel: Parcel) extends Event {
 //  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
   def withParcel(p: Parcel) = copy(parcel = p)
+  def getData: Option[IRecord] = None
 }
 case class DeleteEvent(parcel: Parcel) extends Event {
 //  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
   def withParcel(p: Parcel) = copy(parcel = p)
+  def getData: Option[IRecord] = None
 }
 case class BackEvent(parcel: Parcel) extends Event {
 //  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
   def withParcel(p: Parcel) = copy(parcel = p)
+  def getData: Option[IRecord] = None
 }
 case class ExceptionEvent(parcel: Parcel, e: Throwable) extends Event {
 //  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
   def withParcel(p: Parcel) = copy(parcel = p)
+  def getData: Option[IRecord] = None
 }
 case class EndEvent(parcel: Parcel) extends Event {
 //  def withModel(p: Model): Event = copy(parcel = parcel.withModel(p))
   def withParcel(p: Parcel) = copy(parcel = p)
+  def getData: Option[IRecord] = None
 }
 
 /*
