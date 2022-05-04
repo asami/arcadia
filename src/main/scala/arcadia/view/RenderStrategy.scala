@@ -38,7 +38,9 @@ import arcadia.view.ViewEngine._
  *  version Nov.  7, 2018
  *  version Aug.  5, 2019
  *  version Mar. 31, 2020
- * @version Apr.  1, 2020
+ *  version Apr.  1, 2020
+ *  version Apr. 30, 2022
+ * @version May.  3, 2022
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -63,8 +65,9 @@ case class RenderStrategy(
   def gridContext: GridContext = renderContext.gridContext getOrElse theme.default.gridContext(this)
   lazy val noImageIcon: Picture = Picture.create(theme.default.noImageIcon)
   lazy val noImagePicture: Picture = Picture.create(theme.default.noImagePicture)
-  lazy val formatter = renderContext.formatter.withLocale(locale)
+//  lazy val formatter = renderContext.formatter.withLocale(locale)
 
+  def formatter = renderContext.formatter
   lazy val getWebApplicationRule: Option[WebApplicationRule] = viewContext.flatMap(_.parcel.render.map(_.applicationRule))
   lazy val getView: Option[View] = viewContext.flatMap(_.parcel.view)
   lazy val getPage: Option[WebApplicationRule.Page] = for {
@@ -140,13 +143,16 @@ case class RenderStrategy(
   }
 
   def formatDateTime(p: Any): String =
-    formatter.datetime.print(AnyUtils.toDateTime(p))
+    formatter.formatDateTime(p)
+//    formatter.datetime.print(AnyUtils.toDateTime(p))
 
   def formatDate(p: Any): String =
-    formatter.date.print(AnyUtils.toLocalDate(p))
+    formatter.formatDate(p)
+//    formatter.date.print(AnyUtils.toLocalDate(p))
 
   def formatTime(p: Any): String =
-    formatter.time.print(AnyUtils.toLocalTime(p))
+    formatter.formatTime(p)
+//    formatter.time.print(AnyUtils.toLocalTime(p))
 
   def formatXml(p: Any): NodeSeq =
     XhtmlUtils.parseNode(p.toString)
@@ -1146,45 +1152,45 @@ object RenderContext {
   )
 }
 
-case class FormatterContext(
-  datetime: DateTimeFormatter,
-  date: DateTimeFormatter,
-  time: DateTimeFormatter
-) {
-  def withLocale(locale: Locale) = FormatterContext(
-    datetime.withLocale(locale),
-    date.withLocale(locale),
-    time.withLocale(locale)
-  )
-}
-object FormatterContext {
-  val default = FormatterContext(
-    DateTimeFormat.mediumDateTime().withLocale(Locale.ENGLISH),
-    DateTimeFormat.mediumDate().withLocale(Locale.ENGLISH),
-    DateTimeFormat.mediumTime().withLocale(Locale.ENGLISH)
-  )
+// case class FormatterContext(
+//   datetime: DateTimeFormatter,
+//   date: DateTimeFormatter,
+//   time: DateTimeFormatter
+// ) {
+//   def withLocale(locale: Locale) = FormatterContext(
+//     datetime.withLocale(locale),
+//     date.withLocale(locale),
+//     time.withLocale(locale)
+//   )
+// }
+// object FormatterContext {
+//   val default = FormatterContext(
+//     DateTimeFormat.mediumDateTime().withLocale(Locale.ENGLISH),
+//     DateTimeFormat.mediumDate().withLocale(Locale.ENGLISH),
+//     DateTimeFormat.mediumTime().withLocale(Locale.ENGLISH)
+//   )
 
-  def create(locale: Locale, style: String): FormatterContext =
-    FormatterContext(
-      DateTimeFormat.forStyle(style).withLocale(locale),
-      DateTimeFormat.forStyle(style).withLocale(locale),
-      DateTimeFormat.forStyle(style).withLocale(locale)
-    )
+//   def create(locale: Locale, style: String): FormatterContext =
+//     FormatterContext(
+//       DateTimeFormat.forStyle(style).withLocale(locale),
+//       DateTimeFormat.forStyle(style).withLocale(locale),
+//       DateTimeFormat.forStyle(style).withLocale(locale)
+//     )
 
-  def createStyle(style: String): FormatterContext =
-    FormatterContext(
-      DateTimeFormat.forStyle(style),
-      DateTimeFormat.forStyle(style),
-      DateTimeFormat.forStyle(style)
-    )
-}
+//   def createStyle(style: String): FormatterContext =
+//     FormatterContext(
+//       DateTimeFormat.forStyle(style),
+//       DateTimeFormat.forStyle(style),
+//       DateTimeFormat.forStyle(style)
+//     )
+// }
 
-case class ViewContext(
-  engine: ViewEngine,
-  parcel: Parcel
-) {
-  def isMatch(e: ViewEngine, p: Parcel) = engine == e && parcel == p
-}
+// case class ViewContext(
+//   engine: ViewEngine,
+//   parcel: Parcel
+// ) {
+//   def isMatch(e: ViewEngine, p: Parcel) = engine == e && parcel == p
+// }
 
 class EpilogueContext {
   private val _javascripts = mutable.ArrayBuffer.empty[String]

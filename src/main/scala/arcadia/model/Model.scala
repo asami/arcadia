@@ -41,7 +41,8 @@ import arcadia.domain._
  *  version Mar. 21, 2020
  *  version Apr. 18, 2020
  *  version May. 28, 2020
- * @version Jun.  1, 2020
+ *  version Jun.  1, 2020
+ * @version May.  3, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -750,6 +751,8 @@ case class PropertySheetModel(
   }.apply
 }
 object PropertySheetModel extends ModelClass {
+  val empty = PropertySheetModel(Record.empty)
+
   def apply(caption: String, schema: Schema, record: IRecord): PropertySheetModel = PropertySheetModel(
     Some(I18NElement(caption)), Some(schema), record
   )

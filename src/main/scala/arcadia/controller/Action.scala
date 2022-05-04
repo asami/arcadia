@@ -42,7 +42,9 @@ import arcadia.scenario._
  *  version May.  1, 2019
  *  version Mar. 31, 2020
  *  version Apr. 18, 2020
- * @version May. 28, 2020
+ *  version May. 28, 2020
+ *  version Apr. 25, 2022
+ * @version May.  3, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -192,6 +194,8 @@ object Action {
     def writes(p: Source): JsValue = RAISE.notImplementedYetDefect
   }
   implicit val FormColumnFormat = Json.format[FormColumn]
+  implicit val PropertyFormat = Json.format[Property]
+  implicit val PropertyActionFormat = Json.format[PropertyAction]
   implicit val OperationActionFormat = Json.format[OperationAction]
   implicit val GetEntityActionFormat = Json.format[GetEntityAction]
   implicit val ReadEntityListActionFormat = Json.format[ReadEntityListAction]
@@ -225,6 +229,9 @@ object Action {
   def parseJsObject(json: JsObject): JsResult[Action] =
     (json \ "action").asOpt[String] match {
       case Some(s) => s match {
+        // control
+        case "property" => Json.fromJson[PropertyAction](json)
+        // operation
         case "operation" => Json.fromJson[OperationAction](json)
         case "get-entity" => Json.fromJson[GetEntityAction](json)
         case "read-entity-list" => Json.fromJson[ReadEntityListAction](json)
@@ -233,12 +240,14 @@ object Action {
         case "invoke-with-id-directive" => Json.fromJson[InvokeWithIdDirectiveAction](json)
 //        case "reset-password-directive" => Json.fromJson[ResetPasswordDirectiveAction](json)
 //        case "reset-password-operation" => Json.fromJson[ResetPasswordOperationAction](json)
+        // widget
         case "carousel" => Json.fromJson[CarouselAction](json)
         case "banner" => Json.fromJson[BannerAction](json)
         case "badge" => Json.fromJson[BadgeAction](json)
         case "notice" => Json.fromJson[NoticeAction](json)
         case "content" => Json.fromJson[ContentAction](json)
         case "searchbox" => Json.fromJson[SearchBoxAction](json)
+        // scenario
         case "invoke-operation-scenario" => Json.fromJson[InvokeOperationScenarioAction](json)
         case "login-scenario" => Json.fromJson[LoginScenarioAction](json)
         case "reset-password-scenario" => Json.fromJson[ResetPasswordScenarioAction](json)
@@ -293,6 +302,17 @@ trait SourceSinkAction extends Action {
     )(sk =>
       parcel.sink(sk, command, model)
     )
+}
+
+case class PropertyAction(
+  properties: List[Property]
+) extends Action {
+  
+  protected def execute_Apply(parcel: Parcel): Parcel =
+    parcel.addProperties(properties)
+}
+
+object PropertyAction {
 }
 
 case class IndexAction(

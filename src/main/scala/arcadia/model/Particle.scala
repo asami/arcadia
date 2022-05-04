@@ -33,7 +33,9 @@ import arcadia.domain._
  *  version Sep.  5, 2018
  *  version Nov.  7, 2018
  *  version Apr. 24, 2019
- * @version Apr. 17, 2020
+ *  version Apr. 17, 2020
+ *  version Apr. 25, 2022
+ * @version May.  3, 2022
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -372,6 +374,15 @@ case object Delete extends Method {
   def name = "DELETE"
 }
 
+case class Property(
+  name: String,
+  value: JsValue
+) {
+  
+}
+object Property {
+}
+
 case class RequestParameter(
   query: Option[IRecord],
   form: Option[IRecord]
@@ -565,6 +576,7 @@ object Particle {
   //   }
   //   def writes(p: Record): JsValue = RAISE.notImplementedYetDefect
   // }
+  implicit val PropertyFormat = Json.format[Property]
   implicit val RequestParameterFormat = Json.format[RequestParameter]
   implicit object LabelIndicatorFormat extends Format[LabelIndicator] {
     def reads(json: JsValue): JsResult[LabelIndicator] = LabelIndicator.parseJsValue(json)

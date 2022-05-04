@@ -35,7 +35,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Mar. 21, 2020
  *  version Apr. 18, 2020
  *  version Feb. 27, 2022
- * @version Mar. 30, 2022
+ *  version Mar. 30, 2022
+ * @version May.  4, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -90,6 +91,16 @@ case object ModelTag extends Tag with SelectByName {
 
   protected def eval_Expression(p: Expression): XmlContent = {
     p.applyModel
+  }
+}
+
+case object ValueTag extends Tag with SelectByName {
+  val name = "value"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val name = p.get("name")
+    val v = p.service.get(name)
+    XmlContent.text(v.print)
   }
 }
 
@@ -405,7 +416,25 @@ case object DateTimeTag extends Tag with SelectByName {
   val name = "datetime"
 
   protected def eval_Expression(p: Expression): XmlContent = {
-    val dt = new DateTime()
-    XmlContent.text(dt.toString) // TODO
+    val dt = p.service.dateTime
+    XmlContent.text(dt.print)
+  }
+}
+
+case object DateTag extends Tag with SelectByName {
+  val name = "date"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val dt = p.service.date
+    XmlContent.text(dt.print)
+  }
+}
+
+case object TimeTag extends Tag with SelectByName {
+  val name = "time"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val dt = p.service.time
+    XmlContent.text(dt.print)
   }
 }

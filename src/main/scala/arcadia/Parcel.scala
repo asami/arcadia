@@ -3,6 +3,7 @@ package arcadia
 import scala.util.control.NonFatal
 import java.util.Locale
 import java.net.URI
+import play.api.libs.json._
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.Invalid
@@ -13,6 +14,8 @@ import arcadia.context._
 import arcadia.service.ServiceFacility
 import arcadia.domain._
 import arcadia.model.{Model, ErrorModel, Badge, IRecordModel, CandidatesModel}
+import arcadia.model.PropertySheetModel
+import arcadia.model.Property
 import arcadia.view.{ViewEngine, RenderStrategy, Partials, View,
   UsageKind, TableKind, CardKind
 }
@@ -34,13 +37,15 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Mar. 31, 2020
  *  version Apr. 20, 2020
  *  version Jun.  3, 2020
- * @version Mar. 21, 2022
+ *  version Mar. 21, 2022
+ * @version May.  3, 2022
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
   command: Option[Command],
   model: Option[Model],
   modelHanger: Map[String, Model],
+  propertyModel: Option[PropertySheetModel],
   view: Option[View],
   content: Option[Content],
   render: Option[RenderStrategy],
@@ -120,6 +125,22 @@ case class Parcel(
   //   }.mkString(",")
   //   s"Parcel(${b})"
   // }
+
+  def addProperties(p: List[Property]) = {
+    val a = propertyModel.map(x => Record.create(x.record)).getOrElse(Record.empty)
+    val b = p./:(a)((z, x) => z.update(x.name, _value(x)))
+    val c = if (b.isEmpty)
+      None
+    else
+      Some(PropertySheetModel(b))
+    copy(propertyModel = c)
+  }
+
+  private def _value(p: Property) = p.value match {
+    case JsNumber(v) => v
+    case JsString(s) => s
+    case _ => ???
+  }
 
   lazy val show: String = try {
     val a = Vector(
@@ -284,7 +305,7 @@ case class Parcel(
 
 object Parcel {
   def apply(model: Model, strategy: RenderStrategy): Parcel = Parcel(
-    None, Some(model), Map.empty, None, None, Some(strategy), None, None, None, None
+    None, Some(model), Map.empty, None, None, None, Some(strategy), None, None, None, None
   )
 
   // def apply(command: Command, req: ServiceRequest): Parcel = Parcel(

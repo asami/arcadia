@@ -1,10 +1,13 @@
 package arcadia.context
 
 import scala.xml._
+import java.util.TimeZone
 import java.net.URI
 import java.net.URL
+import org.joda.time._
 import play.api.libs.json.JsValue
 import org.goldenport.exception.RAISE
+import org.goldenport.extension.Showable
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.{Schema, Column}
 import org.goldenport.record.v2.{Invalid, Conclusion}
@@ -32,7 +35,9 @@ import arcadia.service.ServiceFacility
  *  version Apr. 17, 2020
  *  version May. 29, 2020
  *  version Feb. 27, 2022
- * @version Mar. 21, 2022
+ *  version Mar. 21, 2022
+ *  version Apr. 30, 2022
+ * @version May.  2, 2022
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -41,7 +46,13 @@ case class ExecutionContext(
   webapp: WebApplication
 ) {
   def config = webapp.config
-  def locale = webapp.getLocale getOrElse platformExecutionContext.locale
+
+  // TODO request locale
+  lazy val locale = webapp.getLocale getOrElse platformExecutionContext.locale
+
+  def dateTimeContext = platformExecutionContext.dateTimeContext
+  def formatContext = webapp.getFormatContext getOrElse platformExecutionContext.formatContext
+
   def isLogined: Boolean = platformExecutionContext.isLogined
   def getOperationName: Option[String] = platformExecutionContext.getOperationName
   def getPathName: Option[PathName] = platformExecutionContext.getPathName
@@ -99,6 +110,25 @@ case class ExecutionContext(
   lazy val inputFormParameters: IRecord = platformExecutionContext.inputFormParameters.toRecord.http.request.normalize
   def getFormParameter(key: String): Option[String] = inputFormParameters.getString(key)
   lazy val assets: String = config.getAssets getOrElse platformExecutionContext.assets
+
+  def dateTime: DateTime = dateTimeContext.current
+  def timezone: TimeZone = dateTimeContext.timezone
+  def dateTimeZone: DateTimeZone = dateTimeContext.dateTimeZone
+
+  // def format(p: Any): String = p match {
+  //   case m: Showable => m.print
+  //   case m: DateTime => webapp.format(locale, dateTimeZone, m) getOrElse platformExecutionContext.formatDateTime(locale, dateTimeZone, m)
+  //   case m => m.toString
+  // }
+
+  // def formatDateTime(p: DateTime): String =
+  //   webapp.formatDateTime(locale, dateTimeZone, p) getOrElse platformExecutionContext.formatDateTime(locale, dateTimeZone, p)
+
+  // def formatDate(p: DateTime): String =
+  //   webapp.formatDate(locale, dateTimeZone, p) getOrElse platformExecutionContext.formatDate(locale, dateTimeZone, p)
+
+  // def formatTime(p: DateTime): String =
+  //   webapp.formatTime(locale, dateTimeZone, p) getOrElse platformExecutionContext.formatTime(locale, dateTimeZone, p)
 
   def toCode(e: Throwable): Int = ExecutionContext.toCode(e)
 

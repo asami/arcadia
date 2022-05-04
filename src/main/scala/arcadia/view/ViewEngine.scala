@@ -23,7 +23,9 @@ import arcadia.model.{Model, ErrorModel}
  *  version Jan.  7, 2018
  *  version Jul. 28, 2018
  *  version Mar. 21, 2020
- * @version Mar. 28, 2022
+ *  version Mar. 28, 2022
+ *  version Apr. 30, 2022
+ * @version May.  2, 2022
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -128,8 +130,9 @@ class ViewEngine(
   def applyOption(p: Parcel): Option[Content] = p.executeWithTrace("ViewEngine#applyOption", p.show) {
     val render = {
       val t = theme getOrElse PlainTheme
-      val style = "MM" // TODO
-      val f = FormatterContext.createStyle(style)
+      // val style = "MM" // TODO
+      // val f = FormatterContext.createStyle(style)
+      val f = p.context.fold(FormatterContext.default)(x => FormatterContext.create(x))
       (p.render getOrElse PlainHtml).
         withThemePartials(t, partials).
         withFormatter(f)
@@ -263,6 +266,8 @@ class ViewEngine(
 
 }
 object ViewEngine {
+  // Scalate uses variable context.
+  // final val PROP_VIEW_CONTEXT = "context"
   final val PROP_VIEW_MODEL = "model"
   final val PROP_VIEW_SERVICE = "service"
   final val PROP_VIEW_OBJECT = "o"
@@ -272,6 +277,7 @@ object ViewEngine {
   final val PROP_VIEW_RECORDS = "records"
   final val PROP_VIEW_WIDGET = "widget"
   final val PROP_VIEW_FORM = "form"
+  final val PROP_VIEW_PROPERTIES = "properties"
 
   case class Rule(
     theme: Option[RenderTheme],

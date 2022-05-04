@@ -5,11 +5,13 @@ import scala.xml.NodeSeq
 import java.io.File
 import java.net.URL
 import java.util.Locale
+import org.joda.time.{DateTime, DateTimeZone}
 import play.api.libs.json._
 import scalax.io._
 import org.fusesource.scalate._
 import org.fusesource.scalate.support.URLTemplateSource
 import org.goldenport.exception.RAISE
+import org.goldenport.context.FormatContext
 import org.goldenport.values.{Version, PathName}
 import org.goldenport.bag.{ProjectVersionDirectoryBag, UrlBag}
 import org.goldenport.util.StringUtils
@@ -30,7 +32,8 @@ import arcadia.scenario._
  *  version Apr. 28, 2019
  *  version Mar. 18, 2020
  *  version Apr. 13, 2020
- * @version Apr. 15, 2021
+ *  version Apr. 15, 2021
+ * @version May.  3, 2022
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -43,6 +46,11 @@ case class WebApplication(
   def getLocale = config.getLocale
   def extend: List[String] = config.extend getOrElse Nil
   def basePath: String = config.base_path getOrElse name
+  // def format(locale: Locale, tz: DateTimeZone, p: DateTime): Option[String] = None
+  // def formatDateTime(locale: Locale, tz: DateTimeZone, p: DateTime): Option[String] = None
+  // def formatDate(locale: Locale, tz: DateTimeZone, p: DateTime): Option[String] = None
+  // def formatTime(locale: Locale, tz: DateTimeZone, p: DateTime): Option[String] = None
+  def getFormatContext: Option[FormatContext] = None
 }
 
 object WebApplication {

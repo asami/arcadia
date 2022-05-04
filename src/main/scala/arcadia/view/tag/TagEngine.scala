@@ -25,7 +25,8 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  *  version May.  3, 2018
  *  version Aug.  5, 2018
  *  version Feb. 27, 2022
- * @version Mar. 30, 2022
+ *  version Mar. 30, 2022
+ * @version May.  4, 2022
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -151,11 +152,14 @@ object Tags {
     FormTag,
     //
     ModelTag,
+    ValueTag,
     ErrorTag,
     WidgetTag,
     CommandTag,
     //
-    DateTimeTag
+    DateTimeTag,
+    DateTag,
+    TimeTag
   ))
 }
 
@@ -182,12 +186,16 @@ case class Expression(
   }
 
   lazy val element = elem.copy(child = XmlUtils.seqOfNodeSeqToSeqOfNode(children.map(_.xml)))
+  lazy val strategy: RenderStrategy = parcel.render getOrElse {
+    RAISE.noReachDefect
+  }
   lazy val getModel: Option[Model] = parcel.model
   lazy val model: Model = getModel getOrElse {
     throw new IllegalStateException("TagEngine: No model")
   }
-  lazy val strategy: RenderStrategy = parcel.render getOrElse {
-    RAISE.noReachDefect
+  lazy val getService: Option[ViewService] = parcel.context.map(ViewService(_, strategy, parcel.propertyModel))
+  lazy val service: ViewService = getService getOrElse {
+    throw new IllegalStateException("TagEngine: No service")
   }
   lazy val engine: ViewEngine = strategy.viewContext.map(_.engine) getOrElse {
     RAISE.noReachDefect

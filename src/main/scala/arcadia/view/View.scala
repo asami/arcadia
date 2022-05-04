@@ -1,5 +1,6 @@
 package arcadia.view
 
+import scalaz._, Scalaz._
 import scala.xml.NodeSeq
 import java.net.URL
 import org.fusesource.scalate._
@@ -16,6 +17,7 @@ import arcadia._
 import arcadia.context._
 import arcadia.model._
 import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL, PROP_VIEW_FORM}
+import ViewEngine.PROP_VIEW_PROPERTIES
 
 /*
  * @since   Jul. 15, 2017
@@ -28,7 +30,9 @@ import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL, PROP_VIEW_FORM}
  *  version Mar. 21, 2020
  *  version May. 28, 2020
  *  version Feb. 27, 2022
- * @version Mar. 28, 2022
+ *  version Mar. 28, 2022
+ *  version Apr. 30, 2022
+ * @version May.  4, 2022
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -88,7 +92,9 @@ abstract class TemplateViewBase(template: TemplateSource) extends View() {
     _model_bindings(strategy, parcel) ++
     _form_bindings(strategy, parcel) ++
     property_Bindings(strategy) ++
-    _service_bindings(strategy, parcel)
+    _service_bindings(strategy, parcel) ++
+    _properties_bindings(strategy, parcel)
+//    _context_bindings(strategy, parcel)
   }
 
   private def _model_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
@@ -110,9 +116,19 @@ abstract class TemplateViewBase(template: TemplateSource) extends View() {
 
   private def _service_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
     (parcel.context orElse strategy.viewContext.flatMap(_.parcel.context)).
-      map(x => Map(PROP_VIEW_SERVICE -> ViewService(x, strategy))).
+      map(x => Map(PROP_VIEW_SERVICE -> ViewService(x, strategy, parcel.propertyModel))).
       getOrElse(Map.empty)
 
+  // Scalate uses variable context.
+  // private def _context_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
+  //   strategy.viewContext.
+  //     map(x => Map(PROP_VIEW_CONTEXT -> x)).
+  //     getOrElse(Map.empty)
+
+  private def _properties_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
+    (parcel.context orElse strategy.viewContext.flatMap(_.parcel.context)).
+      map(x => Map(PROP_VIEW_PROPERTIES -> ViewProperties(x, strategy))).
+      getOrElse(Map.empty)
 }
 
 case class TemplateView(

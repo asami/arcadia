@@ -5,14 +5,19 @@ import java.nio.charset.Charset
 import java.util.Locale
 import java.net.URI
 import java.net.URL
+import org.joda.time._
 import play.api.libs.json.JsValue
 import org.goldenport.Platform
+import org.goldenport.context._
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v3.IRecord
 import org.goldenport.record.v2.{Schema, Column}
 import org.goldenport.record.v2.{Invalid, Conclusion}
 import org.goldenport.values.PathName
 import org.goldenport.io.IoUtils
+import org.goldenport.util.DateTimeFormatter
+import org.goldenport.util.DateFormatter
+import org.goldenport.util.TimeFormatter
 import arcadia._
 import arcadia.model._
 import arcadia.view._
@@ -33,12 +38,17 @@ import arcadia.rule._
  *  version Mar. 23, 2020
  *  version Apr. 17, 2020
  *  version May. 29, 2020
- * @version Feb. 28, 2022
+ *  version Feb. 28, 2022
+ * @version May.  2, 2022
  * @author  ASAMI, Tomoharu
  */
 trait PlatformExecutionContext {
   def platformContext: PlatformContext
   def locale: Locale
+  def dateTimeContext: DateTimeContext
+  def formatContext: FormatContext
+  // def timezone: DateTimeZone
+  // def dateTime: DateTime
   def isLogined: Boolean
   def getOperationName: Option[String]
   def getPathName: Option[PathName]
@@ -90,4 +100,22 @@ trait PlatformExecutionContext {
   def getFormParameter(key: String): Option[String]
   def assets: String
   def getResetPasswordRule: Option[ResetPasswordRule] = None
+
+  def formatDateTime(locale: Locale, tz: DateTimeZone, p: DateTime): String = {
+    // TODO customizable
+    val dtf = DateTimeFormatter.create(locale, tz)
+    dtf.format(p)
+  }
+
+  def formatDate(locale: Locale, tz: DateTimeZone, p: DateTime): String = {
+    // TODO customizable
+    val dtf = DateFormatter.create(locale, tz)
+    dtf.format(p)
+  }
+
+  def formatTime(locale: Locale, tz: DateTimeZone, p: DateTime): String = {
+    // TODO customizable
+    val dtf = TimeFormatter.create(locale, tz)
+    dtf.format(p)
+  }
 }
