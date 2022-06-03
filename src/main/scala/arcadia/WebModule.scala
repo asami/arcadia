@@ -22,25 +22,28 @@ import arcadia.view._
  *  version Nov. 10, 2017
  *  version Mar. 18, 2020
  *  version Jun.  2, 2020
- * @version Feb. 28, 2022
+ *  version Feb. 28, 2022
+ * @version May. 22, 2022
  * @author  ASAMI, Tomoharu
  */
 abstract class WebModule() {
   import WebModule._
   def toWebApplication(platform: PlatformContext): WebApplication
 
-  protected final def is_html(p: File): Boolean =
-    is_html(StringUtils.toSuffix(p.getName))
+  protected final def is_html(p: File): Boolean = isHtml(p.getName)
+  // is_html(StringUtils.toSuffix(p.getName))
 
-  protected final def is_html(p: String): Boolean = p == "html"
+  protected final def is_html(p: String): Boolean = isHtml(p) //  == "html"
 
   protected final def is_template(p: File): Boolean =
     is_template(p.getName)
 
-  protected final def is_template(p: String): Boolean = {
-    val suffix = StringUtils.toSuffix(p)
-    templateSuffixes.contains(suffix)
-  }
+  protected final def is_template(p: String): Boolean = isTemplate(p)
+
+  // protected final def is_template(p: String): Boolean = {
+  //   val suffix = StringUtils.toSuffix(p)
+  //   templateSuffixes.contains(suffix)
+  // }
 }
 
 object WebModule {
@@ -68,12 +71,25 @@ object WebModule {
     else
       None
   }
+
+  def isHtml(pathname: String): Boolean = {
+    val suffix = StringUtils.toSuffix(pathname)
+    htmlSuffixes.contains(suffix)
+  }
+
+  def isTemplate(pathname: String): Boolean = {
+    val suffix = StringUtils.toSuffix(pathname)
+    templateSuffixes.contains(suffix)
+  }
+
+  def toTemplateSource(p: File) = TemplateSource.fromFile(p)
 }
 
 class DirectoryWebModule(base: File) extends WebModule {
   def toWebApplication(platform: PlatformContext) = {
     val builder = new WebApplication.Builder[File]() {
       protected def base_url: URL = to_url(base)
+      protected def base_dir_for_dynamic_resolving = Some(base)
       protected def is_html(p: File): Boolean = DirectoryWebModule.this.is_html(p)
       protected def is_template(p: File): Boolean = DirectoryWebModule.this.is_template(p)
       protected def is_directory(p: File): Boolean = p.isDirectory

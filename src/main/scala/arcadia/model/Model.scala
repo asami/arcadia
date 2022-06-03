@@ -42,7 +42,7 @@ import arcadia.domain._
  *  version Apr. 18, 2020
  *  version May. 28, 2020
  *  version Jun.  1, 2020
- * @version May.  3, 2022
+ * @version May. 28, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -392,6 +392,7 @@ case class ErrorModel(
 ) extends Model {
   val expiresKind = Some(NoCacheExpires)
   def toRecord: IRecord = RAISE.notImplementedYetDefect
+  override def apply(strategy: RenderStrategy): Content = XmlContent(render(strategy), expiresKind, code)
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, None
   ) {

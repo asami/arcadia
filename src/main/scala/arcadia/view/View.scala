@@ -2,6 +2,7 @@ package arcadia.view
 
 import scalaz._, Scalaz._
 import scala.xml.NodeSeq
+import java.io.File
 import java.net.URL
 import org.fusesource.scalate._
 import org.goldenport.exception.RAISE
@@ -18,6 +19,7 @@ import arcadia.context._
 import arcadia.model._
 import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL, PROP_VIEW_FORM}
 import ViewEngine.PROP_VIEW_PROPERTIES
+import ViewEngine.PROP_VIEW_IT
 
 /*
  * @since   Jul. 15, 2017
@@ -32,7 +34,7 @@ import ViewEngine.PROP_VIEW_PROPERTIES
  *  version Feb. 27, 2022
  *  version Mar. 28, 2022
  *  version Apr. 30, 2022
- * @version May.  4, 2022
+ * @version May. 22, 2022
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -97,10 +99,14 @@ abstract class TemplateViewBase(template: TemplateSource) extends View() {
 //    _context_bindings(strategy, parcel)
   }
 
-  private def _model_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
-    parcel.getEffectiveModel.map(model_bindings(strategy, _)) getOrElse {
+  private def _model_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] = {
+    val a = parcel.getEffectiveModel.map(model_bindings(strategy, _)) getOrElse {
       Map(PROP_VIEW_MODEL -> ViewModel(EmptyModel, strategy))
     }
+    a.get(PROP_VIEW_MODEL).
+      map(x => a + (PROP_VIEW_IT -> x)).
+      getOrElse(a)
+  }
 
   protected def model_bindings(strategy: RenderStrategy, model: Model): Map[String, AnyRef] =
     model.viewBindings(strategy)
@@ -161,6 +167,13 @@ case class ModelView(template: TemplateSource) extends TemplateViewBase(template
 case class PageView(name: String, template: TemplateSource) extends TemplateViewBase(template) {
   val guard = OperationNameGuard(name)
 }
+object PageView {
+  def create(p: File): PageView = {
+    val name = StringUtils.pathLastComponentBody(p.getCanonicalPath)
+    val ts = WebModule.toTemplateSource(p)
+    PageView(name, ts)
+  }
+}
 
 case class HtmlView(url: URL, pathname: Option[String] = None) extends View() {
   private val _pathname = pathname getOrElse UrlUtils.takeLeafName(url)
@@ -171,6 +184,9 @@ case class HtmlView(url: URL, pathname: Option[String] = None) extends View() {
       XmlContent.loadHtml(url)
     else
       StringContent(new UrlBag(url).toText, StaticPageExpires) // UTF-8
+}
+object HtmlView {
+  def apply(p: File): HtmlView = HtmlView(p.toURI.toURL)
 }
 
 case class MaterialView(baseUrl: URL) extends View() {

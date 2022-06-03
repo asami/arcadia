@@ -1,11 +1,12 @@
 package arcadia.view
 
 import scala.xml._
+import java.io.File
 import org.fusesource.scalate._
-import org.fusesource.scalate.support.URLTemplateSource
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2._
 import org.goldenport.value._
+import org.goldenport.values.PathName
 import org.goldenport.trace.Result
 import org.goldenport.util.MapUtils
 import arcadia._
@@ -25,7 +26,7 @@ import arcadia.model.{Model, ErrorModel}
  *  version Mar. 21, 2020
  *  version Mar. 28, 2022
  *  version Apr. 30, 2022
- * @version May.  2, 2022
+ * @version May. 22, 2022
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -39,6 +40,8 @@ class ViewEngine(
     rule.theme orElse extend.toStream.flatMap(_.theme).headOption
 
   lazy val slots: Vector[Slot] = rule.slots ++ extend.toVector.flatMap(_.slots)
+
+  private var _new_slots: Vector[Slot] = Vector.empty
 
   lazy val components: Vector[Slot] = {
     val a: Vector[Slot] = rule.components.toSlots
@@ -55,7 +58,47 @@ class ViewEngine(
   lazy val tags: Tags = rule.tags.complements(extend.map(_.tags)).complements(Tags.embeded)
 
   def findView(parcel: Parcel): Option[View] =
-    slots.find(_.isAccept(parcel)).map(_.view)
+    slots.find(_.isAccept(parcel)).map(_.view) orElse _find_new_view(parcel)
+
+  private def _find_new_view(parcel: Parcel): Option[View] =
+    _new_slots.find(_.isAccept(parcel)).map(_.view) orElse {
+      val r = parcel.command.flatMap {
+        case MaterialCommand(pathname) => _get_view(pathname)
+        case _ => None
+      }
+      r foreach { x =>
+        _new_slots = _new_slots :+ Slot(x.gv)
+      }
+      r
+    }
+
+  private def _get_view(pathname: PathName): Option[View] =
+    if (true) { // disable in production
+      for {
+        dir <- rule.baseDir
+        candidate <- _find_candidate(pathname, dir.listFiles())
+        view <- _get_view(candidate)
+      } yield view
+    } else {
+      None
+    }
+
+  private def _find_candidate(pn: PathName, ps: Seq[File]): Option[File] = {
+    val s = pn.v + "."
+    ps.find(_.getName.startsWith(s))
+  }
+
+  private def _get_view(p: File): Option[View] = {
+    val pn = p.getName
+    if (WebModule.isHtml(pn))
+      Some(HtmlView(p))
+    else if (WebModule.isTemplate(pn))
+      Some(_template_view(p))
+    else
+      None
+  }
+
+  private def _template_view(p: File): PageView = PageView.create(p)
 
   def findComponent(parcel: Parcel): Option[View] =
     components.find(_.isAccept(parcel)).map(_.view)
@@ -96,26 +139,28 @@ class ViewEngine(
       case m => false
     }.getOrElse(false)
 
-  private val _template_engine = {
-    val a = new TemplateEngine()
-    a.workingDirectory = platform.createTempDirectory()
-    // a.workingDirectory = { // TODO
-    //   val tmp = new java.io.File("/tmp")
-    //   val f = java.io.File.createTempFile("everforth", ".dir", tmp)
-    //   f.delete
-    //   f.mkdirs
-    //   f
-    // }
-    a.mode = "develop"
-    a.allowReload = true // TODO
-//    a.escapeMarkup = false // style="background-image: url('assets/img/bg37.jpg') ;"
-    a.importStatements = a.importStatements ::: List(
-      "import arcadia.view._",
-      "import arcadia.model._",
-      "import arcadia.domain._"
-    )
-    a
-  }
+  private val _template_engine = new ScalateTemplateEngine(platform)
+
+//   private val _template_engine = {
+//     val a = new TemplateEngine()
+//     a.workingDirectory = platform.createTempDirectory()
+//     // a.workingDirectory = { // TODO
+//     //   val tmp = new java.io.File("/tmp")
+//     //   val f = java.io.File.createTempFile("everforth", ".dir", tmp)
+//     //   f.delete
+//     //   f.mkdirs
+//     //   f
+//     // }
+//     a.mode = "develop"
+//     a.allowReload = true // TODO
+// //    a.escapeMarkup = false // style="background-image: url('assets/img/bg37.jpg') ;"
+//     a.importStatements = a.importStatements ::: List(
+//       "import arcadia.view._",
+//       "import arcadia.model._",
+//       "import arcadia.domain._"
+//     )
+//     a
+//   }
 
   private val _tag_engine = new TagEngine(tags)
 
@@ -244,7 +289,7 @@ class ViewEngine(
 
   def shutdown(): Unit = _template_engine.shutdown()
 
-  def layout(template: TemplateSource, bindings: Map[String, Object]): String =
+  private def layout(template: TemplateSource, bindings: Map[String, Object]): String =
     _template_engine.layout(template, bindings)
 
   def render(template: TemplateSource, bindings: Map[String, Object]): NodeSeq = {
@@ -259,7 +304,11 @@ class ViewEngine(
     //  // Binding(PROP_VIEW_RECORD, "_root_.arcadia.view.ViewRecords", true, None, "val", false)
     // ).filter(x => keys.contains(x.name))
     // _template_engine.layoutAsNodes(template.uri, bindings, meta)
-    _template_engine.layoutAsNodes(template.uri, bindings)
+    val r = _template_engine.layoutAsNodes(template, bindings)
+    // if (true)
+    //   _template_engine.invalidateCachedTemplates()
+    // r
+    r
   }
 
   def eval(parcel: Parcel, p: Content): Content = _tag_engine.call(parcel).apply(p)
@@ -268,6 +317,7 @@ class ViewEngine(
 object ViewEngine {
   // Scalate uses variable context.
   // final val PROP_VIEW_CONTEXT = "context"
+  final val PROP_VIEW_IT = "it"
   final val PROP_VIEW_MODEL = "model"
   final val PROP_VIEW_SERVICE = "service"
   final val PROP_VIEW_OBJECT = "o"
@@ -287,7 +337,8 @@ object ViewEngine {
     pages: Pages,
     components: Components,
     tags: Tags,
-    singlePageApplication: Option[WebApplicationRule.SinglePageApplication]
+    singlePageApplication: Option[WebApplicationRule.SinglePageApplication],
+    baseDir: Option[File]
   ) {
     def isSinglePageApplication(pathname: String): Boolean =
       singlePageApplication.map(_.isActive(pathname)).getOrElse(false)
@@ -324,8 +375,9 @@ object ViewEngine {
       pages: Pages,
       components: Components,
       tags: Tags,
-      spa: Option[WebApplicationRule.SinglePageApplication]
-    ): Rule = Rule(theme, slots.toVector, layouts, partials, pages, components, tags, spa)
+      spa: Option[WebApplicationRule.SinglePageApplication],
+      basedir: Option[File]
+    ): Rule = Rule(theme, slots.toVector, layouts, partials, pages, components, tags, spa, basedir)
 
     def create(head: (Guard, View), tail: (Guard, View)*): Rule = Rule(
       None,
@@ -335,6 +387,7 @@ object ViewEngine {
       Pages.empty,
       Components.empty,
       Tags.empty,
+      None,
       None
     )
   }

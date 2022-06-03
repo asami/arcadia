@@ -33,7 +33,7 @@ import arcadia.scenario._
  *  version Mar. 18, 2020
  *  version Apr. 13, 2020
  *  version Apr. 15, 2021
- * @version May.  3, 2022
+ * @version May. 22, 2022
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -97,6 +97,7 @@ object WebApplication {
     protected def applicationName: String = _application_name
     protected def version: Option[Version] = _version
     protected def base_url: URL
+    protected def base_dir_for_dynamic_resolving: Option[File]
     protected def is_html(p: T): Boolean
     protected def is_template(p: T): Boolean
     protected def is_directory(p: T): Boolean
@@ -208,7 +209,7 @@ object WebApplication {
         val slots = applicationslots ++ compslots
         val tags = Tags.empty // TODO
         val spa = config.singlePageApplication.map(_.toRule)
-        ViewEngine.Rule.create(theme, slots, layouts, partials, pages, comps, tags, spa)
+        ViewEngine.Rule.create(theme, slots, layouts, partials, pages, comps, tags, spa, base_dir_for_dynamic_resolving)
       }
       val controller = {
         val controllers = build_controllers

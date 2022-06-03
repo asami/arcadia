@@ -29,7 +29,8 @@ import arcadia.context.Session
  *  version Jan.  8, 2018
  *  version Apr. 20, 2020
  *  version Feb. 27, 2022
- * @version Mar. 28, 2022
+ *  version Mar. 28, 2022
+ * @version May. 28, 2022
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
@@ -213,6 +214,7 @@ object XmlContent {
   def apply(xml: NodeSeq): XmlContent = XmlContent(MimeType.text_html, xml, None, None, None, None, None)
   def apply(xml: NodeSeq, expires: ExpiresKind): XmlContent = XmlContent(MimeType.text_html, xml, Some(expires), None, None, None, None)
   def apply(xml: NodeSeq, expires: Option[ExpiresKind]): XmlContent = XmlContent(MimeType.text_html, xml, expires, None, None, None, None)
+  def apply(xml: NodeSeq, expires: Option[ExpiresKind], code: Int): XmlContent = XmlContent(MimeType.text_html, xml, expires, None, None, None, None, code)
 
   def apply(ps: Seq[XmlContent]): XmlContent = {
     ps.toList match {
