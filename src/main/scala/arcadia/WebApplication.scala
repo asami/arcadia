@@ -33,7 +33,8 @@ import arcadia.scenario._
  *  version Mar. 18, 2020
  *  version Apr. 13, 2020
  *  version Apr. 15, 2021
- * @version May. 22, 2022
+ *  version May. 22, 2022
+ * @version Jul. 25, 2022
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -94,7 +95,7 @@ object WebApplication {
 
   abstract class Builder[T]() {
     private lazy val (_application_name, _version) = ProjectVersionDirectoryBag.takeApplicationVersion(base_url)
-    protected def applicationName: String = _application_name
+    protected def application_name_by_url: String = _application_name
     protected def version: Option[Version] = _version
     protected def base_url: URL
     protected def base_dir_for_dynamic_resolving: Option[File]
@@ -215,7 +216,8 @@ object WebApplication {
         val controllers = build_controllers
         ControllerEngine.Rule(controllers)
       }
-      WebApplication(applicationName, version, config, controller, view)
+      val applicationname = config.name getOrElse application_name_by_url
+      WebApplication(applicationname, version, config, controller, view)
     }
 
     private def _is_view(s: String, t: T): Boolean =

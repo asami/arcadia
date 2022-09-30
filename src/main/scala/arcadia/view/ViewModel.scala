@@ -17,7 +17,8 @@ import arcadia.model._
  *  version Aug.  5, 2018
  *  version Mar. 31, 2020
  *  version Apr. 11, 2020
- * @version Mar.  5, 2022
+ *  version Mar.  5, 2022
+ * @version Jun. 26, 2022
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -90,13 +91,14 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   def content: NodeSeq = _render_partial(strategy.partials.content, contentContent)
   def contentContent: NodeSeq = main
 
-  def main: NodeSeq = contentDocument.headOption.
+  private def main: NodeSeq = contentDocument.headOption.
     flatMap(_to_body_content).
     getOrElse(contentDocument)
 
-  def mainTitle: NodeSeq = contentDocument.headOption.
-    flatMap(_to_head_title).
-    getOrElse(NodeSeq.Empty)
+  def contentHeadTitle: NodeSeq = getContentHeadTitle.getOrElse(NodeSeq.Empty)
+
+  def getContentHeadTitle: Option[NodeSeq] = 
+    contentDocument.headOption.flatMap(_to_head_title)
 
   private def _to_body_content(p: Node): Option[NodeSeq] =
     p.label match {
@@ -182,7 +184,11 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   def resolvePathName(p: String): PathName = resolvePathName(PathName(p))
   def resolvePathName(pn: PathName): PathName = getExecutionContext.fold(pn)(_.resolvePathName(pn))
 
-  def pageTitle: NodeSeq = strategy.getPage.map(_.title(locale)).getOrElse(Text("No title"))
+  def pageTitle: NodeSeq = {
+    val a = getContentHeadTitle
+    val b = a orElse strategy.getPage.map(_.title(locale))
+    b.getOrElse(NodeSeq.Empty) // Text("No title")
+  }
   def pageContentHeaderStyle: String = strategy.getPage.flatMap(_.contentHeaderStyle).getOrElse("background-image: url('assets/img/bg37.jpg') ;") // TODO
   def pageIsHeadText: Boolean = _page_is(_.isHeadText)
   def pageHeadText: String = _page_text(_.headText)

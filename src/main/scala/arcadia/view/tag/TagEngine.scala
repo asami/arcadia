@@ -26,7 +26,8 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  *  version Aug.  5, 2018
  *  version Feb. 27, 2022
  *  version Mar. 30, 2022
- * @version May.  4, 2022
+ *  version May.  4, 2022
+ * @version Oct.  1, 2022
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -45,7 +46,7 @@ class TagEngine(
 
     def apply(p: Content): Content =
       p match {
-        case m: XmlContent => _apply(m)
+        case m: XmlContent => _apply(m).withCode(p.code)
         case m => m
       }
 

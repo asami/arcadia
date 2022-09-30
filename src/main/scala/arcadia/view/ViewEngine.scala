@@ -26,13 +26,15 @@ import arcadia.model.{Model, ErrorModel}
  *  version Mar. 21, 2020
  *  version Mar. 28, 2022
  *  version Apr. 30, 2022
- * @version May. 22, 2022
+ *  version May. 22, 2022
+ * @version Sep. 10, 2022
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
   val platform: PlatformContext,
   val rule: ViewEngine.Rule,
-  val extend: List[ViewEngine]
+  val extend: List[ViewEngine],
+  val templateEngines: TemplateEngineHangar
 ) {
   import ViewEngine._
 
@@ -139,7 +141,7 @@ class ViewEngine(
       case m => false
     }.getOrElse(false)
 
-  private val _template_engine = new ScalateTemplateEngine(platform)
+  private val _template_engine = templateEngines // new ScalateTemplateEngine(platform)
 
 //   private val _template_engine = {
 //     val a = new TemplateEngine()
@@ -289,8 +291,8 @@ class ViewEngine(
 
   def shutdown(): Unit = _template_engine.shutdown()
 
-  private def layout(template: TemplateSource, bindings: Map[String, Object]): String =
-    _template_engine.layout(template, bindings)
+  // private def layout(template: TemplateSource, bindings: Map[String, Object]): String =
+  //   _template_engine.layout(template, bindings)
 
   def render(template: TemplateSource, bindings: Map[String, Object]): NodeSeq = {
     // val keys = bindings.keySet

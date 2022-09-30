@@ -33,7 +33,8 @@ import arcadia.controller._
  *  version Apr. 20, 2020
  *  version May. 28, 2020
  *  version Jun.  1, 2020
- * @version Mar. 30, 2022
+ *  version Mar. 30, 2022
+ * @version Sep. 25, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Scenario {
@@ -45,6 +46,7 @@ trait Scenario {
   def schema: Schema = getSchema getOrElse RAISE.noReachDefect // ScenarioDefect
   def getSchema: Option[Schema] = None
   def getCallerUri: Option[URI] = None
+  def getCancelContent: Option[Content] = None
   def start(parcel: Parcel): Parcel = RAISE.unsupportedOperationFault
   def execute(evt: Event): Parcel = apply(evt)._2.parcel
   def apply(evt: Event): (Scenario, Event) = {
@@ -391,6 +393,8 @@ case class InvokeOperationScenario(
 
   override def getSchema = Some(schema)
   override protected def adjust_Intent(p: Intent): Intent = p
+
+  override def getCancelContent: Option[Content] = Some(RedirectContent(""))
 
   def execute(p: Intent): Intent = {
     p.context.map { ctx =>
@@ -997,6 +1001,11 @@ case class Intent(
   def goUnknownEvent(p: Event): Intent = copy(parcel = parcel.goError("Unknown scenario event: $p"))
   def withDomainEntityType(p: DomainEntityType) = copy(getDomainEntityType = Some(p))
   def withDomainEntityId(p: DomainObjectId) = copy(getDomainEntityId = Some(p))
+  def goCancel = scenario.getCancelContent match {
+    case Some(s) => copy(parcel = parcel.withContent(s))
+    case None => withReturn
+  }
+  // legacy
   def withReturn = scenario.getCallerUri.fold(
     copy(parcel = parcel.withContent(RedirectContent("../../index.html")))
   )(x =>
@@ -1036,7 +1045,7 @@ trait SchemaActionBase extends Action {
 }
 
 case object CancelAction extends Action {
-  def apply(p: Intent): Intent = p.withReturn
+  def apply(p: Intent): Intent = p.goCancel // withReturn
 }
 
 case object ValidationAction extends SchemaActionBase {

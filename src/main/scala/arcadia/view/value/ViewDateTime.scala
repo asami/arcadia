@@ -5,11 +5,12 @@ import org.goldenport.context.Showable
 
 /*
  * @since   May.  1, 2022
- * @version May.  4, 2022
+ *  version May.  4, 2022
+ * @version Jun. 26, 2022
  * @author  ASAMI, Tomoharu
  */
 case class ViewDateTime(
   dateTime: DateTime,
   print: String
-) extends Showable {
+) extends ViewValue {
 }

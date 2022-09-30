@@ -23,10 +23,12 @@ import org.goldenport.hocon.RichConfig.Implicits._
  *  version Aug.  6, 2018
  *  version Apr. 28, 2019
  *  version Mar. 24, 2020
- * @version Apr. 23, 2020
+ *  version Apr. 23, 2020
+ * @version Jul. 25, 2022
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationConfig(
+  name: Option[String],
   theme: Option[String],
   application_title: Option[I18NElement],
   logo_title: Option[I18NElement],
@@ -62,6 +64,7 @@ case class WebApplicationConfig(
   def complement(rhs: WebApplicationConfig) = {
     import scalaz._, Scalaz._
     WebApplicationConfig(
+      name orElse rhs.name,
       theme orElse rhs.theme,
       application_title orElse rhs.application_title,
       logo_title orElse rhs.logo_title,
@@ -114,6 +117,7 @@ case class WebApplicationConfig(
 
 object WebApplicationConfig {
   val empty = WebApplicationConfig(
+    None,
     None,
     None,
     None,
@@ -293,6 +297,7 @@ object WebApplicationConfig {
 
   def create(name: String): WebApplicationConfig = WebApplicationConfig(
     None,
+    None,
     Some(I18NElement(name)),
     None,
     None,
@@ -393,6 +398,7 @@ object WebApplicationConfig {
     val pages = None
     val lifecycle = LifecycleConfig(expires.toOption, cdn.toOption)
     WebApplicationConfig(
+      c.getStringOption("name"),
       c.getStringOption("theme"),
       c.getI18NElementOption("application_title"),
       c.getI18NElementOption("logo_title"),

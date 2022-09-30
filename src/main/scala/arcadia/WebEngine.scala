@@ -8,6 +8,8 @@ import org.goldenport.trace.{TraceContext, Result}
 import arcadia.context._
 import arcadia.controller.ControllerEngine
 import arcadia.view.ViewEngine
+import arcadia.view.TemplateEngineHangar
+import arcadia.view.ScalateTemplateEngine
 import arcadia.controller._
 import arcadia.model.ErrorModel
 import arcadia.scenario._
@@ -28,7 +30,8 @@ import arcadia.service.ServiceFacility
  *  version Mar. 31, 2020
  *  version Apr.  1, 2020
  *  version May.  8, 2020
- * @version Mar. 20, 2022
+ *  version Mar. 20, 2022
+ * @version Sep. 10, 2022
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -36,10 +39,21 @@ class WebEngine(
   val services: ServiceFacility,
   val application: WebApplication,
   val extend: List[WebEngine],
-  val config: WebApplicationConfig = WebApplicationConfig.empty
+  val config: WebApplicationConfig = WebApplicationConfig.empty,
+  val webConfig: WebEngine.Config = WebEngine.Config.empty
 ) {
   val rule: WebApplicationRule = extend./:(application.config.toRule)(_ complement _.application.config.toRule).complement(config.toRule)
-  val view: ViewEngine = new ViewEngine(platform, application.view, extend.map(_.view))
+  val templateengines = {
+    val a = webConfig.templateEngineHangarFactory.create(platform)
+    val b = TemplateEngineHangar(new ScalateTemplateEngine(platform))
+    a + b
+  }
+  val view: ViewEngine = new ViewEngine(
+    platform,
+    application.view,
+    extend.map(_.view),
+    templateengines
+  )
   val scenariorule = ScenarioEngine.Rule.create() // TODO
   val scenario = new ScenarioEngine(platform, scenariorule)
   val prologuecontroller = {
@@ -140,4 +154,10 @@ class WebEngine(
   def shutdown(): Unit = view.shutdown()
 }
 object WebEngine {
+  case class Config(
+    templateEngineHangarFactory: TemplateEngineHangar.Factory = TemplateEngineHangar.Factory.empty
+  )
+  object Config {
+    val empty = Config()
+  }
 }

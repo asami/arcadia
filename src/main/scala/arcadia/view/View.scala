@@ -34,7 +34,8 @@ import ViewEngine.PROP_VIEW_IT
  *  version Feb. 27, 2022
  *  version Mar. 28, 2022
  *  version Apr. 30, 2022
- * @version May. 22, 2022
+ *  version May. 22, 2022
+ * @version Oct.  1, 2022
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -59,7 +60,12 @@ abstract class View() {
 
   protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content =
     parcel.executeWithTrace(s"${show}#execute_apply", parcel.show) {
-      val r = engine.eval(parcel, execute_Apply(engine, parcel))
+      val c0 = execute_Apply(engine, parcel)
+      val c = parcel.model.fold(c0) {
+        case m: ErrorModel => c0.withCode(m.code)
+        case _ => c0
+      }
+      val r = engine.eval(parcel, c)
       Result(r, r.show)
     }
 

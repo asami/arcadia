@@ -17,7 +17,8 @@ import arcadia.domain._
  *  version Aug. 31, 2018
  *  version Nov.  7, 2018
  *  version Apr. 30, 2019
- * @version Mar. 20, 2022
+ *  version Mar. 20, 2022
+ * @version Sep. 26, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Response {
@@ -105,4 +106,5 @@ object Response {
 
   def record(p: IRecord): Response = Standard(getRecord = Some(p))
   def notFound(): Response = Standard(StatusCode.NotFound.code)
+  def error(code: Int, msg: String): Response = Standard(code, getString = Some(msg))
 }

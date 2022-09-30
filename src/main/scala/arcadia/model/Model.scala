@@ -42,7 +42,8 @@ import arcadia.domain._
  *  version Apr. 18, 2020
  *  version May. 28, 2020
  *  version Jun.  1, 2020
- * @version May. 28, 2022
+ *  version May. 28, 2022
+ * @version Sep. 27, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -429,7 +430,7 @@ object ErrorModel extends ModelClass {
   def create(code: Int, message: Option[String], exception: Option[Throwable]): ErrorModel =
     ErrorModel(code, message.map(I18NElement(_)), exception, None, None, None, None)
   def create(res: Response): ErrorModel =
-    ErrorModel(res.code, None, None, None, None, None, None)
+    ErrorModel(res.code, res.getString.map(I18NElement(_)), None, None, None, None, None)
   def notFound(parcel: Parcel, m: String): ErrorModel = {
     val backuri = _back_uri(parcel)
     val msg = I18NElement(m)

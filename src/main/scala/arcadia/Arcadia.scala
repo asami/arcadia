@@ -27,14 +27,17 @@ import arcadia.service.{ServiceFacility, SystemService}
 /*
  * @since   Jan. 24, 2022
  *  version Feb. 28, 2022
- * @version Mar. 20, 2022
+ *  version Mar. 20, 2022
+ *  version Jul. 24, 2022
+ * @version Sep. 10, 2022
  * @author  ASAMI, Tomoharu
  */
 class Arcadia(
   platformContext: PlatformContext,
   services: ServiceFacility,
   applications: Map[String, WebApplication],
-  configs: Map[String, WebApplicationConfig]
+  configs: Map[String, WebApplicationConfig],
+  webEngineConfig: WebEngine.Config
 ) {
   private val _engines = new TrieMap[String, WebEngine]()
 
@@ -42,7 +45,7 @@ class Arcadia(
 
   private def _engine(name: String, history: List[String]): WebEngine =
     _engines.get(name) getOrElse {
-      def h = if (history.isEmpty) "" else s""": $history.mkString(",")"""
+      def h = if (history.isEmpty) "" else s""": ${history.mkString(",")}"""
       if (history.contains(name))
         Conclusion.config.illegalConfigurationDefect(s"Recursive '$name'$h").RAISE
       applications.get(name).fold {
@@ -50,7 +53,14 @@ class Arcadia(
       } { app =>
         val extend = app.extend.map(_engine(_, name :: history))
         // TODO merge webRule
-        val r = new WebEngine(platformContext, services, app, extend, _web_config(app))
+        val r = new WebEngine(
+          platformContext,
+          services,
+          app,
+          extend,
+          _web_config(app),
+          webEngineConfig
+        )
         _engines += (name -> r)
         r
       }
@@ -77,11 +87,15 @@ object Arcadia {
   // def create(pc: PlatformContext, configs: Map[String, WebApplicationRule]): Arcadia = {
   // }
 
-  def make(pc: PlatformContext, config: Hocon): Consequence[Arcadia] = for {
+  def make(
+    pc: PlatformContext,
+    webengineconfig: WebEngine.Config,
+    config: Hocon
+  ): Consequence[Arcadia] = for {
     services <- _make_services(pc, config)
     apps <- _make_applications(pc, config)
     confs <- _make_configs(config)
-  } yield new Arcadia(pc, services, apps, confs)
+  } yield new Arcadia(pc, services, apps, confs, webengineconfig)
 
   private def _make_services(pc: PlatformContext, config: Hocon): Consequence[ServiceFacility] = Consequence {
     val services = List(new SystemService(pc))

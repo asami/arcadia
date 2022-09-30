@@ -23,7 +23,8 @@ import arcadia.view._
  *  version Mar. 18, 2020
  *  version Jun.  2, 2020
  *  version Feb. 28, 2022
- * @version May. 22, 2022
+ *  version May. 22, 2022
+ * @version Sep. 10, 2022
  * @author  ASAMI, Tomoharu
  */
 abstract class WebModule() {
@@ -47,7 +48,7 @@ abstract class WebModule() {
 }
 
 object WebModule {
-  val templateSuffixes = Set("coffee", "md", "markdown", "ssp", "scaml", "mustache", "jade")
+  val templateSuffixes = Set("coffee", "md", "markdown", "ssp", "scaml", "mustache", "jade", "dox")
   val warSuffixes = Set("war", "zip")
   val htmlSuffixes = Set("html", "xhtml")
 
