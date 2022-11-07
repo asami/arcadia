@@ -21,6 +21,8 @@ import org.goldenport.util.StringUtils
 // import org.goldenport.util.StringUtils
 import arcadia.context._
 import arcadia.service.{ServiceFacility, SystemService}
+import arcadia.view.TemplateEngineHangar
+import arcadia.view.ScalateTemplateEngine
 // import arcadia.controller._
 // import arcadia.view._
 
@@ -29,7 +31,8 @@ import arcadia.service.{ServiceFacility, SystemService}
  *  version Feb. 28, 2022
  *  version Mar. 20, 2022
  *  version Jul. 24, 2022
- * @version Sep. 10, 2022
+ *  version Sep. 10, 2022
+ * @version Oct. 23, 2022
  * @author  ASAMI, Tomoharu
  */
 class Arcadia(
@@ -53,13 +56,18 @@ class Arcadia(
       } { app =>
         val extend = app.extend.map(_engine(_, name :: history))
         // TODO merge webRule
+        val templateengines = {
+          val a = webEngineConfig.templateEngineHangarFactory.create(platformContext)
+          val b = TemplateEngineHangar(new ScalateTemplateEngine(platformContext))
+          a + b
+        }
         val r = new WebEngine(
           platformContext,
+          templateengines,
           services,
           app,
           extend,
-          _web_config(app),
-          webEngineConfig
+          _web_config(app)
         )
         _engines += (name -> r)
         r
@@ -92,14 +100,18 @@ object Arcadia {
     webengineconfig: WebEngine.Config,
     config: Hocon
   ): Consequence[Arcadia] = for {
-    services <- _make_services(pc, config)
+    services <- _make_services(pc, webengineconfig, config)
     apps <- _make_applications(pc, config)
     confs <- _make_configs(config)
   } yield new Arcadia(pc, services, apps, confs, webengineconfig)
 
-  private def _make_services(pc: PlatformContext, config: Hocon): Consequence[ServiceFacility] = Consequence {
-    val services = List(new SystemService(pc))
-    new ServiceFacility(pc, services)
+  private def _make_services(
+    pc: PlatformContext,
+    webengineconfig: WebEngine.Config,
+    config: Hocon
+  ): Consequence[ServiceFacility] = Consequence {
+    val services = webengineconfig.services ++ Vector(new SystemService(pc))
+    new ServiceFacility(pc, services.toVector)
   }
 
   private def _make_applications(pc: PlatformContext, config: Hocon): Consequence[Map[String, WebApplication]] = {

@@ -3,11 +3,13 @@ package arcadia.model
 import scala.xml.{NodeSeq, Group, Text}
 import java.net.URI
 import java.util.Locale
+import org.goldenport.context.{Conclusion => CConclusion, StatusCode}
 import org.goldenport.exception.RAISE
 import org.goldenport.collection.{NonEmptyVector, VectorMap}
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.{Record => _, Conclusion => RConclusion, _}
 import org.goldenport.record.v2.util.RecordUtils
+import org.goldenport.record.util.AnyUtils
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.value._
 import org.goldenport.trace.TraceContext
@@ -43,7 +45,9 @@ import arcadia.domain._
  *  version May. 28, 2020
  *  version Jun.  1, 2020
  *  version May. 28, 2022
- * @version Sep. 27, 2022
+ *  version Sep. 27, 2022
+ *  version Oct. 30, 2022
+ * @version Nov.  6, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -383,14 +387,16 @@ case object EmptyModel extends Model {
 }
 
 case class ErrorModel(
-  code: Int,
-  message: Option[I18NElement],
-  exception: Option[Throwable],
+  conclusion: CConclusion,
+  element: Option[I18NElement],
   invalid: Option[Invalid],
   topUri: Option[URI],
   backUri: Option[URI],
   trace: Option[TraceContext]
 ) extends Model {
+  def code = conclusion.code
+  def message: Option[I18NElement] = element orElse Some(I18NElement(conclusion.messageI18N))
+  def exception = conclusion.exception
   val expiresKind = Some(NoCacheExpires)
   def toRecord: IRecord = RAISE.notImplementedYetDefect
   override def apply(strategy: RenderStrategy): Content = XmlContent(render(strategy), expiresKind, code)
@@ -401,6 +407,23 @@ case class ErrorModel(
   }.apply
 }
 object ErrorModel extends ModelClass {
+  def apply(
+    code: Int,
+    element: Option[I18NElement],
+    exception: Option[Throwable],
+    invalid: Option[Invalid],
+    topUri: Option[URI],
+    backUri: Option[URI],
+    trace: Option[TraceContext]
+  ): ErrorModel = ErrorModel(
+    CConclusion(StatusCode(code), exception = exception),
+    element,
+    invalid,
+    topUri,
+    backUri,
+    trace
+  ) // compatibility
+
   def create(parcel: Parcel, code: Int): ErrorModel = {
     val backuri = _back_uri(parcel)
     ErrorModel(code, None, None, None, None, backuri, parcel.trace)
@@ -427,6 +450,10 @@ object ErrorModel extends ModelClass {
     ErrorModel(500, Some(I18NElement(m)), None, None, None, backuri, parcel.trace)
   }
   def create(parcel: Parcel, evt: scenario.Event): ErrorModel = RAISE.notImplementedYetDefect
+  def create(parcel: Parcel, c: CConclusion): ErrorModel = {
+    val backuri = _back_uri(parcel)
+    ErrorModel(c, None, None, None, backuri, parcel.trace)
+  }
   def create(code: Int, message: Option[String], exception: Option[Throwable]): ErrorModel =
     ErrorModel(code, message.map(I18NElement(_)), exception, None, None, None, None)
   def create(res: Response): ErrorModel =
@@ -456,7 +483,7 @@ sealed trait ValueModel extends Model with IAtomicModel {
 case class SingleValueModel(datatype: DataType, v: Option[Any]) extends ValueModel {
   val expiresKind = None
   def toRecord: IRecord = RAISE.notImplementedYetDefect
-  def render(strategy: RenderStrategy) = Text(v.toString) // TODO
+  def render(strategy: RenderStrategy) = Text(v.fold("")(AnyUtils.toString))
 }
 case class MultipleValueModel(datatype: DataType, v: List[Any]) extends Model with ValueModel {
   val expiresKind = None

@@ -37,7 +37,8 @@ import arcadia.service.ServiceFacility
  *  version Feb. 27, 2022
  *  version Mar. 21, 2022
  *  version Apr. 30, 2022
- * @version May.  2, 2022
+ *  version May.  2, 2022
+ * @version Oct. 30, 2022
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -106,8 +107,8 @@ case class ExecutionContext(
 
   def controllerUri: URI = platformExecutionContext.controllerUri
   def getIdInRequest: Option[DomainObjectId] = platformExecutionContext.getIdInRequest
-  lazy val inputQueryParameters: IRecord = platformExecutionContext.inputQueryParameters.toRecord.http.request.normalize
-  lazy val inputFormParameters: IRecord = platformExecutionContext.inputFormParameters.toRecord.http.request.normalize
+  lazy val inputQueryParameters: IRecord = platformExecutionContext.inputQueryParameters.toRecord.http.request.normalizePlain
+  lazy val inputFormParameters: IRecord = platformExecutionContext.inputFormParameters.toRecord.http.request.normalizePlain
   def getFormParameter(key: String): Option[String] = inputFormParameters.getString(key)
   lazy val assets: String = config.getAssets getOrElse platformExecutionContext.assets
 

@@ -14,6 +14,7 @@ import arcadia.controller._
 import arcadia.model.ErrorModel
 import arcadia.scenario._
 import arcadia.service.ServiceFacility
+import arcadia.service.Service
 
 /*
  * @since   Jul. 15, 2017
@@ -31,23 +32,25 @@ import arcadia.service.ServiceFacility
  *  version Apr.  1, 2020
  *  version May.  8, 2020
  *  version Mar. 20, 2022
- * @version Sep. 10, 2022
+ *  version Sep. 10, 2022
+ * @version Oct. 23, 2022
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
   val platform: PlatformContext,
+  val templateengines: TemplateEngineHangar,
   val services: ServiceFacility,
   val application: WebApplication,
   val extend: List[WebEngine],
-  val config: WebApplicationConfig = WebApplicationConfig.empty,
-  val webConfig: WebEngine.Config = WebEngine.Config.empty
+  val config: WebApplicationConfig = WebApplicationConfig.empty
+//  val webConfig: WebEngine.Config = WebEngine.Config.empty
 ) {
   val rule: WebApplicationRule = extend./:(application.config.toRule)(_ complement _.application.config.toRule).complement(config.toRule)
-  val templateengines = {
-    val a = webConfig.templateEngineHangarFactory.create(platform)
-    val b = TemplateEngineHangar(new ScalateTemplateEngine(platform))
-    a + b
-  }
+  // val templateengines = {
+  //   val a = webConfig.templateEngineHangarFactory.create(platform)
+  //   val b = TemplateEngineHangar(new ScalateTemplateEngine(platform))
+  //   a + b
+  // }
   val view: ViewEngine = new ViewEngine(
     platform,
     application.view,
@@ -155,7 +158,8 @@ class WebEngine(
 }
 object WebEngine {
   case class Config(
-    templateEngineHangarFactory: TemplateEngineHangar.Factory = TemplateEngineHangar.Factory.empty
+    templateEngineHangarFactory: TemplateEngineHangar.Factory = TemplateEngineHangar.Factory.empty,
+    services: Seq[Service] = Nil
   )
   object Config {
     val empty = Config()

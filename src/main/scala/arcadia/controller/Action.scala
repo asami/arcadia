@@ -5,6 +5,7 @@ import java.net.{URL, URI}
 import play.api.libs.json._
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
+import org.goldenport.context.Conclusion
 import org.goldenport.collection.NonEmptyVector
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.{Record => _, _}
@@ -44,7 +45,8 @@ import arcadia.scenario._
  *  version Apr. 18, 2020
  *  version May. 28, 2020
  *  version Apr. 25, 2022
- * @version May.  3, 2022
+ *  version May.  3, 2022
+ * @version Nov.  6, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -1023,7 +1025,12 @@ case class BrokenAction(
   json: Option[JsValue],
   jsonError: Option[JsError]
 ) extends Action {
-  protected def execute_Apply(parcel: Parcel): Parcel = parcel
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    val c = Conclusion.config.illegalConfigurationDefect(message.en)
+    val model = ErrorModel.create(parcel, c)
+    val command = ErrorCommand(model)
+    parcel.withCommandModel(command, model)
+  }
 }
 object BrokenAction {
   def apply(msg: String, json: JsValue): BrokenAction = BrokenAction(I18NString(msg), Some(json), None)

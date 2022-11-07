@@ -5,6 +5,7 @@ import play.api.libs.json.{JsValue, JsNull}
 import org.goldenport.exception.RAISE
 import org.goldenport.context.StatusCode
 import org.goldenport.record.v3.{IRecord, Record}
+import org.goldenport.record.v2.XString
 import org.goldenport.record.v2.util.SchemaBuilder
 import arcadia._
 import arcadia.model._
@@ -18,7 +19,8 @@ import arcadia.domain._
  *  version Nov.  7, 2018
  *  version Apr. 30, 2019
  *  version Mar. 20, 2022
- * @version Sep. 26, 2022
+ *  version Sep. 26, 2022
+ * @version Oct. 30, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Response {
@@ -83,7 +85,10 @@ trait Response {
         getOrElse {
           getRecord.map(PropertySheetModel(None, None, _)).
             getOrElse {
-              EmptyModel // XXX
+              getString.map(x => SingleValueModel(XString, Some(x))). // XXX
+                getOrElse {
+                  EmptyModel // XXX
+                }
             }
         }
     } else {
