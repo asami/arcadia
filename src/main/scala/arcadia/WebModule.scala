@@ -24,11 +24,14 @@ import arcadia.view._
  *  version Jun.  2, 2020
  *  version Feb. 28, 2022
  *  version May. 22, 2022
- * @version Sep. 10, 2022
+ *  version Sep. 10, 2022
+ * @version Nov. 27, 2022
  * @author  ASAMI, Tomoharu
  */
 abstract class WebModule() {
   import WebModule._
+  def name: String
+
   def toWebApplication(platform: PlatformContext): WebApplication
 
   protected final def is_html(p: File): Boolean = isHtml(p.getName)
@@ -87,6 +90,8 @@ object WebModule {
 }
 
 class DirectoryWebModule(base: File) extends WebModule {
+  def name = base.getName
+
   def toWebApplication(platform: PlatformContext) = {
     val builder = new WebApplication.Builder[File]() {
       protected def base_url: URL = to_url(base)
@@ -170,6 +175,8 @@ class WarWebModule(
   val bag = ProjectVersionDirectoryBag.createFromZip(basedir, war, user, password)
   lazy val module = new DirectoryWebModule(bag.homeDirectory)
 
+  def name = module.name
+
   def toWebApplication(platform: PlatformContext) = module.toWebApplication(platform)
     // val builder = new WebApplication.Builder[File]() {
     //   protected def base_url: URL = to_url(base)
@@ -212,5 +219,7 @@ object WarWebModule {
 }
 
 class ResourceWebModule(resourcename: String, classloader: Option[ClassLoader]) extends WebModule {
+  def name = resourcename
+
   def toWebApplication(platform: PlatformContext) = RAISE.notImplementedYetDefect
 }

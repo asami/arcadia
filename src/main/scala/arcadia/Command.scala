@@ -24,7 +24,8 @@ import arcadia.context.{Request, PlatformExecutionContext}
  *  version Apr. 30, 2019
  *  version Mar. 23, 2020
  *  version Apr. 17, 2020
- * @version Mar.  6, 2022
+ *  version Mar.  6, 2022
+ * @version Nov. 28, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Command {
@@ -181,4 +182,12 @@ case class InvokePlatformCommand(service: Any) extends Command {
 }
 
 case class InvokeOperationCommand(context: PlatformExecutionContext, request: Request) extends Command {
+}
+
+case class ExecuteScriptCommand(
+  context: PlatformExecutionContext,
+  schema: Schema,
+  script: String,
+  request: Request
+) extends Command {
 }

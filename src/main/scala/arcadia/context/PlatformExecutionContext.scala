@@ -39,7 +39,8 @@ import arcadia.rule._
  *  version Apr. 17, 2020
  *  version May. 29, 2020
  *  version Feb. 28, 2022
- * @version May.  2, 2022
+ *  version May.  2, 2022
+ * @version Nov. 27, 2022
  * @author  ASAMI, Tomoharu
  */
 trait PlatformExecutionContext {
@@ -68,6 +69,7 @@ trait PlatformExecutionContext {
   def delete(uri: String, query: Map[String, Any], form: Map[String, Any]): Response
   def invoke(op: InvokePlatformCommand): Response
   def invoke(op: InvokeOperationCommand): Response
+  def execute(op: ExecuteScriptCommand): Response
   def getEntitySchema(name: String): Option[Schema]
   def getDefaultPropertyColumn(name: String): Option[Column]
   def getEntity(entitytype: DomainEntityType, id: DomainObjectId): Option[EntityDetailModel]

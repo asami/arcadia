@@ -46,7 +46,7 @@ import arcadia.scenario._
  *  version May. 28, 2020
  *  version Apr. 25, 2022
  *  version May.  3, 2022
- * @version Nov.  6, 2022
+ * @version Nov. 27, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -213,6 +213,7 @@ object Action {
   implicit val ContentActionFormat = Json.format[ContentAction]
   implicit val SearchBoxActionFormat = Json.format[SearchBoxAction]
   implicit val InvokeOperationScenarioActionFormat = Json.format[InvokeOperationScenarioAction]
+  implicit val ExecuteScriptScenarioActionFormat = Json.format[ExecuteScriptScenarioAction]
   implicit val LoginScenarioActionFormat = Json.format[LoginScenarioAction]
   implicit val ResetPasswordScenarioActionFormat = Json.format[ResetPasswordScenarioAction]
 
@@ -251,6 +252,7 @@ object Action {
         case "searchbox" => Json.fromJson[SearchBoxAction](json)
         // scenario
         case "invoke-operation-scenario" => Json.fromJson[InvokeOperationScenarioAction](json)
+        case "script-scenario" => Json.fromJson[ExecuteScriptScenarioAction](json)
         case "login-scenario" => Json.fromJson[LoginScenarioAction](json)
         case "reset-password-scenario" => Json.fromJson[ResetPasswordScenarioAction](json)
         case _ => JsError(s"Unknown action '$s'")
@@ -591,6 +593,31 @@ case class InvokeOperationScenarioAction(
   //   )
   //   set_sink(parcel, model)
   // }
+}
+
+case class ExecuteScriptScenarioAction(
+  formAction: Option[URI],
+  script: String,
+  method: Option[Method],
+  title: Option[I18NElement],
+  description: Option[I18NElement],
+  submitLabel: Option[I18NElement],
+  parameters: Parameters,
+  successView: Option[String],
+  errorView: Option[String],
+  source: Option[Source],
+  sink: Option[Sink]
+) extends SourceSinkAction {
+  def effectiveMethod: Method = method getOrElse Get
+
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    parcel.getPlatformContext.map { ctx =>
+      val x = ExecuteScriptScenario.launch(parcel, this)
+      val rule = ScenarioEngine.Rule()
+      val engine = new ScenarioEngine(ctx, rule)
+      engine.apply(x)
+    }.getOrElse(RAISE.noReachDefect)
+  }
 }
 
 case class LoginScenarioAction(

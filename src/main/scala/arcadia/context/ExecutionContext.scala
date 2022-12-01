@@ -38,7 +38,8 @@ import arcadia.service.ServiceFacility
  *  version Mar. 21, 2022
  *  version Apr. 30, 2022
  *  version May.  2, 2022
- * @version Oct. 30, 2022
+ *  version Oct. 30, 2022
+ * @version Nov. 27, 2022
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -83,6 +84,8 @@ case class ExecutionContext(
 
   def invoke(op: InvokeOperationCommand): Response =
     services.invokeOption(op) getOrElse platformExecutionContext.invoke(op)
+
+  def execute(cmd: ExecuteScriptCommand): Response = platformExecutionContext.execute(cmd)
 
   def getEntitySchema(name: String): Option[Schema] = {
     // TODO config

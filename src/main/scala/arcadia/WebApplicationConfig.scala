@@ -24,7 +24,8 @@ import org.goldenport.hocon.RichConfig.Implicits._
  *  version Apr. 28, 2019
  *  version Mar. 24, 2020
  *  version Apr. 23, 2020
- * @version Jul. 25, 2022
+ *  version Jul. 25, 2022
+ * @version Nov. 26, 2022
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationConfig(
@@ -376,10 +377,10 @@ object WebApplicationConfig {
   private def _parse_hocon(s: String): WebApplicationConfig = {
     val c = ConfigFactory.parseString(s)
     val expires = ExpiresConfig(
-      c.getDurationOption("expires.assets"),
-      c.getDurationOption("expires.static_page"),
-      c.getDurationOption("expires.common_page"),
-      c.getDurationOption("expires.private_page")
+      c.getFiniteDurationOption("expires.assets"),
+      c.getFiniteDurationOption("expires.static_page"),
+      c.getFiniteDurationOption("expires.common_page"),
+      c.getFiniteDurationOption("expires.private_page")
     )
     val cdn = CdnConfig(
       c.getUriOption("cdn.assets"),
@@ -391,8 +392,8 @@ object WebApplicationConfig {
     )
     val http = HttpConfig(
       c.getStringOption("http.cookie.secure").map(CookieSecureKind(_)),
-      c.getDurationOption("http.login.maxAge"),
-      c.getDurationOption("http.access.maxAge")
+      c.getFiniteDurationOption("http.login.maxAge"),
+      c.getFiniteDurationOption("http.access.maxAge")
     )
     val route = Some(RouteConfig("???"))
     val pages = None

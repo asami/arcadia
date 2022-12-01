@@ -34,7 +34,8 @@ import arcadia.controller._
  *  version May. 28, 2020
  *  version Jun.  1, 2020
  *  version Mar. 30, 2022
- * @version Sep. 25, 2022
+ *  version Sep. 25, 2022
+ * @version Nov. 28, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Scenario {
@@ -545,6 +546,171 @@ object InvokeOperationScenario extends ScenarioClass {
   //     InvokeOperationScenario(state, entity, schema, data)
   //   }
   // }
+}
+
+case class ExecuteScriptScenario(
+  state: State,
+  override val schema: Schema,
+  data: IRecord,
+  script: String,
+  operationMethod: Method,
+  successView: Option[String],
+  errorView: Option[String]
+) extends Scenario {
+  val scenarioClass = ExecuteScriptScenario
+
+  val stateMachine = new StateMachine {
+    import StateMachine.Slot
+    val slots = Vector(
+      Slot(InputState, Transitions(
+        Transition(CancelEventGuard, CancelAction),
+        Transition(BackEventGuard, CancelAction),
+        Transition(InputEventGuard, ValidationAction),
+        Transition(OkEventGuard, ExecuteAction(execute)),
+        Transition(ExecuteEventGuard, ExecuteAction(execute))
+      )),
+      Slot(ConfirmState, Transitions(
+        Transition(CancelEventGuard, CancelAction),
+        Transition(BackEventGuard, InputAction),
+        Transition(OkEventGuard, ExecuteAction(execute)),
+        Transition(ExecuteEventGuard, ExecuteAction(execute))
+      )),
+      Slot(ShowState, Transitions(
+        Transition(AllGuard, EndAction)
+      )),
+      Slot(EndState, Transitions(
+        Transition(AllGuard, ReturnAction)
+      ))
+    )
+  }
+
+  def withState(p: State) = copy(state = p)
+
+  override def getSchema = Some(schema)
+  override protected def adjust_Intent(p: Intent): Intent = p
+
+  override def getCancelContent: Option[Content] = Some(RedirectContent(""))
+
+  def execute(p: Intent): Intent = {
+    p.context.map { ctx =>
+      val pathname = "2.1/PalShopApp" // XXX
+      val d = data + p.event.getData.getOrElse(Record.empty)
+      val (query, form) = operationMethod match {
+        case Get => (d, Record.empty)
+        case _ => (Record.empty, d)
+      }
+      val req = Request(pathname, "eval", operationMethod.name, query, form)
+      val cmd = ExecuteScriptCommand(
+        ctx.platformExecutionContext,
+        p.scenario.schema,
+        script,
+        req
+      )
+      val res = ctx.execute(cmd)
+      _response(p, res)
+    }.getOrElse(p.goError("Missing scenario execution context"))
+  }
+
+  private def _response(p: Intent, res: Response): Intent = {
+    val model = res.toModel
+    model match {
+      case m: ErrorModel =>
+        val view = errorView getOrElse("")
+        p.error(view, model)
+      case m =>
+        val view = successView getOrElse("")
+        p.success(view, model)
+    }
+  }
+
+  def marshall = Record.data(
+    "name" -> ExecuteScriptScenario.name,
+    "state" -> state.marshall,
+    "data" -> data
+  ).toJsonString
+}
+object ExecuteScriptScenario extends ScenarioClass {
+  def launch(p: Parcel, action: ExecuteScriptScenarioAction): Parcel = {
+    implicit val strategy = p.toStrategy
+    val data = p.inputQueryFormParameters
+    data.getString(PROP_SCENARIO).flatMap(unmarshallOption(strategy, action, _)).
+      map(_go(p, _, data)).
+      getOrElse(start(p, action, action.parameters.toSchema, data))
+  }
+
+  def start(
+    p: Parcel,
+    action: ExecuteScriptScenarioAction,
+    schema: Schema,
+    data: IRecord
+  ): Parcel = {
+    val pathname = _pathname(p)
+    val parcel = p.withUsageKind(InvokeUsage) // ???
+    val scenario = ExecuteScriptScenario(
+      InputState,
+      schema,
+      data,
+      action.script,
+      action.effectiveMethod,
+      action.successView,
+      action.errorView
+    )
+    val cmd = ScenarioCommand(scenario, pathname, StartEvent(p, data))
+    parcel.withCommand(cmd)
+  }
+
+  private def _go(
+    p: Parcel,
+    scenario: ExecuteScriptScenario,
+    data: IRecord
+  ): Parcel = data.getString(PROP_SUBMIT).map(x =>
+    Event.get(p, x).
+      map { event =>
+        val pathname = _pathname(p)
+        val cmd = ScenarioCommand(scenario, pathname, event)
+        p.withCommand(cmd)
+      }.getOrElse(RAISE.notImplementedYetDefect) // TODO WebScenarioDefect)
+  ).getOrElse(
+    RAISE.notImplementedYetDefect // TODO WebScenarioDefect
+  )
+
+  private def _pathname(p: Parcel): PathName = p.command.collect {
+    case MaterialCommand(pn) => pn
+    case m: IndexCommand => m.pathname
+  }.getOrElse(RAISE.noReachDefect)
+
+  def unmarshallOption(p: String): Option[ExecuteScriptScenario] = RAISE.unsupportedOperationFault
+
+  def unmarshallOption(
+    strategy: RenderStrategy,
+    action: ExecuteScriptScenarioAction,
+    p: String
+  ): Option[ExecuteScriptScenario] =
+    if (p.startsWith("{"))
+      _unmarshall_option(strategy, action, p)
+    else
+      None
+
+  private def _unmarshall_option(
+    strategy: RenderStrategy,
+    action: ExecuteScriptScenarioAction,
+    p: String
+  ): Option[ExecuteScriptScenario] = {
+    val json = Json.parse(p)
+    (json \ "name").asOpt[String].map { name =>
+      val state = State.unmarshall((json \ "state").as[String])
+      val data = Record.create(json \ "data")
+      ExecuteScriptScenario(
+        state,
+        action.parameters.toSchema(strategy),
+        data,
+        action.script,
+        action.effectiveMethod,
+        action.successView,
+        action.errorView
+      )
+    }
+  }
 }
 
 case class LoginScenario(

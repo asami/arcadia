@@ -27,7 +27,8 @@ import arcadia.model.{Model, ErrorModel}
  *  version Mar. 28, 2022
  *  version Apr. 30, 2022
  *  version May. 22, 2022
- * @version Sep. 10, 2022
+ *  version Sep. 10, 2022
+ * @version Nov. 27, 2022
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -369,6 +370,19 @@ object ViewEngine {
     def getLayout(kind: LayoutKind): Option[LayoutView] = layouts.get(kind)
   }
   object Rule {
+    val error = {
+      val theme = None
+      val slots = Vector.empty
+      val layouts = Map.empty[LayoutKind, LayoutView]
+      val partials = Partials.empty
+      val pages = Pages.empty
+      val components = Components.empty
+      val tags = Tags.empty
+      val singlePageApplication = None
+      val baseDir = None
+      Rule(theme, slots, layouts, partials, pages, components, tags, singlePageApplication, baseDir)
+    }
+
     def create(
       theme: Option[RenderTheme],
       slots: Seq[Slot],

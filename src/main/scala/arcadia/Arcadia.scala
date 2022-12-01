@@ -32,7 +32,8 @@ import arcadia.view.ScalateTemplateEngine
  *  version Mar. 20, 2022
  *  version Jul. 24, 2022
  *  version Sep. 10, 2022
- * @version Oct. 23, 2022
+ *  version Oct. 23, 2022
+ * @version Nov. 27, 2022
  * @author  ASAMI, Tomoharu
  */
 class Arcadia(
@@ -134,10 +135,24 @@ object Arcadia {
       webapps.listFiles.toList.traverse(_make_application_in_webapps_).map(_.flatten)
     }
 
-    def _make_application_in_webapps_(p: File): Consequence[List[WebApplication]] =
-      Consequence(
-        WebModule.createOption(p, tmpdir).map(_.toWebApplication(pc)).toList
-      )
+    def _make_application_in_webapps_(p: File): Consequence[List[WebApplication]] = {
+      def _recover_app_(wm: WebModule, c: Conclusion): Consequence[WebApplication] =
+        Consequence(WebApplication.error(wm.name, c))
+      def _error_app_(p: File, c: Conclusion): Consequence[WebApplication] =
+        Consequence(WebApplication.error(p.getName, c))
+
+      Consequence(WebModule.createOption(p, tmpdir)) match {
+        case Consequence.Success(s, _) =>
+          s match {
+            case Some(ss) => Consequence(List(ss.toWebApplication(pc))).
+                recoverWith {
+                  case c => _recover_app_(ss, c).map(List(_))
+                }
+            case None => Consequence(Nil)
+          }
+        case Consequence.Error(c) => _error_app_(p, c).map(List(_))
+      }
+    }
 
     // config.consequenceAsObjectList("application", _make_application)
     for {

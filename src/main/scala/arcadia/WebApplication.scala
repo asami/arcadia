@@ -11,6 +11,7 @@ import scalax.io._
 import org.fusesource.scalate._
 import org.fusesource.scalate.support.URLTemplateSource
 import org.goldenport.exception.RAISE
+import org.goldenport.context.Conclusion
 import org.goldenport.context.FormatContext
 import org.goldenport.values.{Version, PathName}
 import org.goldenport.bag.{ProjectVersionDirectoryBag, UrlBag}
@@ -34,7 +35,8 @@ import arcadia.scenario._
  *  version Apr. 13, 2020
  *  version Apr. 15, 2021
  *  version May. 22, 2022
- * @version Jul. 25, 2022
+ *  version Jul. 25, 2022
+ * @version Nov. 27, 2022
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -88,6 +90,13 @@ object WebApplication {
     val scenario = ScenarioEngine.Rule.empty
     val config = WebApplicationConfig.create("Plain")
     WebApplication("plain", None, config, ControllerEngine.Rule.empty, view)
+  }
+
+  def error(name: String, c: Conclusion) = {
+    val config = WebApplicationConfig.empty
+    val controller = ControllerEngine.Rule.empty
+    val view = ViewEngine.Rule.error
+    WebApplication(name, None, config, controller, view)
   }
 
 //  lazy val systemWebApplications = Vector(plain, dashboard, dashboardwar)
@@ -377,4 +386,19 @@ object WebApplication {
       }
     }
   }
+
+  // case class ErrorBuilder() extends Builder[Unit]() {
+  //   protected def base_url: URL = ???
+  //   protected def base_dir_for_dynamic_resolving: Option[File] = None
+  //   protected def is_html(p: Unit): Boolean = ???
+  //   protected def is_template(p: Unit): Boolean = ???
+  //   protected def is_directory(p: Unit): Boolean = ???
+  //   protected def path(p: Unit): String = ???
+  //   protected def name(p: Unit): String = ???
+  //   protected def to_url(p: Unit): URL = ???
+  //   protected def to_template_source(p: Unit): TemplateSource = ???
+  //   protected def root_node: Unit = ???
+  //   protected def to_children(p: Unit): List[Unit] = ???
+  //   protected def to_descendants(p: Unit): List[Unit] = ???
+  // }
 }
