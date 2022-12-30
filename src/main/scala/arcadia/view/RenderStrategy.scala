@@ -40,7 +40,8 @@ import arcadia.view.ViewEngine._
  *  version Mar. 31, 2020
  *  version Apr.  1, 2020
  *  version Apr. 30, 2022
- * @version May.  3, 2022
+ *  version May.  3, 2022
+ * @version Dec. 30, 2022
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -934,8 +935,12 @@ case class SchemaRule(
     usage: UsageKind,
     schema: Schema
   ): Schema = {
-    val systemschema = rule(op)(screen)(entitytype)(usage)
-    _converge(schema, systemschema)
+    if (true) {
+      schema
+    } else {
+      val systemschema = rule(op)(screen)(entitytype)(usage)
+      _converge(schema, systemschema)
+    }
   }
 
   private def _converge(app: Schema, system: Schema): Schema = {

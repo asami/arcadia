@@ -5,6 +5,7 @@ import java.io.File
 import java.net.URL
 import org.fusesource.scalate._
 import org.fusesource.scalate.support.URLTemplateSource
+import com.typesafe.config.{Config => Hocon}
 import com.asamioffice.goldenport.io.UURL
 import org.goldenport.exception.RAISE
 import org.goldenport.values.PathName
@@ -14,6 +15,7 @@ import org.goldenport.util.StringUtils
 import arcadia.context._
 import arcadia.controller._
 import arcadia.view._
+import arcadia.domain.DomainModel
 
 /*
  * @since   Jul. 23, 2017
@@ -25,14 +27,19 @@ import arcadia.view._
  *  version Feb. 28, 2022
  *  version May. 22, 2022
  *  version Sep. 10, 2022
- * @version Nov. 27, 2022
+ *  version Nov. 27, 2022
+ * @version Dec. 25, 2022
  * @author  ASAMI, Tomoharu
  */
 abstract class WebModule() {
   import WebModule._
   def name: String
 
-  def toWebApplication(platform: PlatformContext): WebApplication
+  def toWebApplication(
+    platform: PlatformContext,
+    webconfig: WebEngine.Config,
+    config: Hocon
+  ): WebApplication
 
   protected final def is_html(p: File): Boolean = isHtml(p.getName)
   // is_html(StringUtils.toSuffix(p.getName))
@@ -92,7 +99,11 @@ object WebModule {
 class DirectoryWebModule(base: File) extends WebModule {
   def name = base.getName
 
-  def toWebApplication(platform: PlatformContext) = {
+  def toWebApplication(
+    platform: PlatformContext,
+    webconfig: WebEngine.Config,
+    config: Hocon
+  ) = {
     val builder = new WebApplication.Builder[File]() {
       protected def base_url: URL = to_url(base)
       protected def base_dir_for_dynamic_resolving = Some(base)
@@ -106,51 +117,10 @@ class DirectoryWebModule(base: File) extends WebModule {
       protected def root_node: File = base
       protected def to_children(p: File): List[File] = p.listFiles.toList
       protected def to_descendants(p: File): List[File] = IoUtils.descendants(p).toList
+      protected def parse_domain_model(p: File): Option[DomainModel] = webconfig.domainModelFactory.parse(p)
     }
     builder.apply(platform)
   }
-  // def toWebApplication = {
-  //   val appname = "dashboard" // TODO
-  //   case class Z(views: Vector[(Guard, View)] = Vector.empty) {
-  //     def r = {
-  //       val xs = views ++ Vector(
-  //         AssetView.fromHtmlFilenameOrUri(base.getAbsolutePath()).gv
-  //       )
-  //       ViewEngine.Rule.create(xs)
-  //     }
-  //     def +(rhs: File) = {
-  //       if (is_html(rhs))
-  //         copy(views = views :+ HtmlView(rhs.toURI.toURL).gv)
-  //       else if (is_template(rhs))
-  //         copy(views = views :+ template_view(rhs))
-  //       else if (rhs.isDirectory)
-  //         copy(views = views ++ directory_view(rhs))
-  //       else
-  //         this
-  //     }
-  //     protected def template_view(p: File): (Guard, View) = {
-  //       val name = StringUtils.pathLastComponentBody(p.getName)
-  //       val src = TemplateSource.fromFile(p)
-  //       name match {
-  //         case "index" => IndexView(src).gv
-  //         case "index.html" => IndexView(src).gv
-  //         case "detail" => ResourceDetailView(src).gv
-  //         case "detail.html" => ResourceDetailView(src).gv
-  //         case "list" => ResourceListView(src).gv
-  //         case "list.html" => ResourceListView(src).gv
-  //         case "dashboard" => DashboardView(src).gv
-  //         case "dashboard.html" => DashboardView(src).gv
-  //         case m => PageView(src).gv
-  //       }
-  //     }
-  //     protected def directory_view(p: File): Vector[(Guard, View)] = {
-  //       Vector.empty // TODO
-  //     }
-  //   }
-  //   val view = base.listFiles()./:(Z())(_+_).r
-  //   val controller = WebApplication.standardControllerRule
-  //   WebApplication(appname, controller, view)
-  // }
 }
 object DirectoryWebModule {
   def fromPathname(dirname: String) = {
@@ -177,39 +147,11 @@ class WarWebModule(
 
   def name = module.name
 
-  def toWebApplication(platform: PlatformContext) = module.toWebApplication(platform)
-    // val builder = new WebApplication.Builder[File]() {
-    //   protected def base_url: URL = to_url(base)
-    //   protected def is_html(p: File): Boolean = DirectoryWebModule.this.is_html(p)
-    //   protected def is_template(p: File): Boolean = DirectoryWebModule.this.is_template(p)
-    //   protected def is_directory(p: File): Boolean = p.isDirectory
-    //   protected def to_url(p: File): URL = p.toURI.toURL
-    //   protected def to_template_source(p: File): TemplateSource = TemplateSource.fromFile(p)
-    //   protected def root_children: List[File] = base.listFiles.toList
-    //   protected def to_children(p: File): List[File] = p.listFiles.toList
-    // }
-    // builder.apply()
-    // val appname = "dashboard" // TODO
-    // case class Z() {
-    //   def r: ViewEngine.Rule = ???
-    //   def +(rhs: Tree[ZipBag.Node]) = _add_children(PathName("/"), rhs)
-    //   def +(container: PathName, rhs: Tree[ZipBag.Node]) = rhs.rootLabel match {
-    //     case ZipBag.RootNode => this
-    //     case ZipBag.BagNode(name, bag) =>
-    //       if (is_html(name))
-    //         ???
-    //       else if (is_template(name))
-    //         ???
-    //       else
-    //         this
-    //     case ZipBag.ContainerNode(name) => _add_children(container + name, rhs)
-    //   }
-    //   private def _add_children(container: PathName, p: Tree[ZipBag.Node]): Z =
-    //     p.subForest./:(this)((z, x) => z + (container, x))
-    // }
-    // val view = war.assets.subForest./:(Z())(_+_).r
-    // val controller = WebApplication.standardControllerRule
-    // WebApplication(appname, controller, view)
+  def toWebApplication(
+    platform: PlatformContext,
+    webconfig: WebEngine.Config,
+    config: Hocon
+  ) = module.toWebApplication(platform, webconfig, config)
 }
 object WarWebModule {
   def apply(uri: String, basedir: File, user: Option[String], password: Option[String]): WarWebModule = {
@@ -221,5 +163,9 @@ object WarWebModule {
 class ResourceWebModule(resourcename: String, classloader: Option[ClassLoader]) extends WebModule {
   def name = resourcename
 
-  def toWebApplication(platform: PlatformContext) = RAISE.notImplementedYetDefect
+  def toWebApplication(
+    platform: PlatformContext,
+    webconfig: WebEngine.Config,
+    config: Hocon
+  ) = RAISE.notImplementedYetDefect
 }

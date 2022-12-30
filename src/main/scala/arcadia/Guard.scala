@@ -11,7 +11,8 @@ import arcadia.model._
  *  version Oct.  8, 2017
  *  version Nov.  5, 2017
  *  version Jul. 21, 2019
- * @version Mar.  6, 2022
+ *  version Mar.  6, 2022
+ * @version Dec. 29, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Guard {
@@ -28,6 +29,12 @@ trait Guard {
       case MaterialCommand(pathname) => body(pathname)
       case _ => p
     } getOrElse(p)
+
+  protected final def predicate_pathname(p: Parcel)(body: PathName => Boolean): Boolean =
+    p.command.fold(false) {
+      case MaterialCommand(pathname) => body(pathname)
+      case _ => false
+    }
 }
 
 case class CommandGuard(classes: Vector[Class[_]]) extends Guard {

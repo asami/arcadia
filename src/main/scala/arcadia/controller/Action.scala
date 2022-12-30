@@ -46,7 +46,8 @@ import arcadia.scenario._
  *  version May. 28, 2020
  *  version Apr. 25, 2022
  *  version May.  3, 2022
- * @version Nov. 27, 2022
+ *  version Nov. 27, 2022
+ * @version Dec. 30, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -366,6 +367,25 @@ object IndexAction {
   }
 }
 
+case class DomainModelAction(
+) extends Action {
+  import DomainModel.Strategy
+
+  protected def execute_Apply(parcel: Parcel): Parcel = execute_pathname(parcel) { pathname =>
+    val s = parcel.getDomainModel.map(_.strategy(parcel, pathname)).getOrElse(Strategy.Skip)
+    s match {
+      case Strategy.ReadEntityList(entity) => ReadEntityListAction(entity).apply(parcel)
+      case Strategy.GetEntity(entity, id) => GetEntityAction(entity, Some(id)).apply(parcel)
+      case Strategy.CreateEntity => RAISE.notImplementedYetDefect
+      case Strategy.UpdateEntity => RAISE.notImplementedYetDefect
+      case Strategy.DeleteEntity => RAISE.notImplementedYetDefect
+      case Strategy.Skip => parcel
+    }
+  }
+}
+object DomainModelAction {
+}
+
 case class ResourceDetailAction(
 ) extends Action {
   protected def execute_Apply(parcel: Parcel): Parcel = execute_pathname(parcel) { pathname =>
@@ -415,8 +435,8 @@ case class OperationAction(
 case class GetEntityAction(
   entity: String,
   id: Option[String],
-  source: Option[Source],
-  sink: Option[Sink]
+  source: Option[Source] = None,
+  sink: Option[Sink] = None
 ) extends SourceSinkAction {
   override protected def show_Info =
     SeqUtils.buildTupleVector(
@@ -436,11 +456,11 @@ case class GetEntityAction(
 
 case class ReadEntityListAction(
   entity: String,
-  query: Option[Map[String, Any]],
-  form: Option[Map[String, Any]],
-  data_href: Option[URI],
-  source: Option[Source],
-  sink: Option[Sink]
+  query: Option[Map[String, Any]] = None,
+  form: Option[Map[String, Any]] = None,
+  data_href: Option[URI] = None,
+  source: Option[Source] = None,
+  sink: Option[Sink] = None
 ) extends SourceSinkAction {
   override protected def show_Info =
     SeqUtils.buildTupleVector(

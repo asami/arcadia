@@ -33,7 +33,8 @@ import arcadia.view.ScalateTemplateEngine
  *  version Jul. 24, 2022
  *  version Sep. 10, 2022
  *  version Oct. 23, 2022
- * @version Nov. 27, 2022
+ *  version Nov. 27, 2022
+ * @version Dec. 25, 2022
  * @author  ASAMI, Tomoharu
  */
 class Arcadia(
@@ -102,7 +103,7 @@ object Arcadia {
     config: Hocon
   ): Consequence[Arcadia] = for {
     services <- _make_services(pc, webengineconfig, config)
-    apps <- _make_applications(pc, config)
+    apps <- _make_applications(pc, webengineconfig, config)
     confs <- _make_configs(config)
   } yield new Arcadia(pc, services, apps, confs, webengineconfig)
 
@@ -115,7 +116,11 @@ object Arcadia {
     new ServiceFacility(pc, services.toVector)
   }
 
-  private def _make_applications(pc: PlatformContext, config: Hocon): Consequence[Map[String, WebApplication]] = {
+  private def _make_applications(
+    pc: PlatformContext,
+    webengineconfig: WebEngine.Config,
+    config: Hocon
+  ): Consequence[Map[String, WebApplication]] = {
     val tmpdir = config.getFileOption(PROP_TMP_DIRECTORY) getOrElse new File("target/war")
     tmpdir.mkdirs
 
@@ -125,7 +130,7 @@ object Arcadia {
         user <- c.consequenceStringOption(PROP_WAR_USER)
         password <- c.consequenceStringOption(PROP_WAR_PASSWORD)
         r <- Consequence(
-          WebModule.create(url, tmpdir, user, password).toWebApplication(pc)
+          WebModule.create(url, tmpdir, user, password).toWebApplication(pc, webengineconfig, config)
         )
       } yield r
 
@@ -144,7 +149,7 @@ object Arcadia {
       Consequence(WebModule.createOption(p, tmpdir)) match {
         case Consequence.Success(s, _) =>
           s match {
-            case Some(ss) => Consequence(List(ss.toWebApplication(pc))).
+            case Some(ss) => Consequence(List(ss.toWebApplication(pc, webengineconfig, config))).
                 recoverWith {
                   case c => _recover_app_(ss, c).map(List(_))
                 }

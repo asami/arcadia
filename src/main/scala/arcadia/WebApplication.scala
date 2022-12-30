@@ -22,6 +22,8 @@ import arcadia.view._
 import arcadia.view.ViewEngine._
 import arcadia.view.tag.Tags
 import arcadia.scenario._
+// import arcadia.domain.DomainModelEngine
+import arcadia.domain.DomainModel
 
 /*
  * @since   Jul. 15, 2017
@@ -36,7 +38,8 @@ import arcadia.scenario._
  *  version Apr. 15, 2021
  *  version May. 22, 2022
  *  version Jul. 25, 2022
- * @version Nov. 27, 2022
+ *  version Nov. 27, 2022
+ * @version Dec. 29, 2022
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -44,7 +47,8 @@ case class WebApplication(
   version: Option[Version],
   config: WebApplicationConfig,
   controller: ControllerEngine.Rule,
-  view: ViewEngine.Rule
+  view: ViewEngine.Rule,
+  domain: DomainModel
 ) {
   def getLocale = config.getLocale
   def extend: List[String] = config.extend getOrElse Nil
@@ -58,8 +62,9 @@ case class WebApplication(
 
 object WebApplication {
   val standardControllerRule = ControllerEngine.Rule.create(
-    ResourceDetailController.gc,
-    ResourceListController.gc,
+    DomainModelController.gc,
+    ResourceDetailController.gc, // unused
+    ResourceListController.gc, // unused
     IndexController.gc,
     LoginController.gc,
     LogoutController.gc
@@ -89,14 +94,14 @@ object WebApplication {
     )
     val scenario = ScenarioEngine.Rule.empty
     val config = WebApplicationConfig.create("Plain")
-    WebApplication("plain", None, config, ControllerEngine.Rule.empty, view)
+    WebApplication("plain", None, config, ControllerEngine.Rule.empty, view, DomainModel.empty)
   }
 
   def error(name: String, c: Conclusion) = {
     val config = WebApplicationConfig.empty
     val controller = ControllerEngine.Rule.empty
     val view = ViewEngine.Rule.error
-    WebApplication(name, None, config, controller, view)
+    WebApplication(name, None, config, controller, view, DomainModel.empty)
   }
 
 //  lazy val systemWebApplications = Vector(plain, dashboard, dashboardwar)
@@ -144,6 +149,7 @@ object WebApplication {
       get_pathnode(root_node, path).map(to_children).orZero
     }
     protected def to_descendants(p: T): List[T]
+    protected def parse_domain_model(p: T): Option[DomainModel]
 
     def apply(platform: PlatformContext): WebApplication = {
       case class Z(views: Vector[(Guard, View)] = Vector.empty) {
@@ -226,7 +232,8 @@ object WebApplication {
         ControllerEngine.Rule(controllers)
       }
       val applicationname = config.name getOrElse application_name_by_url
-      WebApplication(applicationname, version, config, controller, view)
+      val domainmodel = build_domain_model
+      WebApplication(applicationname, version, config, controller, view, domainmodel)
     }
 
     private def _is_view(s: String, t: T): Boolean =
@@ -384,6 +391,18 @@ object WebApplication {
       OperationController.get(name, json).map(x => ControllerEngine.Slot(x.gc)) getOrElse {
         RAISE.notImplementedYetDefect
       }
+    }
+
+    protected def build_domain_model: DomainModel = {
+      case class Z(
+        model: DomainModel = DomainModel.empty
+      ) {
+        def r = model
+        def +(rhs: T) =
+          parse_domain_model(rhs).map(x => copy(model = model + x)).getOrElse(this)
+      }
+      get_pathnode(PathName("WEB-INF/models")).
+        map(x => to_descendants(x)./:(Z())(_+_).r).getOrElse(DomainModel.empty)
     }
   }
 

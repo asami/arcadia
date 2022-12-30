@@ -38,7 +38,8 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Apr. 20, 2020
  *  version Jun.  3, 2020
  *  version Mar. 21, 2022
- * @version May.  3, 2022
+ *  version May.  3, 2022
+ * @version Dec. 29, 2022
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -259,6 +260,8 @@ case class Parcel(
   def isShowTrace: Boolean = webMeta.contains("show.trace")
 
   def locale: Locale = context.map(_.locale) orElse getPlatformExecutionContext.map(_.locale) getOrElse Locale.US
+
+  def getDomainModel: Option[DomainModel] = context.map(_.webapp.domain)
 
 //  def eventName: String = context.flatMap(_.getFormParameter("Submit")) getOrElse RAISE.notImplementedYetDefect
 //  def exception: Throwable = RAISE.notImplementedYetDefect

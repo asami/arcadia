@@ -39,7 +39,8 @@ import arcadia.service.ServiceFacility
  *  version Apr. 30, 2022
  *  version May.  2, 2022
  *  version Oct. 30, 2022
- * @version Nov. 27, 2022
+ *  version Nov. 27, 2022
+ * @version Dec. 29, 2022
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -48,6 +49,8 @@ case class ExecutionContext(
   webapp: WebApplication
 ) {
   def config = webapp.config
+
+  private val _domain_model_engine = DomainModelEngine.create(webapp.domain)
 
   // TODO request locale
   lazy val locale = webapp.getLocale getOrElse platformExecutionContext.locale
@@ -95,11 +98,16 @@ case class ExecutionContext(
     // TODO config
     platformExecutionContext.getDefaultPropertyColumn(name)
   }
-  def getEntity(entitytype: DomainEntityType, id: DomainObjectId): Option[EntityDetailModel] = platformExecutionContext.getEntity(entitytype, id)
-  def readEntityList(p: Query): EntityListModel = platformExecutionContext.readEntityList(p)
-  def createEntity(klass: DomainEntityType, data: IRecord): DomainObjectId = platformExecutionContext.createEntity(klass, data)
-  def updateEntity(klass: DomainEntityType, id: DomainObjectId, data: IRecord): Unit = platformExecutionContext.updateEntity(klass, id, data)
-  def deleteEntity(klass: DomainEntityType, id: DomainObjectId): Unit = platformExecutionContext.deleteEntity(klass, id)
+  def getEntity(entitytype: DomainEntityType, id: DomainObjectId): Option[EntityDetailModel] =
+    _domain_model_engine.getEntity(entitytype, id) getOrElse platformExecutionContext.getEntity(entitytype, id)
+  def readEntityList(p: Query): EntityListModel =
+    _domain_model_engine.readEntityList(p) getOrElse platformExecutionContext.readEntityList(p)
+  def createEntity(klass: DomainEntityType, data: IRecord): DomainObjectId =
+    _domain_model_engine.createEntity(klass, data) getOrElse platformExecutionContext.createEntity(klass, data)
+  def updateEntity(klass: DomainEntityType, id: DomainObjectId, data: IRecord): Unit =
+    _domain_model_engine.updateEntity(klass, id, data) getOrElse platformExecutionContext.updateEntity(klass, id, data)
+  def deleteEntity(klass: DomainEntityType, id: DomainObjectId): Unit =
+    _domain_model_engine.deleteEntity(klass, id) getOrElse platformExecutionContext.deleteEntity(klass, id)
 
   def login(username: String, password: String): Either[Conclusion, Session] = platformExecutionContext.login(username, password)
   def resetPassword(token: String, password: String, confirmpassword: Option[String]): Either[Conclusion, Unit] = platformExecutionContext.resetPassword(token, password, confirmpassword)
