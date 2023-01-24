@@ -16,6 +16,7 @@ import arcadia.context._
 import arcadia.controller._
 import arcadia.view._
 import arcadia.domain.DomainModel
+import arcadia.domain.DomainModelSpace
 
 /*
  * @since   Jul. 23, 2017
@@ -28,7 +29,8 @@ import arcadia.domain.DomainModel
  *  version May. 22, 2022
  *  version Sep. 10, 2022
  *  version Nov. 27, 2022
- * @version Dec. 25, 2022
+ *  version Dec. 25, 2022
+ * @version Jan.  1, 2023
  * @author  ASAMI, Tomoharu
  */
 abstract class WebModule() {

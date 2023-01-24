@@ -13,7 +13,8 @@ import arcadia.model._
 
 /*
  * @since   Dec.  4, 2022
- * @version Dec. 30, 2022
+ *  version Dec. 30, 2022
+ * @version Jan.  1, 2023
  * @author  ASAMI, Tomoharu
  */
 class DomainModelEngine(
@@ -22,7 +23,7 @@ class DomainModelEngine(
   def getEntity(
     entitytype: DomainEntityType,
     id: DomainObjectId
-  ): Consequence[Option[EntityDetailModel]] = Consequence {
+  ): Consequence[Option[EntityDetailModel]] = Consequence.run {
     val caption = I18NElement(entitytype.v)
     val schema = Schema(
       List(
@@ -31,15 +32,16 @@ class DomainModelEngine(
         Column("price", XInt)
       )
     )
-    val record = Record.data(
-      "id" -> 2,
-      "name" -> "Orange",
-      "price" -> 350
-    )
-    Some(EntityDetailModel(Some(caption), entitytype, Some(schema), record))
+    // val record = Record.data(
+    //   "id" -> 2,
+    //   "name" -> "Orange",
+    //   "price" -> 350
+    // )
+    // Some(EntityDetailModel(Some(caption), entitytype, Some(schema), record))
+    model.getEntity(entitytype, id)
   }
 
-  def readEntityList(q: Query): Consequence[EntityListModel] = Consequence {
+  def readEntityList(q: Query): Consequence[EntityListModel] = Consequence.run {
     val entitytype = q.entityType
     val caption = I18NElement(entitytype.v)
     val schema = Schema(
@@ -49,25 +51,26 @@ class DomainModelEngine(
         Column("price", XInt)
       )
     )
-    val records = List(
-      Record.data(
-        "id" -> 1,
-        "name" -> "Apple",
-        "price" -> 300
-      ),
-      Record.data(
-        "id" -> 2,
-        "name" -> "Orange",
-        "price" -> 350
-      ),
-      Record.data(
-        "id" -> 3,
-        "name" -> "Peach",
-        "price" -> 400
-      )
-    )
-    val transfer = Transfer(0, 100, 1000, 3, None)
-    EntityListModel(Some(caption), entitytype, Some(schema), records, transfer)
+    // val records = List(
+    //   Record.data(
+    //     "id" -> 1,
+    //     "name" -> "Apple",
+    //     "price" -> 300
+    //   ),
+    //   Record.data(
+    //     "id" -> 2,
+    //     "name" -> "Orange",
+    //     "price" -> 350
+    //   ),
+    //   Record.data(
+    //     "id" -> 3,
+    //     "name" -> "Peach",
+    //     "price" -> 400
+    //   )
+    // )
+    // val transfer = Transfer(0, 100, 1000, 3, None)
+    // EntityListModel(Some(caption), entitytype, Some(schema), records, transfer)
+    model.readEntityList(q)
   }
 
   def createEntity(

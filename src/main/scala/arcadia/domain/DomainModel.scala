@@ -1,59 +1,56 @@
 package arcadia.domain
 
-import java.io.File
-import org.goldenport.tree.Tree
+import org.goldenport.RAISE
+import org.goldenport.context.Consequence
 import org.goldenport.values.PathName
 import arcadia._
 import arcadia.context._
+import arcadia.model._
 
 /*
  * @since   Dec.  4, 2022
- * @version Dec. 30, 2022
- * @author  ASAMI, Tomoharu
+ *  version Dec. 31, 2022
+ * @version Jan.  1, 2023
+ * @author  ASAMI, abstraclass
  */
-class DomainModel() {
+class DomainModel(initialspaces: Seq[DomainModelSpace] = Vector.empty) {
   import DomainModel._
 
-  val classes = Tree.create[DomainClass]()
+  private var _spaces: Vector[DomainModelSpace] = initialspaces.toVector
 
-  def +(rhs: DomainModel): DomainModel = {
-    classes.copyIn(rhs.classes)
+  def add(rhs: DomainModel): DomainModel = {
+    _spaces = _spaces ++ rhs._spaces
+    this
+  }
+
+  def add(rhs: DomainModelSpace): DomainModel = {
+    _spaces = _spaces :+ rhs
     this
   }
 
   def isAvailableResource(pathname: PathName): Boolean =
-    classes.getNode(pathname.v) match {
-      case Some(s) => s.isLeaf
-      case None => pathname.getParent.fold(false)(x => classes.getNode(x.v).isDefined)
-    }
+    _spaces.exists(_.isAvailableResource(pathname))
 
-  def strategy(parcel: Parcel, pathname: PathName): Strategy = {
-    classes.getNode(pathname.v) match {
-      case Some(s) =>
-        if (s.isLeaf)
-          Strategy.ReadEntityList(s.name)
-        else
-          Strategy.Skip
-      case None => pathname.getParent.map(x =>
-        classes.getNode(x.v) match {
-          case Some(s) => Strategy.GetEntity(s.name, pathname.leaf)
-          case None => Strategy.Skip
-        }
-      ).getOrElse(Strategy.Skip)
-    }
+  def strategy(parcel: Parcel, pathname: PathName): Strategy =
+    _spaces.toStream.flatMap(_.strategy(parcel, pathname)).headOption.
+      getOrElse(Strategy.Skip)
+
+  def getEntity(
+    entitytype: DomainEntityType,
+    id: DomainObjectId
+  ): Consequence[Option[EntityDetailModel]] = {
+    _spaces.toStream.flatMap(_.getEntity(entitytype, id)).headOption.
+      getOrElse(???)
+  }
+
+  def readEntityList(q: Query): Consequence[EntityListModel] = {
+    _spaces.toStream.flatMap(_.readEntityList(q)).headOption.
+      getOrElse(???)
   }
 }
 
 object DomainModel {
-  val empty = new DomainModel()
-
-  trait Factory {
-    def parse(p: File): Option[DomainModel]
-  }
-  object Factory {
-    val empty = new Factory() {
-      def parse(p: File): Option[DomainModel] = None
-    }
+  val empty = new DomainModel() {
   }
 
   sealed trait Strategy
@@ -65,4 +62,6 @@ object DomainModel {
     case object DeleteEntity extends Strategy
     case object Skip extends Strategy
   }
+
+  def apply(p: DomainModelSpace, ps: DomainModelSpace*): DomainModel = new DomainModel(p +: ps)
 }

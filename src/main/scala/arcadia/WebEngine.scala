@@ -15,7 +15,7 @@ import arcadia.model.ErrorModel
 import arcadia.scenario._
 import arcadia.service.ServiceFacility
 import arcadia.service.Service
-import arcadia.domain.DomainModel
+import arcadia.domain.DomainModelSpace
 
 /*
  * @since   Jul. 15, 2017
@@ -35,7 +35,8 @@ import arcadia.domain.DomainModel
  *  version Mar. 20, 2022
  *  version Sep. 10, 2022
  *  version Oct. 23, 2022
- * @version Dec. 25, 2022
+ *  version Dec. 25, 2022
+ * @version Jan.  1, 2023
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -161,7 +162,7 @@ class WebEngine(
 object WebEngine {
   case class Config(
     templateEngineHangarFactory: TemplateEngineHangar.Factory = TemplateEngineHangar.Factory.empty,
-    domainModelFactory: DomainModel.Factory = DomainModel.Factory.empty,
+    domainModelFactory: DomainModelSpace.Factory = DomainModelSpace.Factory.empty,
     services: Seq[Service] = Nil
   )
   object Config {

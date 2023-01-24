@@ -24,6 +24,7 @@ import arcadia.view.tag.Tags
 import arcadia.scenario._
 // import arcadia.domain.DomainModelEngine
 import arcadia.domain.DomainModel
+import arcadia.domain.DomainModelSpace
 
 /*
  * @since   Jul. 15, 2017
@@ -39,7 +40,8 @@ import arcadia.domain.DomainModel
  *  version May. 22, 2022
  *  version Jul. 25, 2022
  *  version Nov. 27, 2022
- * @version Dec. 29, 2022
+ *  version Dec. 29, 2022
+ * @version Jan.  1, 2023
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -399,7 +401,7 @@ object WebApplication {
       ) {
         def r = model
         def +(rhs: T) =
-          parse_domain_model(rhs).map(x => copy(model = model + x)).getOrElse(this)
+          parse_domain_model(rhs).map(x => copy(model = model add x)).getOrElse(this)
       }
       get_pathnode(PathName("WEB-INF/models")).
         map(x => to_descendants(x)./:(Z())(_+_).r).getOrElse(DomainModel.empty)
