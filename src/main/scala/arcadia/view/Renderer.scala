@@ -36,7 +36,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Sep.  1, 2018
  *  version Nov.  7, 2018
  *  version Aug.  5, 2019
- * @version Apr. 15, 2020
+ *  version Apr. 15, 2020
+ * @version Mar. 30, 2023
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -216,7 +217,7 @@ abstract class Renderer(
   }
 
   protected def table_data_url(p: Table, record: IRecord): Option[Link] = {
-    def base = (p.dataHref.map(x => StringUtils.toPathnameBody(x.toString)) orElse p.entityType.map(_.v)).map(make_html_uri) orElse {
+    def base = (p.dataHref.map(x => StringUtils.toPathnameBody(x.toString)) orElse p.entityType.map(_.name)).map(make_html_uri) orElse {
       _get_href_base(record)
     }
     DomainObjectId.get(record, p.entityType) flatMap {

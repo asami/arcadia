@@ -14,17 +14,21 @@ import arcadia.model._
 /*
  * @since   Dec.  4, 2022
  *  version Dec. 30, 2022
- * @version Jan.  1, 2023
+ *  version Jan.  1, 2023
+ *  version Mar. 30, 2023
+ * @version Apr. 16, 2023
  * @author  ASAMI, Tomoharu
  */
 class DomainModelEngine(
   model: DomainModel
 ) {
+  def getEntitySchema(entitytype: DomainEntityType): Option[Schema] = model.getEntitySchema(entitytype)
+
   def getEntity(
     entitytype: DomainEntityType,
     id: DomainObjectId
   ): Consequence[Option[EntityDetailModel]] = Consequence.run {
-    val caption = I18NElement(entitytype.v)
+    val caption = I18NElement(entitytype.name)
     val schema = Schema(
       List(
         Column("id", XInt),
@@ -43,7 +47,7 @@ class DomainModelEngine(
 
   def readEntityList(q: Query): Consequence[EntityListModel] = Consequence.run {
     val entitytype = q.entityType
-    val caption = I18NElement(entitytype.v)
+    val caption = I18NElement(entitytype.name)
     val schema = Schema(
       List(
         Column("id", XInt),
@@ -76,18 +80,18 @@ class DomainModelEngine(
   def createEntity(
     klass: DomainEntityType,
     data: IRecord
-  ): Consequence[DomainObjectId] = ???
+  ): Consequence[DomainObjectId] = model.createEntity(klass, data)
 
   def updateEntity(
     klass: DomainEntityType,
     id: DomainObjectId,
     data: IRecord
-  ): Consequence[Unit] = ???
+  ): Consequence[Unit] = model.updateEntity(klass, id, data)
 
   def deleteEntity(
     klass: DomainEntityType,
     id: DomainObjectId
-  ): Consequence[Unit] = ???
+  ): Consequence[Unit] = model.deleteEntity(klass, id)
 }
 
 object DomainModelEngine {

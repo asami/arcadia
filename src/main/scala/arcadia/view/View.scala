@@ -20,6 +20,7 @@ import arcadia.model._
 import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL, PROP_VIEW_FORM}
 import ViewEngine.PROP_VIEW_PROPERTIES
 import ViewEngine.PROP_VIEW_IT
+import ViewEngine.Slot
 
 /*
  * @since   Jul. 15, 2017
@@ -35,7 +36,8 @@ import ViewEngine.PROP_VIEW_IT
  *  version Mar. 28, 2022
  *  version Apr. 30, 2022
  *  version May. 22, 2022
- * @version Oct.  1, 2022
+ *  version Oct.  1, 2022
+ * @version Apr. 30, 2023
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -393,3 +395,13 @@ case class TdView(model: TableBodyRecordDataModel) extends ModelViewBase[TableBo
 // case class TdView(v: String, strategy: RenderStrategy) extends TrViewElement {
 //   override def toString(): String = v
 // }
+
+case class EntityScenarioView(slots: Vector[Slot]) extends View with Guard {
+  def guard: arcadia.Guard = this
+
+  def isAccept(p: Parcel) = p.getOperationName.fold(false)(op =>
+    false // TODO
+  )
+
+  protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content = ???
+}

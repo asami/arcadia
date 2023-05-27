@@ -39,7 +39,8 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Jun.  3, 2020
  *  version Mar. 21, 2022
  *  version May.  3, 2022
- * @version Dec. 29, 2022
+ *  version Dec. 29, 2022
+ * @version Mar. 31, 2023
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -219,6 +220,14 @@ case class Parcel(
         }
     }
     pn.components./:(Z(basename.components))(_+_).r
+  }
+
+  def getPathDepthForRedirect: Option[Int] = getPathName.map { x =>
+    val cs = x.components
+    if (x.v.endsWith("/"))
+      cs.length
+    else
+      cs.length - 1
   }
 
   def getDomainObjectId: Option[DomainObjectId] = {

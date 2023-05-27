@@ -47,7 +47,8 @@ import arcadia.domain._
  *  version May. 28, 2022
  *  version Sep. 27, 2022
  *  version Oct. 30, 2022
- * @version Nov.  6, 2022
+ *  version Nov.  6, 2022
+ * @version Mar. 30, 2023
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -667,7 +668,7 @@ object EntityDetailModel extends ModelClass {
     klass: DomainEntityType,
     record: IRecord
   ): EntityDetailModel = EntityDetailModel(
-    Some(I18NElement(klass.v)), klass, None, record
+    Some(I18NElement(klass.name)), klass, None, record
   )
 
   def get(param: ModelParameter, response: Response): Option[Model] =
@@ -741,7 +742,7 @@ object EntityListModel extends ModelClass {
     records: List[IRecord],
     transfer: Transfer
   ): EntityListModel = EntityListModel(
-    Some(I18NElement(klass.v)), klass, None, records, transfer
+    Some(I18NElement(klass.name)), klass, None, records, transfer
   )
 
   def empty(name: String): EntityListModel = EntityListModel(

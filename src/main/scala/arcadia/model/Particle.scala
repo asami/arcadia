@@ -35,7 +35,9 @@ import arcadia.domain._
  *  version Apr. 24, 2019
  *  version Apr. 17, 2020
  *  version Apr. 25, 2022
- * @version May.  3, 2022
+ *  version May.  3, 2022
+ *  version Mar. 31, 2023
+ * @version Apr. 22, 2023
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -284,7 +286,7 @@ object Submits {
 }
 
 case class Submit(kind: SubmitKind, label: I18NString) extends Particle {
-  def name = ScenarioCommand.PROP_SUBMIT_PREFIX + kind.name
+  def name = ScenarioCommand.PROP_SUBMIT // ScenarioCommand.PROP_SUBMIT_PREFIX + kind.name
   def value(locale: Locale) = label(locale)
 }
 object Submit {
@@ -301,6 +303,9 @@ sealed trait SubmitKind {
 }
 case object OkSubmitKind extends SubmitKind {
   def name: String = Event.EVENT_OK
+}
+case object OkShowSubmitKind extends SubmitKind {
+  def name: String = Event.EVENT_OK_SHOW
 }
 case object CancelSubmitKind extends SubmitKind {
   def name: String = Event.EVENT_CANCEL

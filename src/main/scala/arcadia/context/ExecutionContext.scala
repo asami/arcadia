@@ -40,7 +40,8 @@ import arcadia.service.ServiceFacility
  *  version May.  2, 2022
  *  version Oct. 30, 2022
  *  version Nov. 27, 2022
- * @version Dec. 29, 2022
+ *  version Dec. 29, 2022
+ * @version Mar. 30, 2023
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -91,8 +92,7 @@ case class ExecutionContext(
   def execute(cmd: ExecuteScriptCommand): Response = platformExecutionContext.execute(cmd)
 
   def getEntitySchema(name: String): Option[Schema] = {
-    // TODO config
-    platformExecutionContext.getEntitySchema(name)
+    _domain_model_engine.getEntitySchema(DomainEntityType(name)) orElse platformExecutionContext.getEntitySchema(name)
   }
   def getDefaultPropertyColumn(name: String): Option[Column] = {
     // TODO config

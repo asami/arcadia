@@ -9,7 +9,8 @@ import arcadia.domain._
 /*
  * @since   Oct.  8, 2017
  *  version Nov. 23, 2017
- * @version Aug. 31, 2018
+ *  version Aug. 31, 2018
+ * @version Mar. 30, 2023
  * @author  ASAMI, Tomoharu
  */
 case class Query(
@@ -35,8 +36,11 @@ case class Query(
 }
 
 object Query {
-  def create(entity: String, params: Option[Map[String, Any]]): Query = {
-    val a = Query(DomainEntityType(entity))
+  def create(entity: String, params: Option[Map[String, Any]]): Query =
+    create(DomainEntityType(entity), params)
+
+  def create(entity: DomainEntityType, params: Option[Map[String, Any]]): Query = {
+    val a = Query(entity)
     params.map(x => a.withParameter(Record.create(x))).getOrElse(a)
   }
 }
