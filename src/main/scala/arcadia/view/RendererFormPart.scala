@@ -23,7 +23,8 @@ import Renderer._
  *  version Sep.  1, 2018
  *  version Apr. 30, 2019
  *  version May.  1, 2019
- * @version Apr. 18, 2020
+ *  version Apr. 18, 2020
+ * @version Jun. 23, 2023
  * @author  ASAMI, Tomoharu
  */
 trait RendererFormPart { self: Renderer =>
@@ -349,6 +350,15 @@ trait RendererFormPart { self: Renderer =>
       {hidden_fields(hiddens)}
     </form>
   }
+
+  protected def property_show_form(
+    action: URI,
+    method: Method,
+    schema: Schema,
+    record: IRecord,
+    hiddens: Hiddens,
+    submits: Submits
+  ): NodeSeq = property_confirm_form(action, method, schema, record, hiddens, submits)
 
   protected def update_entity_directive_form(
     action: URI,

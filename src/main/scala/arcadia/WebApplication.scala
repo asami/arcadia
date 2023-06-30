@@ -42,7 +42,8 @@ import arcadia.domain.DomainModelSpace
  *  version Nov. 27, 2022
  *  version Dec. 29, 2022
  *  version Jan. 30, 2023
- * @version Apr. 30, 2023
+ *  version Apr. 30, 2023
+ * @version Jun. 22, 2023
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -157,34 +158,35 @@ object WebApplication {
     protected def get_entity_scenario_view(p: T): Option[EntityScenarioView] = {
       val s = name(p)
       if (is_directory(p) && s.endsWith(".entity"))
-        Some(_entity_scenari_view(p))
+        Some(_entity_scenario_view(p))
       else
         None
     }
 
-    private def _entity_scenari_view(p: T): EntityScenarioView = {
+    private def _entity_scenario_view(p: T): EntityScenarioView = {
       val xs = to_children(p)
-      case class Z(slots: Vector[Slot] = Vector.empty) {
-        def r = EntityScenarioView(slots)
+      case class Z(views: Vector[View] = Vector.empty) {
+        def r = EntityScenarioView.create(views)
 
         def +(rhs: T) =
-          get_guard_view(rhs).fold(this)(x => copy(slots = slots :+ x))
+          get_guard_view(rhs).fold(this)(x => copy(views = views :+ x))
 
-        protected def get_guard_view(p: T): Option[Slot] =
+        protected def get_guard_view(p: T): Option[View] =
           if (is_template(p))
             template_view(p)
+          else if (is_html(p))
+            html_view(p)
           else
             None
 
-        protected def template_view(p: T): Option[Slot] = {
+        protected def template_view(p: T): Option[View] = {
           val name = StringUtils.pathLastComponentBody(to_url(p).toString)
           val src = to_template_source(p)
-          StringUtils.getNameDirective(name).map { x =>
-            val (s, directive) = x
-            val v = PageView(s, src)
-            val g = PathnameGuard(PathName(s"_${s}_")) // TODO
-            Slot(g, v)
-          }
+          Some(PageView(name, src))
+        }
+
+        protected def html_view(p: T): Option[View] = {
+          Some(HtmlView(to_url(p)))
         }
       }
       xs./:(Z())(_+_).r
@@ -195,70 +197,70 @@ object WebApplication {
 
     case class InnerBuilder(platform: PlatformContext) {
       def apply(): WebApplication = {
-        case class Z(views: Vector[(Guard, View)] = Vector.empty) {
-          def r: Seq[Slot] = views.map(Slot(_)) ++ Vector(
-            Slot(AssetView(base_url).gv),
-            Slot(MaterialView(base_url).gv)
-          )
-          def +(rhs: T) = {
-            if (is_html(rhs))
-              copy(views = views :+ HtmlView(to_url(rhs)).gv)
-            else if (is_template(rhs))
-              copy(views = views :+ template_view(rhs))
-            else if (is_directory(rhs))
-              copy(views = views ++ directory_view(rhs))
-            // else if (is_material(rhs))
-            //   copy(views = views :+ MaterialView(to_url(rhs)).gv)
-            else
-              this
-          }
-          protected def template_view(p: T): (Guard, View) = {
-            val name = StringUtils.pathLastComponentBody(to_url(p).toString)
-            val src = to_template_source(p)
-            name match {
-              case "index" => IndexView(src).gv
-              //            case "detail" => ResourceDetailView(src).gv
-              //            case "list" => ResourceListView(src).gv
-              case "dashboard" => DashboardView(src).gv
-              case m => PageView(m, src).gv
-            }
-          }
-          protected def directory_view(p: T): Vector[(Guard, View)] =
-            if (is_web_info(p) || is_assets(p))
-              Vector.empty
-            else
-              to_children(p)./:(ZZ(name(p)))(_+_).views
-        }
-        case class ZZ(
-          base: String,
-          views: Vector[(Guard, View)] = Vector.empty
-        ) {
-          def r: Seq[Slot] = views.map(Slot(_))
-          def +(rhs: T) = {
-            if (is_html(rhs))
-              copy(views = views :+ html_view(rhs))
-            else if (is_template(rhs))
-              copy(views = views :+ template_view(rhs))
-            else if (is_directory(rhs))
-              copy(views = views ++ directory_view(rhs))
-            else
-              this
-          }
-          protected def html_view(p: T): (Guard, View) =
-            HtmlView(to_url(p)).gv
-          protected def template_view(p: T): (Guard, View) = {
-            val src = to_template_source(p)
-            PageView(pathname(p), src).gv
-          }
-          protected def directory_view(p: T): Vector[(Guard, View)] =
-            to_children(p)./:(ZZ(pathname(p)))(_+_).views
+        // case class Z(views: Vector[(Guard, View)] = Vector.empty) {
+        //   def r: Seq[Slot] = views.map(Slot(_)) ++ Vector(
+        //     Slot(AssetView(base_url).gv),
+        //     Slot(MaterialView(base_url).gv)
+        //   )
+        //   def +(rhs: T) = {
+        //     if (is_html(rhs))
+        //       copy(views = views :+ HtmlView(to_url(rhs)).gv)
+        //     else if (is_template(rhs))
+        //       copy(views = views :+ template_view(rhs))
+        //     else if (is_directory(rhs))
+        //       copy(views = views ++ directory_view(rhs))
+        //     // else if (is_material(rhs))
+        //     //   copy(views = views :+ MaterialView(to_url(rhs)).gv)
+        //     else
+        //       this
+        //   }
+        //   protected def template_view(p: T): (Guard, View) = {
+        //     val name = StringUtils.pathLastComponentBody(to_url(p).toString)
+        //     val src = to_template_source(p)
+        //     name match {
+        //       case "index" => IndexView(src).gv
+        //       //            case "detail" => ResourceDetailView(src).gv
+        //       //            case "list" => ResourceListView(src).gv
+        //       case "dashboard" => DashboardView(src).gv
+        //       case m => PageView(m, src).gv
+        //     }
+        //   }
+        //   protected def directory_view(p: T): Vector[(Guard, View)] =
+        //     if (is_web_info(p) || is_assets(p))
+        //       Vector.empty
+        //     else
+        //       to_children(p)./:(ZZ(name(p)))(_+_).views
+        // }
+        // case class ZZ(
+        //   base: String,
+        //   views: Vector[(Guard, View)] = Vector.empty
+        // ) {
+        //   def r: Seq[Slot] = views.map(Slot(_))
+        //   def +(rhs: T) = {
+        //     if (is_html(rhs))
+        //       copy(views = views :+ html_view(rhs))
+        //     else if (is_template(rhs))
+        //       copy(views = views :+ template_view(rhs))
+        //     else if (is_directory(rhs))
+        //       copy(views = views ++ directory_view(rhs))
+        //     else
+        //       this
+        //   }
+        //   protected def html_view(p: T): (Guard, View) =
+        //     HtmlView(to_url(p)).gv
+        //   protected def template_view(p: T): (Guard, View) = {
+        //     val src = to_template_source(p)
+        //     PageView(pathname(p), src).gv
+        //   }
+        //   protected def directory_view(p: T): Vector[(Guard, View)] =
+        //     to_children(p)./:(ZZ(pathname(p)))(_+_).views
 
-          protected def pathname(p: T): String =
-            s"$base/${StringUtils.pathLastComponentBody(to_url(p).toString)}"
-        }
+        //   protected def pathname(p: T): String =
+        //     s"$base/${StringUtils.pathLastComponentBody(to_url(p).toString)}"
+        // }
         val config = build_config
         val view = {
-          val applicationslots = root_children./:(Z())(_+_).r
+          val applicationslots = root_children./:(TopPagesBuilder())(_+_).r
           val layouts = build_layouts
           val partials = build_partials
           val pages = build_pages
@@ -457,6 +459,97 @@ object WebApplication {
         val names = Vector("WEB-INF/models", s"WEB-INF/${platform.mode.name}/models")
         names.foldMap(_build_)
       }
+    }
+
+    trait PagesBuilder {
+      def views: Vector[(Guard, View)]
+
+      def r: Seq[Slot] = views.map(Slot(_)) ++ additional_Views
+
+      protected def additional_Views: Seq[Slot] = Nil
+    }
+
+    case class TopPagesBuilder(
+      views: Vector[(Guard, View)] = Vector.empty
+    ) extends PagesBuilder {
+      override protected def additional_Views = Vector(
+        Slot(AssetView(base_url).gv),
+        Slot(MaterialView(base_url).gv)
+      )
+
+      def +(rhs: T) = {
+        get_entity_scenario_view(rhs) match {
+          case Some(s) => copy(views = views :+ (s -> s))
+          case None =>
+            if (is_control(rhs))
+              this
+            else if (is_html(rhs))
+              copy(views = views :+ HtmlView(to_url(rhs)).gv)
+            else if (is_template(rhs))
+              copy(views = views :+ template_view(rhs))
+            else if (is_directory(rhs))
+              copy(views = views ++ directory_view(rhs))
+            // else if (is_material(rhs))
+            //   copy(views = views :+ MaterialView(to_url(rhs)).gv)
+            else
+              this
+        }
+      }
+
+      protected def is_control(p: T) = {
+        val name = StringUtils.pathLastComponentBody(to_url(p).toString)
+        name match {
+          case "WEB-INF" => true
+          case _ => false
+        }
+      }
+
+      protected def template_view(p: T): (Guard, View) = {
+        val name = StringUtils.pathLastComponentBody(to_url(p).toString)
+        val src = to_template_source(p)
+        name match {
+          case "index" => IndexView(src).gv
+          //            case "detail" => ResourceDetailView(src).gv
+          //            case "list" => ResourceListView(src).gv
+          case "dashboard" => DashboardView(src).gv
+          case m => PageView(m, src).gv
+        }
+      }
+
+      protected def directory_view(p: T): Vector[(Guard, View)] =
+        if (is_web_info(p) || is_assets(p))
+          Vector.empty
+        else
+          to_children(p)./:(DirectoryPagesBuilder(name(p)))(_+_).views
+    }
+
+    case class DirectoryPagesBuilder(
+      base: String,
+      views: Vector[(Guard, View)] = Vector.empty
+    ) extends PagesBuilder {
+      def +(rhs: T) = {
+        if (is_html(rhs))
+          copy(views = views :+ html_view(rhs))
+        else if (is_template(rhs))
+          copy(views = views :+ template_view(rhs))
+        else if (is_directory(rhs))
+          copy(views = views ++ directory_view(rhs))
+        else
+          this
+      }
+      protected def html_view(p: T): (Guard, View) =
+        HtmlView(to_url(p)).gv
+
+      protected def template_view(p: T): (Guard, View) = {
+        val src = to_template_source(p)
+        PageView(pathname(p), src).gv
+      }
+
+      protected def directory_view(p: T): Vector[(Guard, View)] =
+        to_children(p)./:(DirectoryPagesBuilder(pathname(p)))(_+_).views
+
+      protected def pathname(p: T): String =
+        s"$base/${StringUtils.pathLastComponentBody(to_url(p).toString)}"
     }
   }
 

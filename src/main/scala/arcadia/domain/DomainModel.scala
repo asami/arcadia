@@ -15,7 +15,8 @@ import arcadia.model._
  *  version Dec. 31, 2022
  *  version Jan. 29, 2023
  *  version Mar. 30, 2023
- * @version Apr. 16, 2023
+ *  version Apr. 16, 2023
+ * @version Jun. 24, 2023
  * @author  ASAMI, abstraclass
  */
 class DomainModel(initialspaces: Seq[DomainModelSpace] = Vector.empty) {
@@ -89,8 +90,8 @@ object DomainModel {
     case class ReadEntityList(entity: DomainEntityType) extends Strategy
     case class GetEntity(entity: DomainEntityType, id: DomainObjectId) extends Strategy
     case class CreateEntity(entity: DomainEntityType) extends Strategy
-    case class UpdateEntity(entity: DomainEntityType, id: DomainObjectId) extends Strategy
-    case class DeleteEntity(entity: DomainEntityType, id: DomainObjectId) extends Strategy
+    case class UpdateEntity(entity: DomainEntityType, id: Option[DomainObjectId]) extends Strategy
+    case class DeleteEntity(entity: DomainEntityType, id: Option[DomainObjectId]) extends Strategy
     case object Skip extends Strategy
   }
 

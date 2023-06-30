@@ -13,9 +13,9 @@ import arcadia.domain.DomainModel.Strategy
 
 /*
  * @since   Jan.  1, 2023
- *  version Jan.  1, 2023
  *  version Mar. 30, 2023
- * @version Apr. 16, 2023
+ *  version Apr. 16, 2023
+ * @version Jun. 24, 2023
  * @author  ASAMI, abstraclass
  */
 trait DomainModelSpace {
@@ -24,9 +24,9 @@ trait DomainModelSpace {
   val classes = Tree.create[DomainClass]()
 
   def isAvailableResource(pathname: PathName): Boolean =
-    classes.getNode(pathname.v) match {
-      case Some(s) => s.isLeaf
-      case None => pathname.getParent.fold(false)(x => classes.getNode(x.v).isDefined)
+    pathname.components match {
+      case Nil => false
+      case resource :: _ => classes.getNode(resource).isDefined
     }
 
   def strategy(parcel: Parcel, pathname: PathName): Option[Strategy] = {
@@ -36,15 +36,31 @@ trait DomainModelSpace {
           Some(Strategy.ReadEntityList(DomainEntityType(s.name)))
         else
           Some(Strategy.Skip)
-      case None => pathname.getParent.map(x =>
-        classes.getNode(x.v) match {
-          case Some(s) => pathname.leaf match {
-            case "_create_" => Strategy.CreateEntity(DomainEntityType(x.leaf))
-            case x => Strategy.GetEntity(DomainEntityType(s.name), DomainObjectId(x))
-          }
-          case None => Strategy.Skip
-        }
-      )
+      case None => _strategy(pathname)
+      // case None => pathname.getParent.map(resourcename =>
+      //   classes.getNode(resourcename.v) match {
+      //     case Some(resource) => pathname.leaf match {
+      //       case "_create_" => Strategy.CreateEntity(DomainEntityType(resourcename.leaf))
+      //       case "_update_" => Strategy.UpdateEntity(DomainEntityType(resourcename.leaf), ???)
+      //       case "_delete_" => ???
+      //       case x => Strategy.GetEntity(DomainEntityType(resource.name), DomainObjectId(x))
+      //     }
+      //     case None => Strategy.Skip
+      //   }
+      // )
+    }
+  }
+
+  private def _strategy(pathname: PathName): Option[Strategy] = {
+    pathname.components match {
+      case Nil => None
+      case resource :: "_create_" :: Nil => Some(Strategy.CreateEntity(DomainEntityType(resource)))
+      case resource :: "_update_" :: Nil => Some(Strategy.UpdateEntity(DomainEntityType(resource), None))
+      case resource :: "_delete_" :: Nil => ???
+      case resource :: id :: Nil => Some(Strategy.GetEntity(DomainEntityType(resource), DomainObjectId(id)))
+      case resource :: id :: "_update_" :: Nil => Some(Strategy.UpdateEntity(DomainEntityType(resource), Some(DomainObjectId(id))))
+      case resource :: id :: "_delete_" :: Nil => ???
+      case _ => None
     }
   }
 

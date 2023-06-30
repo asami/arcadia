@@ -48,7 +48,8 @@ import arcadia.domain._
  *  version Sep. 27, 2022
  *  version Oct. 30, 2022
  *  version Nov.  6, 2022
- * @version Mar. 30, 2023
+ *  version Mar. 30, 2023
+ * @version Jun. 23, 2023
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -1201,6 +1202,31 @@ case class PropertyConfirmFormModel(
   ) {
     protected def render_Content: NodeSeq =
       property_confirm_form(action, method, schema, data, hiddens, submit)
+  }.apply
+}
+
+case class PropertyShowFormModel(
+  action: URI,
+  method: Method,
+  schema: Schema,
+  data: IRecord,
+  hiddens: Hiddens,
+  submit: Submits,
+  expiresKind: Option[ExpiresKind] = Some(NoCacheExpires),
+  conclusion: FormModel.Conclusion = FormModel.Conclusion.empty
+) extends Model with FormModel with IComponentModel {
+  def toRecord: IRecord = data // TODO hiddens
+  def get(name: String): Option[Any] = data.get(name)
+
+  def getPlaceholder(name: String): Option[String] = schema.getColumn(name).flatMap(_.form.placeholder).map(_.c)
+
+  def setError(p: RConclusion) = copy(conclusion = FormModel.Conclusion(p))
+
+  def render(strategy: RenderStrategy): NodeSeq = new Renderer(
+    strategy, None, None, None, None
+  ) {
+    protected def render_Content: NodeSeq =
+      property_show_form(action, method, schema, data, hiddens, submit)
   }.apply
 }
 

@@ -12,7 +12,9 @@ import org.goldenport.bag.{ChunkBag, UrlBag}
 import org.goldenport.io.UrlUtils
 import org.goldenport.io.IoUtils
 import org.goldenport.trace.Result
+import org.goldenport.value._
 import org.goldenport.util.StringUtils
+import org.goldenport.util.RegexUtils
 import com.asamioffice.goldenport.io.UURL
 import arcadia._
 import arcadia.context._
@@ -37,7 +39,8 @@ import ViewEngine.Slot
  *  version Apr. 30, 2022
  *  version May. 22, 2022
  *  version Oct.  1, 2022
- * @version Apr. 30, 2023
+ *  version Apr. 30, 2023
+ * @version Jun. 25, 2023
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -89,6 +92,9 @@ trait ModelViewBase[T <: Model] extends View {
 }
 
 abstract class TemplateViewBase(template: TemplateSource) extends View() {
+  def uri = template.uri
+  def sourceName: String = StringUtils.pathLastComponentBody(uri)
+
   override def show_Info = StringUtils.shortUri(template.uri)
 
   protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content = {
@@ -186,6 +192,8 @@ object PageView {
 case class HtmlView(url: URL, pathname: Option[String] = None) extends View() {
   private val _pathname = pathname getOrElse UrlUtils.takeLeafName(url)
   val guard = PathnameGuard(_pathname)
+
+  def sourceName: String = _pathname
 
   protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content =
     if (true)
@@ -396,12 +404,131 @@ case class TdView(model: TableBodyRecordDataModel) extends ModelViewBase[TableBo
 //   override def toString(): String = v
 // }
 
-case class EntityScenarioView(slots: Vector[Slot]) extends View with Guard {
+case class EntityScenarioView(
+  slots: Vector[EntityScenarioView.Slot]
+) extends View with Guard {
+  import EntityScenarioView.Slot.{Scenario => SScenario}
+  import EntityScenarioView.Slot.{Action => SAction}
+
   def guard: arcadia.Guard = this
 
-  def isAccept(p: Parcel) = p.getOperationName.fold(false)(op =>
-    false // TODO
-  )
+  def isAccept(p: Parcel) = {
+    val a = for {
+      name <- _get_scenario_name(p.getOperationName)
+      model <- p.model
+    } yield _is_accept(name, model)
+    a getOrElse false
+  }
 
-  protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content = ???
+  private def _get_scenario_name(p: Option[String]) = for {
+    name <- p
+    body = StringUtils.pathLastComponentBody(name)
+    r <- RegexUtils.getString(EntityScenarioView.ScenarioRegex, body, 1)
+  } yield r
+
+  private def _is_accept(name: String, model: Model): Boolean = {
+    val a = for {
+      scenario <- _scenario(name, model)
+      action <- _action(name, model)
+    } yield _is_accept(scenario, action)
+    a getOrElse false
+  }
+
+  private def _is_accept(s: SScenario, a: SAction): Boolean =
+    slots.exists(_.isAccept(s, a))
+
+  private def _find_view(name: String, model: Model): Option[View] = for {
+    scenario <- _scenario(name, model)
+    action <- _action(name, model)
+    r <- _find_view(scenario, action)
+  } yield r
+
+  private def _find_view(s: SScenario, a: SAction): Option[View] =
+    slots.find(_.isAccept(s, a)).map(_.view)
+
+  private def _scenario(name: String, model: Model): Option[SScenario] =
+    SScenario.get(name)
+
+  private def _action(name: String, model: Model): Option[SAction] =
+    Option(model).collect {
+      case m: PropertyInputFormModel => SAction.Input
+      case m: PropertyConfirmFormModel => SAction.Confirm
+      case m: PropertyShowFormModel => SAction.Show
+    }
+
+  protected def execute_Apply(engine: ViewEngine, p: Parcel): Content = {
+    val a = for {
+      name <- _get_scenario_name(p.getOperationName)
+      model <- p.model
+      view <- _find_view(name, model)
+    } yield view.apply(engine, p)
+    a getOrElse RAISE.noReachDefect
+  }
+}
+object EntityScenarioView {
+  import EntityScenarioView.Slot.{Scenario => SScenario}
+  import EntityScenarioView.Slot.{Action => SAction}
+
+  val ScenarioRegex = """_([^_]+)_""".r
+
+  case class Slot(
+    scenario: Slot.Scenario,
+    action: Slot.Action,
+    view: View
+  ) {
+    def isAccept(s: SScenario, a: SAction) = s == scenario && a == action
+  }
+  object Slot {
+    sealed trait Scenario extends NamedValueInstance {
+    }
+    object Scenario extends EnumerationClass[Scenario] {
+      val elements = Vector(Create, Update, Delete)
+
+      case object Create extends Scenario {
+        val name = "create"
+      }
+      case object Update extends Scenario {
+        val name = "update"
+      }
+      case object Delete extends Scenario {
+        val name = "delete"
+      }
+    }
+
+    sealed trait Action extends NamedValueInstance {
+    }
+    object Action extends EnumerationClass[Action] {
+      val elements = Vector(Input, Confirm, Show)
+
+      case object Input extends Action {
+        val name = "input"
+      }
+      case object Confirm extends Action {
+        val name = "confirm"
+      }
+      case object Show extends Action {
+        val name = "show"
+      }
+    }
+
+    def createOption(p: View): Option[Slot] = {
+      val name: Option[String] = p match {
+        case m: TemplateView => Some(m.sourceName)
+        case m: HtmlView => Some(m.sourceName)
+        case _ => None
+      }
+      for {
+        n <- name
+        x <- StringUtils.getNameDirective(n)
+        (s, directive) = x
+        scenario <- Scenario.get(s)
+        action <- Action.get(directive)
+      } yield Slot(scenario, action, p)
+    }
+  }
+
+  def create(ps: Seq[View]): EntityScenarioView = {
+    val a = ps.flatMap(Slot.createOption)
+    EntityScenarioView(a.toVector)
+  }
 }

@@ -38,7 +38,8 @@ import arcadia.controller._
  *  version Nov. 28, 2022
  *  version Jan. 29, 2023
  *  version Mar. 31, 2023
- * @version Apr. 23, 2023
+ *  version Apr. 23, 2023
+ * @version Jun. 25, 2023
  * @author  ASAMI, Tomoharu
  */
 trait Scenario {
@@ -244,6 +245,7 @@ case class UpdateEntityScenario(
   state: State,
   entityType: DomainEntityType,
   override val schema: Schema,
+  id: Option[DomainObjectId],
   data: IRecord
 ) extends Scenario {
   val scenarioClass = UpdateEntityScenario
@@ -251,18 +253,23 @@ case class UpdateEntityScenario(
   val stateMachine = UpdateEntityScenario.stateMachine
   def withState(p: State) = copy(state = p)
   def withData(p: IRecord) = copy(data = p)
-  override def start(parcel: Parcel): Parcel = UpdateEntityScenario.start(parcel, entityType, schema, data)
+  override def start(parcel: Parcel): Parcel = UpdateEntityScenario.start(parcel, entityType, schema, id, data)
 
   override protected def adjust_Intent(p: Intent): Intent =
-    p.withDomainEntityType(entityType)
+    p.withDomainEntityType(entityType).withDomainEntityId(id)
 
-  def marshall = Record.data(
-    "name" -> UpdateEntityScenario.name,
-    "state" -> state.marshall,
-    "entity" -> entityType.name,
-    "schema" -> schema.toMarshalizable.marshallRecord,
-    "data" -> data
-  ).toJsonString
+  def marshall = {
+    val a = Record.data(
+      "name" -> UpdateEntityScenario.name,
+      "state" -> state.marshall,
+      "entity" -> entityType.name,
+      "schema" -> schema.toMarshalizable.marshallRecord,
+      "data" -> data
+    ) + Record.dataOption(
+      "id" -> id.map(_.v)
+    )
+    a.toJsonString
+  }
 }
 object UpdateEntityScenario extends ScenarioClass {
   val stateMachine = new StateMachine {
@@ -273,12 +280,14 @@ object UpdateEntityScenario extends ScenarioClass {
         Transition(BackEventGuard, CancelAction),
         Transition(InputEventGuard, ValidationAction),
         Transition(OkEventGuard, EntityUpdateAction),
+        Transition(OkShowEventGuard, EntityUpdateShowAction),
         Transition(UpdateEventGuard, EntityUpdateAction)
       )),
       Slot(ConfirmState, Transitions(
         Transition(CancelEventGuard, CancelAction),
         Transition(BackEventGuard, InputAction),
-        Transition(OkEventGuard, ShowAction)
+        Transition(OkEventGuard, EntityUpdateAction),
+        Transition(OkShowEventGuard, EntityUpdateShowAction)
       )),
       Slot(ShowState, Transitions(
         Transition(AllGuard, EndAction)
@@ -290,14 +299,15 @@ object UpdateEntityScenario extends ScenarioClass {
   }
 
   override def launch(p: Parcel, cmd: ScenarioCandidateCommand): Option[Scenario] = {
-    val parcel = p.withUsageKind(CreateUsage)
+    val parcel = p.withUsageKind(UpdateUsage)
     def entitytype = cmd.entityType
     def resolveschema(p: Schema): Schema =
       parcel.render.map(_.resolveSchema(entitytype, p)).getOrElse(p)
     if (cmd.name == name) {
+      val id = None // TODO
       def data = cmd.formRecord
       parcel.context.flatMap(_.
-        getEntitySchema(cmd.entityName).map(x => _init(entitytype, resolveschema(x), data)))
+        getEntitySchema(cmd.entityName).map(x => _init(entitytype, resolveschema(x), id, data)))
     } else {
       None
     }
@@ -305,24 +315,42 @@ object UpdateEntityScenario extends ScenarioClass {
 
   def launch(p: Parcel, action: UpdateEntityScenarioAction): Parcel = {
     val entitytype = action.entityType
+    val id = action.id
     val data = Record.create(p.inputFormParameters)
-    data.getString(PROP_SCENARIO).flatMap(unmarshallOption).
-      map(_go(p, _, data)).
-      getOrElse(start(p, action.entityType, ???, data))
-    // val parcel = p.withUsageKind(CreateUsage)
-    // def resolveschema(p: Schema): Schema =
-    //   parcel.render.map(_.resolveSchema(entitytype, p)).getOrElse(p)
-    // parcel.context.flatMap(_.
-    //   getEntitySchema(entitytype.name).map(x => _init(entitytype, resolveschema(x), data)))
+
+    def _resolveschema_(s: Schema): Schema =
+      p.render.map(_.resolveSchema(entitytype, s)).getOrElse(s)
+
+    def _launch_(schema: Schema) = {
+      data.getString(PROP_SCENARIO).flatMap(unmarshallOption).
+        map(_go(p, _, data)).
+        getOrElse(start(p, entitytype, schema, id, data))
+    }
+
+    p.context.flatMap(_.
+      getEntitySchema(entitytype.name).map(x => _launch_(_resolveschema_(x)))).
+      getOrElse(p)
   }
 
-  private def _init(entity: DomainEntityType, schema: Schema, data: IRecord): UpdateEntityScenario =
-    UpdateEntityScenario(InitState, entity, schema, data)
+  private def _init(entity: DomainEntityType, schema: Schema, id: Option[DomainObjectId], data: IRecord): UpdateEntityScenario =
+    UpdateEntityScenario(InitState, entity, schema, id, data)
 
-  protected[scenario] def start(p: Parcel, entity: DomainEntityType, schema: Schema, data: IRecord): Parcel = {
+  protected[scenario] def start(p: Parcel, entity: DomainEntityType, schema: Schema, id: Option[DomainObjectId], data: IRecord): Parcel = {
     val parcel = p.withUsageKind(CreateUsage)
-    val scenario = UpdateEntityScenario(InputState, entity, schema, data)
-    InputAction.model(parcel, scenario, schema, data)
+    val scenario = UpdateEntityScenario(InputState, entity, schema, id, data)
+    id match {
+      case Some(s) =>
+        val a = p.execute { context =>
+          context.getEntity(entity, s)
+        }
+        a match {
+          case Some(old) =>
+            val d = data + old.record + Record.data("id" -> s.v)
+            InputAction.model(parcel, scenario, schema, d)
+          case None => p.goError(ErrorModel.notFound(p, s.v))
+        }
+      case None => InputAction.model(parcel, scenario, schema, data)
+    }
   }
 
   private def _go(
@@ -353,8 +381,9 @@ object UpdateEntityScenario extends ScenarioClass {
       val state = State.unmarshall((json \ "state").as[String])
       val entity = DomainEntityType((json \ "entity").as[String])
       val schema = Schema.json.unmarshall(json \ "schema")
+      val id = (json \ "id").asOpt[String].map(DomainObjectId.apply)
       val data = Record.create(json \ "data")
-      UpdateEntityScenario(state, entity, schema, data)
+      UpdateEntityScenario(state, entity, schema, id, data)
     }
   }
 }
@@ -363,16 +392,18 @@ case class DeleteEntityScenario(
   state: State,
   entityType: DomainEntityType,
   override val schema: Schema,
+  id: DomainObjectId,
   data: IRecord
 ) extends Scenario {
   val scenarioClass = DeleteEntityScenario
   override def getSchema = Some(schema)
   val stateMachine = DeleteEntityScenario.stateMachine
   def withState(p: State) = copy(state = p)
-  override def start(parcel: Parcel): Parcel = DeleteEntityScenario.start(parcel, entityType, schema, data)
+  override def start(parcel: Parcel): Parcel = DeleteEntityScenario.start(parcel, entityType, schema, id, data)
 
   override protected def adjust_Intent(p: Intent): Intent =
-    p.withDomainEntityType(entityType)
+    p.withDomainEntityType(entityType).withDomainEntityId(id)
+
 
   def marshall = Record.data(
     "name" -> DeleteEntityScenario.name,
@@ -413,9 +444,10 @@ object DeleteEntityScenario extends ScenarioClass {
     def resolveschema(p: Schema): Schema =
       parcel.render.map(_.resolveSchema(entitytype, p)).getOrElse(p)
     if (cmd.name == name) {
+      val id = RAISE.noReachDefect
       def data = cmd.formRecord
       parcel.context.flatMap(_.
-        getEntitySchema(cmd.entityName).map(x => _init(entitytype, resolveschema(x), data)))
+        getEntitySchema(cmd.entityName).map(x => _init(entitytype, resolveschema(x), id, data)))
     } else {
       None
     }
@@ -425,12 +457,12 @@ object DeleteEntityScenario extends ScenarioClass {
     ???
   }
 
-  private def _init(entity: DomainEntityType, schema: Schema, data: IRecord): DeleteEntityScenario =
-    DeleteEntityScenario(InitState, entity, schema, data)
+  private def _init(entity: DomainEntityType, schema: Schema, id: DomainObjectId, data: IRecord): DeleteEntityScenario =
+    DeleteEntityScenario(InitState, entity, schema, id, data)
 
-  protected[scenario] def start(p: Parcel, entity: DomainEntityType, schema: Schema, data: IRecord): Parcel = {
+  protected[scenario] def start(p: Parcel, entity: DomainEntityType, schema: Schema, id: DomainObjectId, data: IRecord): Parcel = {
     val parcel = p.withUsageKind(CreateUsage)
-    val scenario = DeleteEntityScenario(InputState, entity, schema, data)
+    val scenario = DeleteEntityScenario(InputState, entity, schema, id, data)
     InputAction.model(parcel, scenario, schema, data)
   }
 
@@ -447,7 +479,7 @@ object DeleteEntityScenario extends ScenarioClass {
       val entity = DomainEntityType((json \ "entity").as[String])
       val schema = Schema.json.unmarshall(json \ "schema")
       val data = Record.create(json \ "data")
-      DeleteEntityScenario(state, entity, schema, data)
+      DeleteEntityScenario(state, entity, schema, ???, data)
     }
   }
 }
@@ -1272,6 +1304,7 @@ case class Intent(
   def goUnknownEvent(p: Event): Intent = copy(parcel = parcel.goError("Unknown scenario event: $p"))
   def withDomainEntityType(p: DomainEntityType) = copy(getDomainEntityType = Some(p))
   def withDomainEntityId(p: DomainObjectId) = copy(getDomainEntityId = Some(p))
+  def withDomainEntityId(p: Option[DomainObjectId]) = copy(getDomainEntityId = p)
   def goCancel = scenario.getCancelContent match {
     case Some(s) => copy(parcel = parcel.withContent(s))
     case None => withReturn
@@ -1411,7 +1444,7 @@ case object ShowAction extends Action {
       Submit(OkSubmitKind)
     ))
     val hidden = hidden_scenario(scenario, state)
-    PropertyConfirmFormModel(uri, method, schema, data, hidden, submits)
+    PropertyShowFormModel(uri, method, schema, data, hidden, submits)
   }
 }
 

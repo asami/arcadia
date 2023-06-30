@@ -49,7 +49,8 @@ import arcadia.scenario._
  *  version Nov. 27, 2022
  *  version Dec. 30, 2022
  *  version Jan. 29, 2023
- * @version Mar. 30, 2023
+ *  version Mar. 30, 2023
+ * @version Jun. 24, 2023
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -390,7 +391,7 @@ case class DomainModelAction(
       case Strategy.ReadEntityList(entity) => ReadEntityListAction(entity).apply(parcel)
       case Strategy.GetEntity(entity, id) => GetEntityAction(entity, Some(id)).apply(parcel)
       case Strategy.CreateEntity(entity) => CreateEntityScenarioAction(entity).apply(parcel)
-      case Strategy.UpdateEntity(entity, id) => UpdateEntityScenarioAction(entity).apply(parcel)
+      case Strategy.UpdateEntity(entity, id) => UpdateEntityScenarioAction(entity, id).apply(parcel)
       case Strategy.DeleteEntity(entity, id) => DeleteEntityScenarioAction(
       ).apply(parcel)
       case Strategy.Skip => parcel
@@ -680,6 +681,7 @@ case class CreateEntityScenarioAction(
 
 case class UpdateEntityScenarioAction(
   entityType: DomainEntityType,
+  id: Option[DomainObjectId],
   formAction: Option[URI] = None,
   title: Option[I18NElement] = None,
   description: Option[I18NElement] = None,
