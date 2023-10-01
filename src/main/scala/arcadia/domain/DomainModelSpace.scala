@@ -15,7 +15,8 @@ import arcadia.domain.DomainModel.Strategy
  * @since   Jan.  1, 2023
  *  version Mar. 30, 2023
  *  version Apr. 16, 2023
- * @version Jun. 24, 2023
+ *  version Jun. 24, 2023
+ * @version Aug. 31, 2023
  * @author  ASAMI, abstraclass
  */
 trait DomainModelSpace {
@@ -56,10 +57,10 @@ trait DomainModelSpace {
       case Nil => None
       case resource :: "_create_" :: Nil => Some(Strategy.CreateEntity(DomainEntityType(resource)))
       case resource :: "_update_" :: Nil => Some(Strategy.UpdateEntity(DomainEntityType(resource), None))
-      case resource :: "_delete_" :: Nil => ???
+      case resource :: "_delete_" :: Nil => Some(Strategy.DeleteEntity(DomainEntityType(resource), None))
       case resource :: id :: Nil => Some(Strategy.GetEntity(DomainEntityType(resource), DomainObjectId(id)))
       case resource :: id :: "_update_" :: Nil => Some(Strategy.UpdateEntity(DomainEntityType(resource), Some(DomainObjectId(id))))
-      case resource :: id :: "_delete_" :: Nil => ???
+      case resource :: id :: "_delete_" :: Nil => Some(Strategy.DeleteEntity(DomainEntityType(resource), Some(DomainObjectId(id))))
       case _ => None
     }
   }

@@ -18,7 +18,8 @@ import Renderer._
  *  version May.  1, 2018
  *  version Sep.  1, 2018
  *  version Nov.  7, 2018
- * @version Apr. 16, 2019
+ *  version Apr. 16, 2019
+ * @version Oct.  1, 2023
  * @author  ASAMI, Tomoharu
  */
 trait RendererTablePart { self: Renderer =>
@@ -59,7 +60,49 @@ trait RendererTablePart { self: Renderer =>
       case _ => table_standard(p)
     }
 
-  protected def table_standard(p: TableWithRecords): NodeSeq = theme_table.container(p.table,
+  protected def table_standard(p: TableWithRecords): NodeSeq = {
+    val table = _table_page_navigation(p).fold(_table_standard(p))(x =>
+      <div>
+        {_table_standard(p)}
+        {x}
+      </div>
+    )
+    theme_table.container(p.table, table)
+  }
+
+  private def _table_page_navigation(p: TableWithRecords): Option[Node] =
+    if (false) // TODO
+      Some(_table_page_navigation_x(p))
+    else
+      None
+
+  private def _table_page_navigation_x(p: TableWithRecords): Node = {
+    <table>
+      <tr>
+        {_table_page_navigation_bar(p)}
+      </tr>
+    </table>
+  }
+
+  private def _table_page_navigation_bar(p: TableWithRecords): NodeSeq = {
+    val xs = _table_page_navigation_prev(p) +: _table_page_navigation_list(p) :+ _table_page_navigation_next(p)
+    NodeSeq.fromSeq(xs)
+  }
+
+  private def _table_page_navigation_prev(p: TableWithRecords): Node =
+    <td><a href="#">Prev</a></td>
+
+  private def _table_page_navigation_next(p: TableWithRecords): Node =
+    <td><a href="#">Next</a></td>
+
+  private def _table_page_navigation_list(p: TableWithRecords): List[Node] = {
+    val a = for (i <- 0 until 10) yield {
+      <td><a href="#">{i + 1}</a></td>
+    }
+    a.toList
+  }
+
+  private def _table_standard(p: TableWithRecords): Node =
     <table class={theme_table.css.table(p.table)}>{
       seq(
         caption.map(x => <caption class={theme_table.css.caption(p.table)}>{nodeseq(x)}</caption>),
@@ -68,7 +111,6 @@ trait RendererTablePart { self: Renderer =>
         None.map(x => <tfoot class={theme_table.css.tfoot(p.table)}></tfoot>)
       )
     }</table>
-  )
 
   protected def table_head(tablekind: TableKind, schema: Schema): Node =
     table_head(Table(tablekind, strategy.size, schema))

@@ -16,7 +16,8 @@ import arcadia.model._
  *  version Dec. 30, 2022
  *  version Jan.  1, 2023
  *  version Mar. 30, 2023
- * @version Apr. 16, 2023
+ *  version Apr. 16, 2023
+ * @version Sep. 29, 2023
  * @author  ASAMI, Tomoharu
  */
 class DomainModelEngine(
@@ -29,13 +30,13 @@ class DomainModelEngine(
     id: DomainObjectId
   ): Consequence[Option[EntityDetailModel]] = Consequence.run {
     val caption = I18NElement(entitytype.name)
-    val schema = Schema(
-      List(
-        Column("id", XInt),
-        Column("name", XString),
-        Column("price", XInt)
-      )
-    )
+    // val schema = Schema(
+    //   List(
+    //     Column("id", XInt),
+    //     Column("name", XString),
+    //     Column("price", XInt)
+    //   )
+    // )
     // val record = Record.data(
     //   "id" -> 2,
     //   "name" -> "Orange",
@@ -48,13 +49,13 @@ class DomainModelEngine(
   def readEntityList(q: Query): Consequence[EntityListModel] = Consequence.run {
     val entitytype = q.entityType
     val caption = I18NElement(entitytype.name)
-    val schema = Schema(
-      List(
-        Column("id", XInt),
-        Column("name", XString),
-        Column("price", XInt)
-      )
-    )
+    // val schema = Schema(
+    //   List(
+    //     Column("id", XInt),
+    //     Column("name", XString),
+    //     Column("price", XInt)
+    //   )
+    // )
     // val records = List(
     //   Record.data(
     //     "id" -> 1,

@@ -50,7 +50,8 @@ import arcadia.scenario._
  *  version Dec. 30, 2022
  *  version Jan. 29, 2023
  *  version Mar. 30, 2023
- * @version Jun. 24, 2023
+ *  version Jun. 24, 2023
+ * @version Aug. 31, 2023
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -392,8 +393,7 @@ case class DomainModelAction(
       case Strategy.GetEntity(entity, id) => GetEntityAction(entity, Some(id)).apply(parcel)
       case Strategy.CreateEntity(entity) => CreateEntityScenarioAction(entity).apply(parcel)
       case Strategy.UpdateEntity(entity, id) => UpdateEntityScenarioAction(entity, id).apply(parcel)
-      case Strategy.DeleteEntity(entity, id) => DeleteEntityScenarioAction(
-      ).apply(parcel)
+      case Strategy.DeleteEntity(entity, id) => DeleteEntityScenarioAction(entity, id).apply(parcel)
       case Strategy.Skip => parcel
     }
   }
@@ -705,6 +705,8 @@ case class UpdateEntityScenarioAction(
 }
 
 case class DeleteEntityScenarioAction(
+  entityType: DomainEntityType,
+  id: Option[DomainObjectId],
   formAction: Option[URI] = None,
   title: Option[I18NElement] = None,
   description: Option[I18NElement] = None,
@@ -722,8 +724,7 @@ case class DeleteEntityScenarioAction(
       val x = DeleteEntityScenario.launch(parcel, this)
       val rule = ScenarioEngine.Rule()
       val engine = new ScenarioEngine(ctx, rule)
-      // engine.apply(x)
-      ???
+      engine.apply(x)
     }.getOrElse(RAISE.noReachDefect)
   }
 }

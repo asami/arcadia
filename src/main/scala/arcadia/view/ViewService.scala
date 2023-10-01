@@ -13,7 +13,8 @@ import arcadia.view.value._
  *  version Oct. 10, 2017
  *  version Nov.  3, 2017
  *  version Sep.  1, 2018
- * @version May.  4, 2022
+ *  version May.  4, 2022
+ * @version Sep. 30, 2023
  * @author  ASAMI, Tomoharu
  */
 case class ViewService(
@@ -95,6 +96,7 @@ case class Query(
   def toQueryForExecutionContext: CQuery = CQuery(
     DomainEntityType(name),
     start, limit, maxlimit,
+    None,
     Record.create(parameters)
   )
 }

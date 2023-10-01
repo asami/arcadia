@@ -39,7 +39,8 @@ import arcadia.controller._
  *  version Jan. 29, 2023
  *  version Mar. 31, 2023
  *  version Apr. 23, 2023
- * @version Jun. 25, 2023
+ *  version Jun. 25, 2023
+ * @version Aug. 31, 2023
  * @author  ASAMI, Tomoharu
  */
 trait Scenario {
@@ -392,13 +393,14 @@ case class DeleteEntityScenario(
   state: State,
   entityType: DomainEntityType,
   override val schema: Schema,
-  id: DomainObjectId,
+  id: Option[DomainObjectId],
   data: IRecord
 ) extends Scenario {
   val scenarioClass = DeleteEntityScenario
   override def getSchema = Some(schema)
   val stateMachine = DeleteEntityScenario.stateMachine
   def withState(p: State) = copy(state = p)
+  def withData(p: IRecord) = copy(data = p)
   override def start(parcel: Parcel): Parcel = DeleteEntityScenario.start(parcel, entityType, schema, id, data)
 
   override protected def adjust_Intent(p: Intent): Intent =
@@ -444,7 +446,7 @@ object DeleteEntityScenario extends ScenarioClass {
     def resolveschema(p: Schema): Schema =
       parcel.render.map(_.resolveSchema(entitytype, p)).getOrElse(p)
     if (cmd.name == name) {
-      val id = RAISE.noReachDefect
+      val id = None
       def data = cmd.formRecord
       parcel.context.flatMap(_.
         getEntitySchema(cmd.entityName).map(x => _init(entitytype, resolveschema(x), id, data)))
@@ -453,26 +455,68 @@ object DeleteEntityScenario extends ScenarioClass {
     }
   }
 
-  def launch(p: Parcel, action: DeleteEntityScenarioAction): Option[Scenario] = {
-    ???
+  def launch(p: Parcel, action: DeleteEntityScenarioAction): Parcel = {
+    val entitytype = action.entityType
+    val id = action.id
+    val data = Record.create(p.inputFormParameters)
+
+    def _resolveschema_(s: Schema): Schema =
+      p.render.map(_.resolveSchema(entitytype, s)).getOrElse(s)
+
+    def _launch_(schema: Schema) = {
+      data.getString(PROP_SCENARIO).flatMap(unmarshallOption).
+        map(_go(p, _, data)).
+        getOrElse(start(p, entitytype, schema, id, data))
+    }
+
+    p.context.flatMap(_.
+      getEntitySchema(entitytype.name).map(x => _launch_(_resolveschema_(x)))).
+      getOrElse(p)
   }
 
-  private def _init(entity: DomainEntityType, schema: Schema, id: DomainObjectId, data: IRecord): DeleteEntityScenario =
+  private def _init(
+    entity: DomainEntityType,
+    schema: Schema,
+    id: Option[DomainObjectId],
+    data: IRecord
+  ): DeleteEntityScenario =
     DeleteEntityScenario(InitState, entity, schema, id, data)
 
-  protected[scenario] def start(p: Parcel, entity: DomainEntityType, schema: Schema, id: DomainObjectId, data: IRecord): Parcel = {
+  protected[scenario] def start(
+    p: Parcel,
+    entity: DomainEntityType,
+    schema: Schema,
+    id: Option[DomainObjectId],
+    data: IRecord
+  ): Parcel = {
     val parcel = p.withUsageKind(CreateUsage)
     val scenario = DeleteEntityScenario(InputState, entity, schema, id, data)
     InputAction.model(parcel, scenario, schema, data)
   }
 
-  def unmarshallOption(p: String): Option[Scenario] =
+  private def _go(
+    p: Parcel,
+    scenario: DeleteEntityScenario,
+    data: IRecord
+  ): Parcel = data.getString(PROP_SUBMIT).map(x =>
+    Event.get(p, x).
+      map { event =>
+        val pathname = to_pathname(p)
+        val s = scenario.withData(data)
+        val cmd = ScenarioCommand(s, pathname, event)
+        p.withCommand(cmd)
+      }.getOrElse(RAISE.notImplementedYetDefect) // TODO WebScenarioDefect)
+  ).getOrElse(
+    RAISE.notImplementedYetDefect // TODO WebScenarioDefect
+  )
+
+  def unmarshallOption(p: String): Option[DeleteEntityScenario] =
     if (p.startsWith("{"))
       _unmarshall_option(p)
     else
       None
 
-  private def _unmarshall_option(p: String): Option[Scenario] = {
+  private def _unmarshall_option(p: String): Option[DeleteEntityScenario] = {
     val json = Json.parse(p)
     (json \ "name").asOpt[String].map { name =>
       val state = State.unmarshall((json \ "state").as[String])
