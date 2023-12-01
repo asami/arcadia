@@ -7,6 +7,7 @@ import java.net.URI
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.record.v2.Column
 import arcadia.context._
+import arcadia.domain.DomainEntityType
 
 /*
  * @since   Oct. 28, 2017
@@ -14,7 +15,8 @@ import arcadia.context._
  *  version Nov.  6, 2017
  *  version Jan. 22, 2018
  *  version Mar. 14, 2018
- * @version May.  8, 2019
+ *  version May.  8, 2019
+ * @version Oct. 29, 2023
  * @author  ASAMI, Tomoharu
  */
 @RunWith(classOf[JUnitRunner])
@@ -69,7 +71,7 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
 }"""
         Action.parseActionList(rule) should be(List(
           ReadEntityListAction(
-            "productclass",
+            DomainEntityType("productclass"),
             None,
             None,
             None,
@@ -148,7 +150,7 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
             Some(ModelHangerSink("banner_brands"))
           ),
           ReadEntityListAction(
-            "productclass",
+            DomainEntityType("productclass"),
             None,
             None,
             None,
@@ -156,7 +158,7 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
             Some(ModelHangerSink("recommended_products"))
           ),
           ReadEntityListAction(
-            "productclass",
+            DomainEntityType("productclass"),
             Some(Map("limit" -> "20")),
             None,
             None,
@@ -164,7 +166,7 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
             Some(ModelHangerSink("ranking"))
           ),
           ReadEntityListAction(
-            "article",
+            DomainEntityType("article"),
             Some(Map("limit" -> "20")),
             None,
             None,
@@ -176,7 +178,7 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
             Some(ModelHangerSink("banner1"))
           ),
           ReadEntityListAction(
-            "campaign",
+            DomainEntityType("campaign"),
             Some(Map("limit" -> "20")),
             None,
             None,

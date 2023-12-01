@@ -41,7 +41,8 @@ import arcadia.service.ServiceFacility
  *  version Oct. 30, 2022
  *  version Nov. 27, 2022
  *  version Dec. 29, 2022
- * @version Mar. 30, 2023
+ *  version Mar. 30, 2023
+ * @version Nov. 28, 2023
  * @author  ASAMI, Tomoharu
  */
 case class ExecutionContext(
@@ -58,6 +59,7 @@ case class ExecutionContext(
 
   def dateTimeContext = platformExecutionContext.dateTimeContext
   def formatContext = webapp.getFormatContext getOrElse platformExecutionContext.formatContext
+  def theme = webapp.view.theme
 
   def isLogined: Boolean = platformExecutionContext.isLogined
   def getOperationName: Option[String] = platformExecutionContext.getOperationName

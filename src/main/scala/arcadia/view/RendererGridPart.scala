@@ -7,7 +7,8 @@ import Renderer._
 
 /*
  * @since   Apr. 15, 2018
- * @version Apr. 15, 2018
+ *  version Apr. 15, 2018
+ * @version Nov. 28, 2023
  * @author  ASAMI, Tomoharu
  */
 trait RendererGridPart { self: Renderer =>
@@ -38,10 +39,11 @@ trait RendererGridPart { self: Renderer =>
 
   protected def grid_with_content[T](ps: List[T])(f: T => NodeSeq): Elem =
     strategy.theme match {
-      case m if (m.isGridDiv) => grid_div(ps)(f)
-      case m if (m.isGridTable) => grid_table(ps)(f)
+      case m: Bootstrap5RenderThemeBase => grid_bootstrap4(ps)(f)
       case m: Bootstrap4RenderThemeBase => grid_bootstrap4(ps)(f)
       case m: Bootstrap3RenderThemeBase => grid_bootstrap3(ps)(f)
+      case m if (m.isGridDiv) => grid_div(ps)(f)
+      case m if (m.isGridTable) => grid_table(ps)(f)
       case m => grid_table(ps)(f)
     }
 

@@ -14,7 +14,8 @@ import arcadia.view.value._
  *  version Nov.  3, 2017
  *  version Sep.  1, 2018
  *  version May.  4, 2022
- * @version Sep. 30, 2023
+ *  version Sep. 30, 2023
+ * @version Oct. 31, 2023
  * @author  ASAMI, Tomoharu
  */
 case class ViewService(
@@ -97,6 +98,7 @@ case class Query(
     DomainEntityType(name),
     start, limit, maxlimit,
     None,
+    None, // TODO
     Record.create(parameters)
   )
 }

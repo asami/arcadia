@@ -15,7 +15,8 @@ import Renderer._
  *  version May.  1, 2018
  *  version Jul.  8, 2018
  *  version Sep.  1, 2018
- * @version Apr. 16, 2019
+None *  version Apr. 16, 2019
+None * @version Nov. 28, 2023
  * @author  ASAMI, Tomoharu
  */
 trait RendererCardPart { self: Renderer =>
@@ -78,11 +79,11 @@ trait RendererCardPart { self: Renderer =>
 
   private def _card_component(kind: CardKind, card: Card): Option[NodeSeq] =
     kind match {
-      case m: ComponentCard =>
-        strategy.viewContext.flatMap { x =>
-          val a = x.parcel.withModel(CardModel(card, s"card__${m.name}"))
-          strategy.viewContext.flatMap(_.engine.renderComponentOption(a))
-        }
+      case m: ComponentCard => strategy.viewContext.flatMap { x =>
+        val a = x.parcel.withModel(CardModel(card, s"card__${kind.name}"))
+        strategy.viewContext.flatMap(_.engine.renderComponentOption(a))
+      }
+      case ImageTitleCard => None
       case _ => None
     }
 
@@ -123,10 +124,11 @@ trait RendererCardPart { self: Renderer =>
 
   protected def card_full(card: Card): NodeSeq = {
     strategy.theme match {
-      case m if m.isCardDiv => card_div(card)
-      case m if m.isCardTable => card_table(card)
+      case m: Bootstrap5RenderThemeBase => card_bootstrap(card)
       case m: Bootstrap4RenderThemeBase => card_bootstrap(card)
       case m: Bootstrap3RenderThemeBase => card_paperdashboard(card)
+      case m if m.isCardDiv => card_div(card)
+      case m if m.isCardTable => card_table(card)
       case m => card_table(card)
     }
   }

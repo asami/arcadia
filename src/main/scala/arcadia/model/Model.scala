@@ -49,7 +49,8 @@ import arcadia.domain._
  *  version Oct. 30, 2022
  *  version Nov.  6, 2022
  *  version Mar. 30, 2023
- * @version Jun. 23, 2023
+ *  version Jun. 23, 2023
+ * @version Oct. 31, 2023
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -689,7 +690,8 @@ case class EntityListModel(
   transfer: Transfer,
   tableKind: Option[TableKind] = None,
   expiresKind: Option[ExpiresKind] = Some(AgilePageExpires),
-  dataHref: Option[URI] = None
+  dataHref: Option[URI] = None,
+  paging: Option[Renderer.TableOrder.Paging] = None
 ) extends Model with IEntityListModel with IComponentModel {
   override def getEntityType: Option[DomainEntityType] = Some(entityType)
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
@@ -727,11 +729,13 @@ case class EntityListModel(
   )
 
   def withDataHref(p: Option[URI]): EntityListModel = copy(dataHref = p)
+  def withPaging(p: Option[Renderer.TableOrder.Paging]) = copy(paging = p)
+  def withPaging(p: Renderer.TableOrder.Paging) = copy(paging = Some(p))
 
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, caption
   ){
-    protected def render_Content: NodeSeq = table(Renderer.TableOrder(tableKind, getSchema, getEntityType, dataHref, records))
+    protected def render_Content: NodeSeq = table(Renderer.TableOrder(tableKind, getSchema, getEntityType, dataHref, paging, records))
   }.apply
   lazy val effectiveSchema = getSchema.getOrElse(IRecord.makeSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
@@ -745,6 +749,20 @@ object EntityListModel extends ModelClass {
   ): EntityListModel = EntityListModel(
     Some(I18NElement(klass.name)), klass, None, records, transfer
   )
+
+  // def paging(
+  //   klass: DomainEntityType,
+  //   records: List[IRecord],
+  //   transfer: Transfer,
+  //   paging: Option[Renderer.TableOrder.Paging]
+  // ): EntityListModel = EntityListModel(
+  //   Some(I18NElement(klass.name)),
+  //   klass,
+  //   None,
+  //   records,
+  //   transfer,
+  //   paging = paging
+  // )
 
   def empty(name: String): EntityListModel = EntityListModel(
     DomainEntityType(name),
@@ -762,6 +780,23 @@ object EntityListModel extends ModelClass {
       else
         None
     }
+
+  def paging(
+    klass: DomainEntityType,
+    records: List[IRecord],
+    transfer: Transfer,
+    paging: Renderer.TableOrder.Paging
+  ): EntityListModel = {
+    val xs = records.take(paging.pageSize)
+    EntityListModel(
+      Some(I18NElement(klass.name)),
+      klass,
+      None,
+      xs,
+      transfer,
+      paging = Some(paging)
+    )
+  }
 }
 
 case class PropertySheetModel(

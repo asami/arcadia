@@ -28,7 +28,8 @@ import arcadia.model.{Model, ErrorModel}
  *  version Apr. 30, 2022
  *  version May. 22, 2022
  *  version Sep. 10, 2022
- * @version Nov. 27, 2022
+ *  version Nov. 27, 2022
+ * @version Nov. 28, 2023
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -177,7 +178,7 @@ class ViewEngine(
 
   def applyOption(p: Parcel): Option[Content] = p.executeWithTrace("ViewEngine#applyOption", p.show) {
     val render = {
-      val t = theme getOrElse PlainTheme
+      val t = p.getTheme orElse theme getOrElse PlainTheme
       // val style = "MM" // TODO
       // val f = FormatterContext.createStyle(style)
       val f = p.context.fold(FormatterContext.default)(x => FormatterContext.create(x))

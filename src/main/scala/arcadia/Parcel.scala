@@ -19,6 +19,7 @@ import arcadia.model.Property
 import arcadia.view.{ViewEngine, RenderStrategy, Partials, View,
   UsageKind, TableKind, CardKind
 }
+import arcadia.view.RenderTheme
 import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
 
 /*
@@ -40,7 +41,8 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Mar. 21, 2022
  *  version May.  3, 2022
  *  version Dec. 29, 2022
- * @version Mar. 31, 2023
+ *  version Mar. 31, 2023
+ * @version Nov. 28, 2023
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -271,6 +273,8 @@ case class Parcel(
   def locale: Locale = context.map(_.locale) orElse getPlatformExecutionContext.map(_.locale) getOrElse Locale.US
 
   def getDomainModel: Option[DomainModel] = context.map(_.webapp.domain)
+
+  def getTheme: Option[RenderTheme] = context.flatMap(_.theme)
 
 //  def eventName: String = context.flatMap(_.getFormParameter("Submit")) getOrElse RAISE.notImplementedYetDefect
 //  def exception: Throwable = RAISE.notImplementedYetDefect

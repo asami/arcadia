@@ -41,7 +41,8 @@ import arcadia.view.ViewEngine._
  *  version Apr.  1, 2020
  *  version Apr. 30, 2022
  *  version May.  3, 2022
- * @version Dec. 30, 2022
+ *  version Dec. 30, 2022
+ * @version Nov. 28, 2023
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -440,11 +441,18 @@ object RenderTheme extends EnumerationClass[RenderTheme] {
     NowUiKitTheme,
     NowUiDashboardProTheme,
     MyColorTheme,
-    LightBootstrapDashboardTheme
+    LightBootstrapDashboardTheme,
+    BootstrapTheme, // Latest Bootstrap 5
+    BootstrapListTheme,
+    BootstrapGridTheme
   )
 }
 
 sealed trait BootstrapRenderThemeBase extends RenderTheme {
+  override def isGridDiv = true
+  override def isCardDiv = true
+  // protected def default_CardKind_In_Grid: CardKind = ComponentCard
+
   override protected def table_Container(p: Renderer.Table, body: => Node): Node = p.kind match {
     case StandardTable => _table_container_standard(body)
     case ListTable => _table_container_list(body)
@@ -504,6 +512,9 @@ trait Bootstrap3RenderThemeBase extends BootstrapRenderThemeBase {
 }
 
 trait Bootstrap4RenderThemeBase extends BootstrapRenderThemeBase {
+}
+
+trait Bootstrap5RenderThemeBase extends BootstrapRenderThemeBase {
 }
 
 case object PlainTheme extends RenderTheme {
@@ -685,6 +696,17 @@ case object NowUiDashboardProTheme extends Bootstrap4RenderThemeBase {
       </a>
     </li>
   }
+}
+
+case object BootstrapTheme extends Bootstrap5RenderThemeBase {
+}
+
+case object BootstrapListTheme extends Bootstrap5RenderThemeBase {
+  override def default_TableKind = ListTable
+}
+
+case object BootstrapGridTheme extends Bootstrap5RenderThemeBase {
+  override def default_TableKind = GridTable
 }
 
 sealed trait TableKind extends NamedValueInstance {
@@ -1120,7 +1142,7 @@ case class RenderContext(
     )(suffix =>
       new URI(s"${b}/${id.presentationId}.${suffix}"))
   }
-  def uri(base: DomainEntityType, id: DomainObjectId): URI = new URI("${base.v}/${id.presentationId}${suffix}")
+  def uri(base: DomainEntityType, id: DomainObjectId): URI = new URI(s"${base.name}/${id.presentationId}${suffix}")
 
   def suffix: String = ".html" // TODO
 
