@@ -29,7 +29,8 @@ import arcadia.model.{Model, ErrorModel}
  *  version May. 22, 2022
  *  version Sep. 10, 2022
  *  version Nov. 27, 2022
- * @version Nov. 28, 2023
+ *  version Nov. 28, 2023
+ * @version Dec. 28, 2023
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -48,7 +49,7 @@ class ViewEngine(
   private var _new_slots: Vector[Slot] = Vector.empty
 
   lazy val components: Vector[Slot] = {
-    val a: Vector[Slot] = rule.components.toSlots
+    val a: Vector[Slot] = rule.components.components
     val b: Vector[Slot] = extend.toVector.flatMap(_.components)
     a ++ b
   }
@@ -104,8 +105,11 @@ class ViewEngine(
 
   private def _template_view(p: File): PageView = PageView.create(p)
 
-  def findComponent(parcel: Parcel): Option[View] =
-    components.find(_.isAccept(parcel)).map(_.view)
+  def findComponent(parcel: Parcel): Option[View] = {
+    val a = components.find(_.isAccept(parcel))
+    val b = a orElse parcel.render.flatMap(_.components.components.find(_.isAccept(parcel)))
+    b.map(_.view)
+  }
 
   def getLayout(parcel: Parcel): Option[LayoutView] = {
     def getlayout(kind: LayoutKind) = rule.getLayout(kind).orElse(
@@ -183,12 +187,21 @@ class ViewEngine(
       // val f = FormatterContext.createStyle(style)
       val f = p.context.fold(FormatterContext.default)(x => FormatterContext.create(x))
       (p.render getOrElse PlainHtml).
-        withThemePartials(t, partials).
+        withThemeComponentsPartials(t, Components(components), partials).
         withFormatter(f)
     }
     val parcel = p.withRenderStrategy(render)
+    _apply_option_recursive(parcel)
+  }
+
+  def applyOptionParent(p: Parcel): Option[Content] = p.executeWithTrace("ViewEngine#applyOptionParent", p.show) {
+    _apply_option_recursive(p)
+  }
+
+  private def _apply_option_recursive(parcel: Parcel) = {
+    def _render_ = parcel.render getOrElse RAISE.noReachDefect
     val r1 = findView(parcel).fold {
-      extend.toStream.flatMap(_.applyOption(parcel)).headOption orElse {
+      extend.toStream.flatMap(_.applyOptionParent(parcel)).headOption orElse {
         // val model = p.getEffectiveModel orElse Some(ErrorModel.notFound(parcel, "View and Model is not found."))
         // model map { m =>
         //   getLayout(parcel).map(_.apply(this, parcel)) getOrElse {
@@ -197,7 +210,7 @@ class ViewEngine(
         // }
         def f(m: Model): Content = getLayout(parcel).
           map(_.apply(this, parcel)).
-          getOrElse(m.apply(render))
+          getOrElse(m.apply(_render_))
         parcel.getEffectiveModel.map(f).
           orElse(
             if (is_spa_redirect(parcel))

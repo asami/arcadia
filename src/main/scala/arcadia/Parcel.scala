@@ -42,7 +42,8 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version May.  3, 2022
  *  version Dec. 29, 2022
  *  version Mar. 31, 2023
- * @version Nov. 28, 2023
+ *  version Nov. 28, 2023
+ * @version Dec. 28, 2023
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -69,6 +70,11 @@ case class Parcel(
   def withView(view: View) = copy(view = Some(view))
   def withContent(p: Content) = copy(content = Some(p))
   def withRenderStrategy(render: RenderStrategy) = copy(render = Some(render))
+  // unused
+  private def setRenderStrategy(p: RenderStrategy) = render match {
+    case Some(s) => copy(render = Some(p.push(s)))
+    case None => copy(render = Some(p))
+  }
 
   // def withPartials(p: Partials) = render.fold(this)(r => copy(render = Some(r.copy(partials = p))))
 

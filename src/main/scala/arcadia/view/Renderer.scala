@@ -39,7 +39,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Apr. 15, 2020
  *  version Mar. 30, 2023
  *  version Oct. 31, 2023
- * @version Nov. 29, 2023
+ *  version Nov. 29, 2023
+ * @version Dec.  2, 2023
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -335,14 +336,23 @@ abstract class Renderer(
 
   protected def picture_icon(rec: IRecord): Picture =
     _get_any(rec, card_icon_keys).fold {
-      Picture.create(theme.default.noImageIcon)
+      if (false)
+        Picture.create(theme.default.noImageIcon)
+      else
+        Picture.createIcon("bi-image-alt")
     } {
       case m: URL => Picture.create(m.toURI)
       case m: URI => Picture.create(m)
-      case m: String => Picture.create(new URI(m))
+      case m: String =>
+        if (_is_image(m))
+          Picture.create(new URI(m))
+        else
+          Picture.createIcon(m)
       case m: Picture => m
       case m => RAISE.noReachDefect
     }
+
+  private def _is_image(p: String) = p.contains('/') || p.contains('.')
 
   private def _get_string(rec: IRecord, keys: Seq[Symbol]): Option[String] =
     keys.toStream.flatMap(x => rec.getString(x)).headOption
@@ -375,7 +385,7 @@ abstract class Renderer(
         for ((x, i) <- ps.zipWithIndex) yield {
           val c = if (i == 0) "carousel-item active" else "carousel-item"
           <div class={c}>
-  	    <img class="d-block w-100" src={x.l} alt={x.alt(locale)}></img>
+            _carousel_image(x)
             {
               if (!isCaption || (x.caption.isEmpty && x.description.isEmpty))
                 Group(Nil)
@@ -407,6 +417,15 @@ abstract class Renderer(
     </div>
   }
 
+  private def _carousel_image(p: Picture): Elem = p match {
+    case m: Picture.UriPicture => _carousel_image(m)
+    case m: Picture.IconPicture => RAISE.notImplementedYetDefect
+  }
+
+  private def _carousel_image(p: Picture.UriPicture): Elem = {
+    <img class="d-block w-100" src={p.l} alt={p.alt(locale)}></img>
+  }
+
   protected def banner(ps: List[Picture]): Elem =
     if (ps.length == 0)
       empty_block
@@ -426,7 +445,12 @@ abstract class Renderer(
       <a href={href.toString} target="_blank">{img(p)}</a>
     }
 
-  def img(p: Picture): Elem = XmlUtils.element("img",
+  def img(p: Picture): Elem = p match {
+    case m: Picture.UriPicture => img(m)
+    case m: Picture.IconPicture => img(m)
+  }
+
+  def img(p: Picture.UriPicture): Elem = XmlUtils.element("img",
     SeqUtils.buildTupleVector(
       Vector(
         "class" -> "card-img-top",
@@ -438,6 +462,8 @@ abstract class Renderer(
     ),
     Nil
   )
+
+  def img(p: Picture.IconPicture): Elem = RAISE.notImplementedYetDefect
 
   protected def badge(p: Badge): Elem = {
     val c = s"badge badge-${p.asIndicatorName}"

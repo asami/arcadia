@@ -42,7 +42,8 @@ import arcadia.view.ViewEngine._
  *  version Apr. 30, 2022
  *  version May.  3, 2022
  *  version Dec. 30, 2022
- * @version Nov. 28, 2023
+ *  version Nov. 28, 2023
+ * @version Dec. 28, 2023
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -53,15 +54,35 @@ case class RenderStrategy(
   partials: Partials,
   components: Components,
   renderContext: RenderContext,
-  viewContext: Option[ViewContext]
+  viewContext: Option[ViewContext],
+  history: RenderStrategy.History = RenderStrategy.History.empty // unused
 ) {
   def scope = renderContext.scope
   def size = renderContext.size getOrElse NormalSize
-  def tableKind = renderContext.tableKind getOrElse theme.default.tableKind
-  def tableKind(p: Option[TableKind]) = renderContext.tableKind orElse p getOrElse theme.default.tableKind
-  def cardKind = renderContext.cardKind getOrElse theme.default.cardKind
-  def cardKind(p: Option[TableKind]) = renderContext.cardKind orElse p getOrElse theme.default.cardKind
-  def cardKindInGrid = renderContext.cardKindInGrid getOrElse theme.default.cardKindInGrid
+  def tableKind = (
+    renderContext.tableKind orElse
+      history.tableKind orElse // unused
+      applicationRule.renderStrategy.tableKind
+      getOrElse theme.default.tableKind
+  )
+  def tableKind(p: Option[TableKind]) = (
+    renderContext.tableKind orElse
+      history.tableKind orElse // unused
+      applicationRule.renderStrategy.tableKind orElse
+      p getOrElse theme.default.tableKind
+  )
+  def cardKind = (
+    renderContext.cardKind orElse
+      history.cardKind orElse // unused
+      applicationRule.renderStrategy.cardKind getOrElse theme.default.cardKind
+  )
+  def cardKind(p: Option[TableKind]) = (
+    renderContext.cardKind orElse
+      history.cardKind orElse
+      applicationRule.renderStrategy.cardKind orElse
+      p getOrElse theme.default.cardKind
+  )
+  def cardKindInGrid = renderContext.cardKindInGrid orElse applicationRule.renderStrategy.cardKindInGrid getOrElse theme.default.cardKindInGrid
   def isLogined = executeOption(_.isLogined) getOrElse false
   def getOperationName: Option[String] = executeOption(_.getOperationName).flatten
   def gridContext: GridContext = renderContext.gridContext getOrElse theme.default.gridContext(this)
@@ -103,11 +124,14 @@ case class RenderStrategy(
   def withFormatter(p: FormatterContext) = copy(renderContext = renderContext.withFormatter(p))
 
   def withViewContext(engine: ViewEngine, parcel: Parcel) = copy(viewContext = Some(ViewContext(engine, parcel)))
-  def withThemePartials(t: RenderTheme, p: Partials) = copy(
+  def withThemeComponentsPartials(t: RenderTheme, cs: Components, p: Partials) = copy(
     theme = t,
+    components = cs,
     partials = p
   )
   def complementApplicationRule(p: WebApplicationRule) = copy(applicationRule = applicationRule.complement(p))
+
+  def push(p: RenderStrategy) = copy(history = history.append(p))
 
   def forComponent(engine: ViewEngine, parcel: Parcel) = forView(engine, parcel)
   def forView(engine: ViewEngine, parcel: Parcel) =
@@ -166,6 +190,21 @@ case class RenderStrategy(
     def buttonSearch: I18NElement = renderContext.label.buttonSearch
     def placeholderStart: I18NElement = renderContext.label.placeholderStart
     def placeholderEnd: I18NElement = renderContext.label.placeholderEnd
+  }
+}
+object RenderStrategy {
+  // Unused
+  case class History(
+    history: Vector[RenderStrategy] = Vector.empty
+  ) {
+    def append(p: RenderStrategy) = copy(history = history :+ p)
+
+    def tableKind: Option[TableKind] = history.toStream.flatMap(_.applicationRule.renderStrategy.tableKind).headOption
+
+    def cardKind: Option[CardKind] = history.toStream.flatMap(_.applicationRule.renderStrategy.cardKind).headOption
+  }
+  object History {
+    val empty = History()
   }
 }
 
@@ -1087,9 +1126,8 @@ object Pages {
 }
 
 case class Components(
-  components: Vector[ComponentView]
+  components: Vector[Slot]
 ) {
-  def toSlots: Vector[ViewEngine.Slot] = components.map(x => x.guard -> x).map(Slot(_))
 }
 object Components {
   val empty = Components(Vector.empty)

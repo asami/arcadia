@@ -14,7 +14,8 @@ import arcadia.model.Picture
  *  version Sep.  4, 2017
  *  version Oct. 24, 2017
  *  version Dec. 17, 2017
- * @version Aug. 31, 2018
+ *  version Aug. 31, 2018
+ * @version Dec.  2, 2023
  * @author  ASAMI, Tomoharu
  */
 case class ViewObject(v: DomainObject, strategy: RenderStrategy) {
@@ -29,9 +30,15 @@ case class ViewObject(v: DomainObject, strategy: RenderStrategy) {
   def imageIcon: Picture = v.imageIcon.getOrElse(strategy.noImageIcon)
   def imagePrimary: Picture = v.imagePrimary.getOrElse(strategy.noImagePicture)
   // compatibility
-  def image__icon: URI = imageIcon.extrasmall
+  def image__icon: URI = imageIcon match {
+    case m: Picture.UriPicture => m.extrasmall
+    case m: Picture.IconPicture => RAISE.notImplementedYetDefect
+  }
   // compatibility
-  def image__primary: URI = imagePrimary.large
+  def image__primary: URI = imagePrimary match {
+    case m: Picture.UriPicture => m.large
+    case m: Picture.IconPicture => RAISE.notImplementedYetDefect
+  }
 
   private def _normalize(s: String): String = try {
     XmlUtils.toSummary(s)

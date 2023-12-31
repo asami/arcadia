@@ -19,7 +19,8 @@ import Renderer._
  *  version Sep.  1, 2018
  *  version Nov.  7, 2018
  *  version Apr. 16, 2019
- * @version Oct. 31, 2023
+ *  version Oct. 31, 2023
+ * @version Dec.  2, 2023
  * @author  ASAMI, Tomoharu
  */
 trait RendererTablePart { self: Renderer =>
@@ -389,11 +390,20 @@ trait RendererTablePart { self: Renderer =>
     <span data-toggle="tooltip" title={p.toString}>{s}</span>
   }
 
-  protected def table_value_image_link_picture(p: Picture): Node = {
+  protected def table_value_image_link_picture(p: Picture): Node = p match {
+    case m: Picture.UriPicture => table_value_image_link_picture(m)
+    case m: Picture.IconPicture => table_value_image_link_picture(m)
+  }
+
+  protected def table_value_image_link_picture(p: Picture.UriPicture): Node = {
     val src = p.src.toString
     val a = p.alt.map(string).getOrElse(src)
     val s = StringUtils.pathLastComponentBody(a)
     <span data-toggle="tooltip" title={src}>{s}</span>
+  }
+
+  protected def table_value_image_link_picture(p: Picture.IconPicture): Node = {
+    RAISE.notImplementedYetDefect
   }
 
   protected def table_value_img(column: TableColumn, p: Any): Node = p match {
@@ -413,13 +423,23 @@ trait RendererTablePart { self: Renderer =>
   protected def table_value_img_uri(column: TableColumn, p: URI): Node =
     <img src={p.toString}></img>
 
-  protected def table_value_img_picture(column: TableColumn, p: Picture): Node = {
+  protected def table_value_img_picture(column: TableColumn, p: Picture): Node =
+    p match {
+      case m: Picture.UriPicture => table_value_img_picture(m)
+      case m: Picture.IconPicture => table_value_img_picture(m)
+    }
+
+  protected def table_value_img_picture(column: TableColumn, p: Picture.UriPicture): Node = {
     val alt: String = p.alt.map(string).getOrElse("")
     val src = column.kind match {
       case PropertyTable => p.l
       case _ => p.xs
     }
     <img class={theme_table.css.img(strategy.tableKind)} src={src} alt={alt}></img>
+  }
+
+  protected def table_value_img_picture(column: TableColumn, p: Picture.IconPicture): Node = {
+    RAISE.notImplementedYetDefect
   }
 
   protected def table_value_img(p: Any): Node = p match {
@@ -439,13 +459,22 @@ trait RendererTablePart { self: Renderer =>
   protected def table_value_img_uri(p: URI): Node =
     <img src={p.toString}></img>
 
-  protected def table_value_img_picture(p: Picture): Node = {
+  protected def table_value_img_picture(p: Picture): Node = p match {
+    case m: Picture.UriPicture => table_value_img_picture(m)
+    case m: Picture.IconPicture => table_value_img_picture(m)
+  }
+
+  protected def table_value_img_picture(p: Picture.UriPicture): Node = {
     val alt: String = p.alt.map(string).getOrElse("")
     val src = strategy.tableKind match {
       case PropertyTable => p.l
       case _ => p.xs
     }
     <img class={theme_table.css.img(strategy.tableKind)} src={src} alt={alt}></img>
+  }
+
+  protected def table_value_img_picture(p: Picture.IconPicture): Node = {
+    RAISE.notImplementedYetDefect
   }
 
   protected def table_value_html(p: Any): Node = p match {

@@ -43,7 +43,8 @@ import arcadia.domain.DomainModelSpace
  *  version Dec. 29, 2022
  *  version Jan. 30, 2023
  *  version Apr. 30, 2023
- * @version Jun. 22, 2023
+ *  version Jun. 22, 2023
+ * @version Dec. 30, 2023
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -138,12 +139,12 @@ object WebApplication {
       get_pathnode(root_node, path)
     protected def get_pathnode(p: T, path: PathName): Option[T] = {
       assert (!path.isAbsolute, s"No relative path: $path")
-      def go(n: T, p: List[String]): Option[T] = p match {
+      def go(n: T, ps: List[String]): Option[T] = ps match {
         case Nil => Some(n)
         case x :: Nil => get_node(n, x)
         case x :: xs => get_node(n, x).flatMap(n => go(n, xs))
       }
-      go(root_node, path.components)
+      go(p, path.components)
     }
     protected def get_node(p: T, s: String): Option[T] = to_children(p).find(x => name(x) === s)
     protected def root_node: T
@@ -265,7 +266,7 @@ object WebApplication {
           val partials = build_partials
           val pages = build_pages
           val comps = build_components
-          val compslots = comps.toSlots
+          val compslots = comps.components
           val theme = config.theme.flatMap(RenderTheme.get)
           val slots = applicationslots ++ compslots
           val tags = Tags.empty // TODO
@@ -405,7 +406,8 @@ object WebApplication {
 
       protected def build_components: Components = {
         case class Z(m: Vector[ComponentView] = Vector.empty) {
-          val r = Components(m)
+          val r = Components(m.map(x => Slot(x.gv)))
+
           def +(rhs: T) = {
             if (_is_view(rhs))
               Z(m :+ ComponentView.create(namebody(rhs), to_template_source(rhs)))
@@ -413,8 +415,9 @@ object WebApplication {
               this
           }
         }
-        get_pathnode(PathName("WEB-INF/components")).
-          map(x => to_children(x)./:(Z())(_+_).r).getOrElse(Components.empty)
+        val a = get_pathnode(PathName("WEB-INF/widgets")).map(x => to_children(x)).getOrElse(Nil)
+        val b = get_pathnode(PathName("WEB-INF/components")).map(x => to_children(x)).getOrElse(Nil)
+        (a ++ b)./:(Z())(_+_).r
       }
 
       protected def build_controllers: Vector[ControllerEngine.Slot] = {
