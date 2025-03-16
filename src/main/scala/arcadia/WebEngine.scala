@@ -5,6 +5,7 @@ import org.goldenport.exception.RAISE
 import org.goldenport.values.ResourceName
 import org.goldenport.record.v2.Record
 import org.goldenport.trace.{TraceContext, Result}
+import org.goldenport.realm.Realm
 import arcadia.context._
 import arcadia.controller.ControllerEngine
 import arcadia.view.ViewEngine
@@ -36,7 +37,8 @@ import arcadia.domain.DomainModelSpace
  *  version Sep. 10, 2022
  *  version Oct. 23, 2022
  *  version Dec. 25, 2022
- * @version Jan.  1, 2023
+ *  version Jan.  1, 2023
+ * @version Mar. 15, 2025
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -158,6 +160,10 @@ class WebEngine(
   }
 
   def shutdown(): Unit = view.shutdown()
+
+  def applicationRealms: List[Realm] = application.getRealm.toList ::: extend.flatMap(_.applicationRealms)
+
+  def extendRealms: List[Realm] = extend.flatMap(_.applicationRealms)
 }
 object WebEngine {
   case class Config(

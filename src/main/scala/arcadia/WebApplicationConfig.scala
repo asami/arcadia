@@ -26,7 +26,8 @@ import org.goldenport.hocon.RichConfig.Implicits._
  *  version Apr. 23, 2020
  *  version Jul. 25, 2022
  *  version Nov. 26, 2022
- * @version Dec. 27, 2023
+ *  version Dec. 27, 2023
+ * @version Mar. 15, 2025
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationConfig(

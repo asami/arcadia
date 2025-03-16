@@ -10,6 +10,7 @@ import com.asamioffice.goldenport.io.UURL
 import org.goldenport.exception.RAISE
 import org.goldenport.values.PathName
 import org.goldenport.bag.ProjectVersionDirectoryBag
+import org.goldenport.realm.Realm
 import org.goldenport.io.IoUtils
 import org.goldenport.util.StringUtils
 import arcadia.context._
@@ -30,7 +31,8 @@ import arcadia.domain.DomainModelSpace
  *  version Sep. 10, 2022
  *  version Nov. 27, 2022
  *  version Dec. 25, 2022
- * @version Jan.  1, 2023
+ *  version Jan.  1, 2023
+ * @version Mar. 11, 2025
  * @author  ASAMI, Tomoharu
  */
 abstract class WebModule() {
@@ -84,6 +86,9 @@ object WebModule {
     else
       None
   }
+
+  def createOption(realm: Realm, basedir: File): Option[WebModule] =
+    Some(new RealmWebModule(realm, basedir))
 
   def isHtml(pathname: String): Boolean = {
     val suffix = StringUtils.toSuffix(pathname)
@@ -170,4 +175,29 @@ class ResourceWebModule(resourcename: String, classloader: Option[ClassLoader]) 
     webconfig: WebEngine.Config,
     config: Hocon
   ) = RAISE.notImplementedYetDefect
+}
+
+class RealmWebModule(
+  realm: Realm,
+  basedir: File
+) extends WebModule {
+  lazy val module = {
+    realm.origin match {
+      case Some(s) => 
+        new DirectoryWebModule(s)
+      case None => 
+        realm.export(basedir)
+        new DirectoryWebModule(basedir)
+    }
+  }
+
+  def name = module.name
+
+  def toWebApplication(
+    platform: PlatformContext,
+    webconfig: WebEngine.Config,
+    config: Hocon
+  ) = module.toWebApplication(platform, webconfig, config)
+}
+object RealmWebModule {
 }

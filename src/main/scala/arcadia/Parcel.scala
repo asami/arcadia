@@ -43,21 +43,22 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Dec. 29, 2022
  *  version Mar. 31, 2023
  *  version Nov. 28, 2023
- * @version Dec. 28, 2023
+ *  version Dec. 28, 2023
+ * @version Mar. 12, 2025
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
-  command: Option[Command],
-  model: Option[Model],
-  modelHanger: Map[String, Model],
-  propertyModel: Option[PropertySheetModel],
-  view: Option[View],
-  content: Option[Content],
-  render: Option[RenderStrategy],
-  session: Option[Session],
-  platformExecutionContextOption: Option[PlatformExecutionContext],
-  context: Option[ExecutionContext],
-  trace: Option[TraceContext]
+  command: Option[Command] = None,
+  model: Option[Model] = None,
+  modelHanger: Map[String, Model] = Map.empty,
+  propertyModel: Option[PropertySheetModel] = None,
+  view: Option[View] = None,
+  content: Option[Content] = None,
+  render: Option[RenderStrategy] = None,
+  session: Option[Session] = None,
+  platformExecutionContextOption: Option[PlatformExecutionContext] = None,
+  context: Option[ExecutionContext] = None,
+  trace: Option[TraceContext] = None
 ) {
   def getPlatformExecutionContext: Option[PlatformExecutionContext] =
     platformExecutionContextOption orElse context.map(_.platformExecutionContext)
@@ -326,9 +327,23 @@ case class Parcel(
 }
 
 object Parcel {
+  val empty = Parcel()
+
   def apply(model: Model, strategy: RenderStrategy): Parcel = Parcel(
     None, Some(model), Map.empty, None, None, None, Some(strategy), None, None, None, None
   )
+
+  def view(
+    pc: PlatformExecutionContext,
+    pathname: String
+  ): Parcel = Parcel.empty.withCommand(ViewCommand(pathname)).
+    copy(platformExecutionContextOption = Some(pc))
+
+  def material(
+    pc: PlatformExecutionContext,
+    pathname: String
+  ): Parcel = Parcel.empty.withCommand(MaterialCommand(pathname)).
+    copy(platformExecutionContextOption = Some(pc))
 
   // def apply(command: Command, req: ServiceRequest): Parcel = Parcel(
   //   Some(command), command.getModel, None, None, Some(req)

@@ -1,6 +1,8 @@
 package arcadia
 
-import scalaz.{Node => _, _}, Scalaz._
+import scalaz.{Node => _, _}
+import Scalaz._
+
 import scala.util.control.NonFatal
 import scala.xml._
 import scala.concurrent.duration._
@@ -9,10 +11,10 @@ import java.net.URL
 import java.io.OutputStream
 import org.joda.time.DateTime
 import org.goldenport.exception.RAISE
-import org.goldenport.bag.ChunkBag
+import org.goldenport.bag.{Bag, ChunkBag}
 import org.goldenport.io.IoUtils
 import org.goldenport.record.v2.Record
-import org.goldenport.xml.{XmlUtils, XmlPrinter}
+import org.goldenport.xml.{XmlPrinter, XmlUtils}
 import org.goldenport.xml.XhtmlUtils
 import org.goldenport.util.SeqUtils.mkStringOption
 import org.goldenport.util.DateTimeUtils.httpDateTimeString

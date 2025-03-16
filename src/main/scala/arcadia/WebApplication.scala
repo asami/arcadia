@@ -3,6 +3,7 @@ package arcadia
 import scalaz._, Scalaz._
 import scala.xml.NodeSeq
 import java.io.File
+import java.nio.file.Path
 import java.net.URL
 import java.util.Locale
 import org.joda.time.{DateTime, DateTimeZone}
@@ -15,6 +16,7 @@ import org.goldenport.context.Conclusion
 import org.goldenport.context.FormatContext
 import org.goldenport.values.{Version, PathName}
 import org.goldenport.bag.{ProjectVersionDirectoryBag, UrlBag}
+import org.goldenport.realm.Realm
 import org.goldenport.util.StringUtils
 import arcadia.context._
 import arcadia.controller._
@@ -44,7 +46,8 @@ import arcadia.domain.DomainModelSpace
  *  version Jan. 30, 2023
  *  version Apr. 30, 2023
  *  version Jun. 22, 2023
- * @version Dec. 30, 2023
+ *  version Dec. 30, 2023
+ * @version Mar. 15, 2025
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -53,16 +56,21 @@ case class WebApplication(
   config: WebApplicationConfig,
   controller: ControllerEngine.Rule,
   view: ViewEngine.Rule,
-  domain: DomainModel
+  domain: DomainModel,
+  rootFile: Option[File]
 ) {
   def getLocale = config.getLocale
   def extend: List[String] = config.extend getOrElse Nil
-  def basePath: String = config.base_path getOrElse name
+  def basePath: String = config.base_path getOrElse name // TODO Current usage is a kind of application id.
   // def format(locale: Locale, tz: DateTimeZone, p: DateTime): Option[String] = None
   // def formatDateTime(locale: Locale, tz: DateTimeZone, p: DateTime): Option[String] = None
   // def formatDate(locale: Locale, tz: DateTimeZone, p: DateTime): Option[String] = None
   // def formatTime(locale: Locale, tz: DateTimeZone, p: DateTime): Option[String] = None
   def getFormatContext: Option[FormatContext] = None
+
+  def withName(p: String) = copy(name = p)
+
+  lazy val getRealm = rootFile.map(Realm.create)
 }
 
 object WebApplication {
@@ -75,7 +83,7 @@ object WebApplication {
     LogoutController.gc
   )
 
-  lazy val empty = plain(PlatformContext.empty)
+  lazy val plain: WebApplication = plain(PlatformContext.develop)
 
   val materialSuffixes = Set("html", "png", "jpg", "jpeg", "gif", "apng", "webp", "avif", "css", "js")
 
@@ -99,14 +107,14 @@ object WebApplication {
     )
     val scenario = ScenarioEngine.Rule.empty
     val config = WebApplicationConfig.create("Plain")
-    WebApplication("plain", None, config, ControllerEngine.Rule.empty, view, DomainModel.empty)
+    WebApplication("plain", None, config, ControllerEngine.Rule.empty, view, DomainModel.empty, None)
   }
 
   def error(name: String, c: Conclusion) = {
     val config = WebApplicationConfig.empty
     val controller = ControllerEngine.Rule.empty
     val view = ViewEngine.Rule.error
-    WebApplication(name, None, config, controller, view, DomainModel.empty)
+    WebApplication(name, None, config, controller, view, DomainModel.empty, None)
   }
 
 //  lazy val systemWebApplications = Vector(plain, dashboard, dashboardwar)
@@ -279,7 +287,11 @@ object WebApplication {
         }
         val applicationname = config.name getOrElse application_name_by_url
         val domainmodel = build_domain_model
-        WebApplication(applicationname, version, config, controller, view, domainmodel)
+        val rootfile = root_node match {
+          case m: File => Some(m)
+          case m => None
+        }
+        WebApplication(applicationname, version, config, controller, view, domainmodel, rootfile)
       }
 
       private def _is_view(s: String, t: T): Boolean =
@@ -293,12 +305,13 @@ object WebApplication {
       protected def build_config: WebApplicationConfig = {
         val a = _get_rule("WEB-INF/webapp.conf")
         val b = _get_rule("WEB-INF/webapp.json")
-          (a, b) match {
+        val c = (a, b) match {
           case (Some(l), Some(r)) => l complement r
           case (Some(l), None) => l
           case (None, Some(r)) => r
           case (None, None) => WebApplicationConfig.empty
         }
+        c
       }
 
       private def _get_rule(p: String): Option[WebApplicationConfig] =

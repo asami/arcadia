@@ -10,8 +10,10 @@ import java.io.File
 // import org.fusesource.scalate.support.URLTemplateSource
 // import com.asamioffice.goldenport.io.UURL
 import com.typesafe.config.{Config => Hocon}
-import org.goldenport.context.Consequence
-import org.goldenport.context.Conclusion
+import org.goldenport.RAISE
+import org.goldenport.context._
+import org.goldenport.io.{InputSource, FileInputSource, UrlInputSource}
+import org.goldenport.realm.Realm
 import org.goldenport.hocon.RichConfig.Implicits._
 import org.goldenport.util.StringUtils
 // import org.goldenport.exception.RAISE
@@ -23,6 +25,7 @@ import arcadia.context._
 import arcadia.service.{ServiceFacility, SystemService}
 import arcadia.view.TemplateEngineHangar
 import arcadia.view.ScalateTemplateEngine
+import arcadia.standalone.service.ArcadiaService.PROP_STANDALONE_WEB_APPLICATION_NAME
 // import arcadia.controller._
 // import arcadia.view._
 
@@ -34,7 +37,8 @@ import arcadia.view.ScalateTemplateEngine
  *  version Sep. 10, 2022
  *  version Oct. 23, 2022
  *  version Nov. 27, 2022
- * @version Dec. 25, 2022
+ *  version Dec. 25, 2022
+ * @version Mar. 13, 2025
  * @author  ASAMI, Tomoharu
  */
 class Arcadia(
@@ -100,10 +104,12 @@ object Arcadia {
   def make(
     pc: PlatformContext,
     webengineconfig: WebEngine.Config,
-    config: Hocon
+    config: Hocon,
+    libs: Seq[InputSource],
+    standalones: Seq[Realm]
   ): Consequence[Arcadia] = for {
     services <- _make_services(pc, webengineconfig, config)
-    apps <- _make_applications(pc, webengineconfig, config)
+    apps <- _make_applications(pc, webengineconfig, config, libs, standalones)
     confs <- _make_configs(config)
   } yield new Arcadia(pc, services, apps, confs, webengineconfig)
 
@@ -119,7 +125,9 @@ object Arcadia {
   private def _make_applications(
     pc: PlatformContext,
     webengineconfig: WebEngine.Config,
-    config: Hocon
+    config: Hocon,
+    libs: Seq[InputSource],
+    standalones: Seq[Realm]
   ): Consequence[Map[String, WebApplication]] = {
     val tmpdir = config.getFileOption(PROP_TMP_DIRECTORY) getOrElse new File("target/war")
     tmpdir.mkdirs
@@ -134,10 +142,12 @@ object Arcadia {
         )
       } yield r
 
-
     def _make_applications_in_webapps_(): Consequence[List[WebApplication]] = {
       val webapps = new File("webapps")
-      webapps.listFiles.toList.traverse(_make_application_in_webapps_).map(_.flatten)
+      Option(webapps.listFiles) match {
+        case Some(s) => s.toList.traverse(_make_application_in_webapps_).map(_.flatten)
+        case None => Consequence.success(Nil)
+      }
     }
 
     def _make_application_in_webapps_(p: File): Consequence[List[WebApplication]] = {
@@ -159,11 +169,52 @@ object Arcadia {
       }
     }
 
+    def _make_library_applications_(ps: Seq[InputSource]): Consequence[List[WebApplication]] =
+      ps.toList.traverse(_make_library_application_)
+
+    def _make_library_application_(p: InputSource): Consequence[WebApplication] = Consequence {
+      val module = p match {
+        case FileInputSource(file) => _make_module_file_(file)
+        case UrlInputSource(url) => _make_module_url_(url)
+        case m => RAISE.noReachDefect(s"_make_library_application_: $m")
+      }
+      module.toWebApplication(pc, webengineconfig, config)
+    }
+
+    def _make_module_file_(p: File) =
+      WebModule.createOption(p, tmpdir) getOrElse {
+        UnfoldResourceFault.parameter(p.toString).RAISE
+      }
+
+    def _make_module_url_(p: URL) =
+      WebModule.create(p, tmpdir, None, None)
+
+    def _make_standalone_applications_(ps: Seq[Realm]): Consequence[List[WebApplication]] =
+      (ps.zipWithIndex).toList.traverse {
+        case (realm, index) =>
+          val name = if (index == 0)
+            PROP_STANDALONE_WEB_APPLICATION_NAME
+          else
+            s"${PROP_STANDALONE_WEB_APPLICATION_NAME}${index}"
+          val dir = new File(tmpdir, s"${name}.d")
+          _make_standalone_application_(realm, dir, name)
+      }.map(_.flatten)
+
+    def _make_standalone_application_(
+      p: Realm,
+      tmpdir: File,
+      name: String
+    ): Consequence[Option[WebApplication]] = Consequence(
+      WebModule.createOption(p, tmpdir).map(_.toWebApplication(pc, webengineconfig, config).withName(name))
+    )
+
     // config.consequenceAsObjectList("application", _make_application)
     for {
       a <- config.consequenceAsObjectList("application", _make_application_)
       b <- _make_applications_in_webapps_()
-    } yield (a ++ b).map(x => x.name -> x).toMap
+      c <- _make_library_applications_(libs)
+      d <- _make_standalone_applications_(standalones)
+    } yield (a ++ b ++ c ++ d).map(x => x.name -> x).toMap
   }
 
 //   private def _make_applications(pc: PlatformContext, config: Hocon, urls: Seq[URL]): Consequence[Map[String, WebApplication]] = Consequence {
