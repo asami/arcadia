@@ -2,7 +2,7 @@ organization := "org.goldenport"
 
 name := "arcadia"
 
-version := "0.2.12"
+version := "0.3.0"
 
 scalaVersion := "2.10.3"
 // crossScalaVersions := Seq("2.10.39.2", "2.9.1")
@@ -23,12 +23,14 @@ resolvers += "GitHab releases 2022" at "https://raw.github.com/asami/maven-repos
 
 resolvers += "GitHab releases" at "https://raw.github.com/asami/maven-repository/2023/releases"
 
+resolvers += "GitHub Packages" at "https://maven.pkg.github.com/asami/maven-repository"
+
 resolvers += "Asami Maven Repository" at "http://www.asamioffice.com/maven"
 
 // override goldenport-record
-libraryDependencies += "org.goldenport" %% "goldenport-scala-lib" % "1.3.58"
+libraryDependencies += "org.goldenport" %% "goldenport-scala-lib" % "1.4.1"
 
-libraryDependencies += "org.goldenport" %% "goldenport-record" % "1.3.70"
+libraryDependencies += "org.goldenport" %% "goldenport-record" % "1.4.0"
 
 libraryDependencies += "com.typesafe.play" %% "play-json" % "2.2.2" % "provided" exclude("org.scala-stm", "scala-stm_2.10.0")
 
@@ -43,12 +45,10 @@ libraryDependencies += "junit" % "junit" % "4.10" % "test"
 //
 // AutoMkcol.globalSettings
 
-// credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
+publishTo := Some(
+  "GitHub Packages" at "https://maven.pkg.github.com/asami/maven-repository"
+)
 
-val mavenrepo = settingKey[String]("mavenrepo")
+credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
 
-mavenrepo := sys.env.getOrElse("PUBLISH_MAVEN_REPO", default = "target/maven-repository")
-
-publishTo <<= mavenrepo { v: String =>
-  Some(Resolver.file("file", file(v)))
-}
+publishMavenStyle := true
