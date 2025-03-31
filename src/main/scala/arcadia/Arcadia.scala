@@ -25,6 +25,7 @@ import arcadia.context._
 import arcadia.service.{ServiceFacility, SystemService}
 import arcadia.view.TemplateEngineHangar
 import arcadia.view.ScalateTemplateEngine
+import arcadia.view.PugTemplateEngine
 import arcadia.standalone.service.ArcadiaService.PROP_STANDALONE_WEB_APPLICATION_NAME
 // import arcadia.controller._
 // import arcadia.view._
@@ -38,7 +39,7 @@ import arcadia.standalone.service.ArcadiaService.PROP_STANDALONE_WEB_APPLICATION
  *  version Oct. 23, 2022
  *  version Nov. 27, 2022
  *  version Dec. 25, 2022
- * @version Mar. 13, 2025
+ * @version Mar. 19, 2025
  * @author  ASAMI, Tomoharu
  */
 class Arcadia(
@@ -64,7 +65,10 @@ class Arcadia(
         // TODO merge webRule
         val templateengines = {
           val a = webEngineConfig.templateEngineHangarFactory.create(platformContext)
-          val b = TemplateEngineHangar(new ScalateTemplateEngine(platformContext))
+          val b = if (webEngineConfig.useScalate)
+            TemplateEngineHangar(new ScalateTemplateEngine(platformContext))
+          else
+            TemplateEngineHangar(new PugTemplateEngine(platformContext))
           a + b
         }
         val r = new WebEngine(

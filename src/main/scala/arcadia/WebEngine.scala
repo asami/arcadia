@@ -38,7 +38,7 @@ import arcadia.domain.DomainModelSpace
  *  version Oct. 23, 2022
  *  version Dec. 25, 2022
  *  version Jan.  1, 2023
- * @version Mar. 15, 2025
+ * @version Mar. 18, 2025
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -169,9 +169,11 @@ object WebEngine {
   case class Config(
     templateEngineHangarFactory: TemplateEngineHangar.Factory = TemplateEngineHangar.Factory.empty,
     domainModelFactory: DomainModelSpace.Factory = DomainModelSpace.Factory.empty,
-    services: Seq[Service] = Nil
+    services: Seq[Service] = Nil,
+    useScalate: Boolean = true
   )
   object Config {
     val empty = Config()
+    val standalone = Config(useScalate = false)
   }
 }

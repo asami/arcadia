@@ -47,7 +47,7 @@ import arcadia.domain.DomainModelSpace
  *  version Apr. 30, 2023
  *  version Jun. 22, 2023
  *  version Dec. 30, 2023
- * @version Mar. 15, 2025
+ * @version Mar. 30, 2025
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -59,6 +59,8 @@ case class WebApplication(
   domain: DomainModel,
   rootFile: Option[File]
 ) {
+  import WebApplication.realmConfig
+
   def getLocale = config.getLocale
   def extend: List[String] = config.extend getOrElse Nil
   def basePath: String = config.base_path getOrElse name // TODO Current usage is a kind of application id.
@@ -70,7 +72,7 @@ case class WebApplication(
 
   def withName(p: String) = copy(name = p)
 
-  lazy val getRealm = rootFile.map(Realm.create)
+  lazy val getRealm = rootFile.map(Realm.create(realmConfig, _))
 }
 
 object WebApplication {
@@ -85,7 +87,19 @@ object WebApplication {
 
   lazy val plain: WebApplication = plain(PlatformContext.develop)
 
-  val materialSuffixes = Set("html", "png", "jpg", "jpeg", "gif", "apng", "webp", "avif", "css", "js")
+  val realmConfig = Realm.Builder.Config.default.copy(
+    isStrict = true,
+    textSuffixes = Set("dox", "md", "markdown", "org", "html", "jade", "pub", "ssp", "scaml", "mustache"),
+    binarySuffixes = Set(
+      "png", "jpg", "jpeg", "gif", "apng", "webp", "svg", "avif", "css", "js",
+      "woff2", "woff", "ttf", "eof"
+    )
+  )
+
+  // val materialSuffixes = Set(
+  //   "html", "png", "jpg", "jpeg", "gif", "apng", "webp", "svg", "avif", "css", "js",
+  //   "woff2", "woff", "ttf", "eof"
+  // )
 
   def plain(platform: PlatformContext) = {
     val basedir = platform.getDevelopDirectory

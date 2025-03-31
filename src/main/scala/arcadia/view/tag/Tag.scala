@@ -13,6 +13,7 @@ import org.goldenport.record.v2.{Schema, Column, Invalid, Warning}
 import org.goldenport.i18n.{I18NElement, I18NString}
 import org.goldenport.trace.Result
 import org.goldenport.values.PathName
+import org.goldenport.util.StringUtils
 import arcadia._
 import arcadia.context._
 import arcadia.view._
@@ -36,7 +37,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Apr. 18, 2020
  *  version Feb. 27, 2022
  *  version Mar. 30, 2022
- * @version May.  4, 2022
+ *  version May.  4, 2022
+ * @version Mar. 28, 2025
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -208,8 +210,7 @@ case object ContentTag extends Tag with SelectByName {
   val name = "content"
 
   protected def eval_Expression(p: Expression): XmlContent = {
-    val model = p.effectiveModel
-    p.applyModel(model)
+    XmlContent(p.viewModel.content)
   }
 }
 
@@ -436,5 +437,106 @@ case object TimeTag extends Tag with SelectByName {
   protected def eval_Expression(p: Expression): XmlContent = {
     val dt = p.service.time
     XmlContent.text(dt.print)
+  }
+}
+
+/*
+ * Layout Tags
+ */
+case object HeadDefTag extends Tag with SelectByName {
+  val name = "head-def"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.headDef)
+  }
+}
+
+case object FootDefTag extends Tag with SelectByName {
+  val name = "foot-def"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.footDef)
+  }
+}
+
+case object HeaderTag extends Tag with SelectByName {
+  val name = "header"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.header)
+  }
+}
+
+case object FooterTag extends Tag with SelectByName {
+  val name = "footer"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.footer)
+  }
+}
+
+case object SidebarTag extends Tag with SelectByName {
+  val name = "sidebar"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.sidebar)
+  }
+}
+
+case object NavigationTag extends Tag with SelectByName {
+  val name = "navigation"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.navigation)
+  }
+}
+
+case object ContentHeaderTag extends Tag with SelectByName {
+  val name = "content-header"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.contentHeader)
+  }
+}
+
+case object ContentMainTag extends Tag with SelectByName {
+  val name = "content-main"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.contentContent)
+  }
+}
+
+case object PageTitleTag extends Tag with SelectByName {
+  val name = "page-title"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.pageTitle)
+  }
+}
+
+case object LinkTag extends Tag with SelectByName {
+  val name = "link"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val assets = p.viewModel.assets
+    val path = p.take("path", "Missing path")
+    val src = StringUtils.concatPath(assets, path)
+    val rel = p.get("rel") getOrElse ""
+    val xml = <link href={src} type={rel}/>
+    XmlContent(xml)
+  }
+}
+
+case object ScriptTag extends Tag with SelectByName {
+  val name = "script"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val assets = p.viewModel.assets
+    val path = p.take("path", "Missing path")
+    val src = StringUtils.concatPath(assets, path)
+    val t = p.get("type") getOrElse ""
+    val xml = <script src={src} type={t}/>
+    XmlContent(xml)
   }
 }

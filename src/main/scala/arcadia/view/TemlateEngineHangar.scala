@@ -2,11 +2,15 @@ package arcadia.view
 
 import scala.xml._
 import org.fusesource.scalate.TemplateSource
+import org.fusesource.scalate.util.{StringResource, Resource}
+import org.goldenport.xml.XhtmlUtils
 import arcadia.context._
+
 
 /*
  * @since   Sep. 10, 2022
- * @version Sep. 10, 2022
+ *  version Sep. 10, 2022
+ * @version Mar. 19, 2025
  * @author  ASAMI, Tomoharu
  */
 case class TemplateEngineHangar(
@@ -18,10 +22,16 @@ case class TemplateEngineHangar(
     for (x <- engines)
       x.shutdown()
 
-  def layoutAsNodes(template: TemplateSource, bindings: Map[String, Object]): NodeSeq =
+  def layoutAsNodes(template: TemplateSource, bindings: ViewEngine.Bindings): NodeSeq =
     engines.toStream.filter(_.isAccept(template)).headOption.
       map(_.layoutAsNodes(template, bindings)).
-      getOrElse(???)
+      getOrElse(_parse_html(template))
+
+  private def _parse_html(template: TemplateSource): NodeSeq =
+    template match {
+      case m: StringResource => XhtmlUtils.parseFragmentNode(m.text)
+      case m: Resource => XhtmlUtils.parseFragmentNode(m.text) // TODO encoding
+    }
 }
 
 object TemplateEngineHangar {

@@ -18,7 +18,8 @@ import arcadia.model._
  *  version Mar. 31, 2020
  *  version Apr. 11, 2020
  *  version Mar.  5, 2022
- * @version Jun. 26, 2022
+ *  version Jun. 26, 2022
+ * @version Mar. 28, 2025
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -189,6 +190,7 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
     val b = a orElse strategy.getPage.map(_.title(locale))
     b.getOrElse(NodeSeq.Empty) // Text("No title")
   }
+  def pageHeaderStyle: String = "" // TODO
   def pageContentHeaderStyle: String = strategy.getPage.flatMap(_.contentHeaderStyle).getOrElse("background-image: url('assets/img/bg37.jpg') ;") // TODO
   def pageIsHeadText: Boolean = _page_is(_.isHeadText)
   def pageHeadText: String = _page_text(_.headText)
@@ -222,4 +224,14 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
     }
 
   def assets(path: String): String = StringUtils.concatPath(assets, path)
+
+  /*
+   * Properties for template engine
+   */
+  def bindings: Map[String, AnyRef] = Map(
+    "assets" -> assets,
+    "body_class_name" -> bodyClassName,
+    "page_header_style" -> pageHeaderStyle,
+    "page_content_header_style" -> pageContentHeaderStyle
+  )
 }

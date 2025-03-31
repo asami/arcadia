@@ -3,15 +3,18 @@ package arcadia.view
 import scala.xml._
 import java.io.File
 import org.fusesource.scalate._
+import org.fusesource.scalate.util.FileResource
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2._
 import org.goldenport.value._
 import org.goldenport.values.PathName
+import org.goldenport.io.IoUtils
 import org.goldenport.trace.Result
 import org.goldenport.util.MapUtils
 import arcadia._
 import arcadia.context._
 import arcadia.view.tag._
+import arcadia.view.expression.ExpressionEngine
 import arcadia.model.{Model, ErrorModel}
 
 /*
@@ -30,7 +33,8 @@ import arcadia.model.{Model, ErrorModel}
  *  version Sep. 10, 2022
  *  version Nov. 27, 2022
  *  version Nov. 28, 2023
- * @version Dec. 28, 2023
+ *  version Dec. 28, 2023
+ * @version Mar. 29, 2025
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -112,9 +116,6 @@ class ViewEngine(
   }
 
   def getLayout(parcel: Parcel): Option[LayoutView] = {
-    def getlayout(kind: LayoutKind) = rule.getLayout(kind).orElse(
-      extend.toStream.flatMap(_.rule.getLayout(kind)).headOption
-    )
     val layout =
       if (is_spa(parcel))
         Some(DefaultLayout)
@@ -126,8 +127,8 @@ class ViewEngine(
         )
     layout match {
       case Some(NoneLayout) => None
-      case Some(m) => getlayout(m) orElse getlayout(DefaultLayout)
-      case None => getlayout(DefaultLayout)
+      case Some(m) => getLayout(m) orElse getLayout(DefaultLayout)
+      case None => getLayout(DefaultLayout)
     }
     // val uselayout = is_spa(parcel) || parcel.command.map(_.getUseLayout.getOrElse(true)).getOrElse(true)
     // if (uselayout)
@@ -135,6 +136,10 @@ class ViewEngine(
     // else
     //   None
   }
+
+  def getLayout(kind: LayoutKind): Option[LayoutView] = rule.getLayout(kind).orElse(
+    extend.toStream.flatMap(_.getLayout(kind)).headOption
+  )
 
   protected def is_spa(parcel: Parcel): Boolean = parcel.command.map {
     case m: MaterialCommand => rule.isSinglePageApplication(m.pathname.v)
@@ -148,33 +153,8 @@ class ViewEngine(
     }.getOrElse(false)
 
   private val _template_engine = templateEngines // new ScalateTemplateEngine(platform)
-
-//   private val _template_engine = {
-//     val a = new TemplateEngine()
-//     a.workingDirectory = platform.createTempDirectory()
-//     // a.workingDirectory = { // TODO
-//     //   val tmp = new java.io.File("/tmp")
-//     //   val f = java.io.File.createTempFile("everforth", ".dir", tmp)
-//     //   f.delete
-//     //   f.mkdirs
-//     //   f
-//     // }
-//     a.mode = "develop"
-//     a.allowReload = true // TODO
-// //    a.escapeMarkup = false // style="background-image: url('assets/img/bg37.jpg') ;"
-//     a.importStatements = a.importStatements ::: List(
-//       "import arcadia.view._",
-//       "import arcadia.model._",
-//       "import arcadia.domain._"
-//     )
-//     a
-//   }
-
   private val _tag_engine = new TagEngine(tags)
-
-  // def apply(parcel: Parcel): Content = rule.findView(parcel).map(_.apply(this, parcel)) getOrElse {
-  //   WebViewNotFoundFault(parcel.toMessage).RAISE
-  // }
+  private val _expression_engine = new ExpressionEngine()
 
   def apply(p: Parcel): Content = applyOption(p) getOrElse {
     error(p, 404)
@@ -296,7 +276,10 @@ class ViewEngine(
       val page = x
       page.apply(this, p.withModel(m).withView(x)).withCode(m.code)
     }.getOrElse {
-      p.render.fold(RAISE.noReachDefect)(m.apply)
+      p.render match {
+        case Some(s) => m.apply(s)
+        case None => m.RAISE
+      }
     }
   }
 
@@ -309,7 +292,7 @@ class ViewEngine(
   // private def layout(template: TemplateSource, bindings: Map[String, Object]): String =
   //   _template_engine.layout(template, bindings)
 
-  def render(template: TemplateSource, bindings: Map[String, Object]): NodeSeq = {
+  def render(template: TemplateSource, parcel: Parcel, bindings: Bindings): NodeSeq = {
     // val keys = bindings.keySet
     // val meta = Vector(
     //   Binding(PROP_VIEW_MODEL, "_root_.arcadia.view.ViewModel", true, None, "val", false),
@@ -321,6 +304,7 @@ class ViewEngine(
     //  // Binding(PROP_VIEW_RECORD, "_root_.arcadia.view.ViewRecords", true, None, "val", false)
     // ).filter(x => keys.contains(x.name))
     // _template_engine.layoutAsNodes(template.uri, bindings, meta)
+    implicit val pec = parcel.getPlatformExecutionContext getOrElse RAISE.noReachDefect
     val r = _template_engine.layoutAsNodes(template, bindings)
     // if (true)
     //   _template_engine.invalidateCachedTemplates()
@@ -328,8 +312,10 @@ class ViewEngine(
     r
   }
 
-  def eval(parcel: Parcel, p: Content): Content = _tag_engine.call(parcel).apply(p)
-
+  def eval(parcel: Parcel, p: Content, bindings: Bindings): Content = {
+    val a = _tag_engine.call(parcel, bindings).apply(p)
+    _expression_engine.apply(parcel, bindings, a)
+  }
 }
 object ViewEngine {
   // Scalate uses variable context.
@@ -451,5 +437,56 @@ object ViewEngine {
     val name = "plain"
   }
   case class PageLayout(name: String) extends LayoutKind {
+  }
+
+  case class Bindings(
+    bindings: Map[String, AnyRef]
+  ) {
+    import scala.collection.JavaConverters._
+
+    def viewModel: ViewModel = _get_view_model_keys("model", "it", "view") getOrElse RAISE.noReachDefect
+
+    private def _get_view_model_keys(key: String, keys: String*): Option[ViewModel] =
+      (key +: keys).toStream.flatMap(_get_view_model).headOption
+
+    private def _get_view_model(key: String): Option[ViewModel] =
+      bindings.get(key).flatMap {
+        case m: ViewModel => Some(m)
+        case m => None
+      }
+
+    def javaMap: java.util.Map[String, Object] = bindings.asJava
+  }
+
+  def evalExpression(
+    p: TemplateSource,
+    bindings: Bindings
+  )(implicit pec: PlatformExecutionContext): TemplateSource = {
+    p match {
+      case m: FileResource => evalExpressionFile(m, bindings)
+    }
+  }
+
+  def evalExpressionFile(
+    p: FileResource,
+    bindings: Bindings
+  )(implicit pec: PlatformExecutionContext): TemplateSource = {
+    val uri = p.uri
+    val x = IoUtils.toText(p.file, pec.charsetInputFile)
+    val s = evalExpression(x, bindings)
+    TemplateSource.fromText(uri, s)
+  }
+
+  def evalExpression(s: String, bindings: Bindings): String = {
+    import org.apache.commons.jexl3._
+    import scala.util.matching.Regex
+    val context = new MapContext(bindings.javaMap)
+    val jexl = new JexlBuilder().create()
+    val pattern: Regex = """\$\{([^}]+)\}""".r
+    pattern.replaceAllIn(s, m => {
+      val expr = jexl.createExpression(m.group(1).trim) 
+      val result = expr.evaluate(context)
+      result.toString
+    })
   }
 }

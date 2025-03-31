@@ -1,6 +1,7 @@
 package arcadia.view.tag
 
 import scalaz.{Node => _, _}, Scalaz._
+import scala.util.control.NonFatal
 import scala.xml._
 import java.net.URI
 import org.goldenport.Strings
@@ -27,28 +28,27 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  *  version Feb. 27, 2022
  *  version Mar. 30, 2022
  *  version May.  4, 2022
- * @version Oct.  1, 2022
+ *  version Oct.  1, 2022
+ * @version Mar. 21, 2025
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
   tags: Tags
 ) {
-  def call(parcel: Parcel): Call = Call(parcel)
+  def call(parcel: Parcel, bindings: ViewEngine.Bindings): Call = Call(parcel, bindings)
 
-  case class Call(parcel: Parcel) {
-    // def apply(p: Content): Content = parcel.executeWithTrace(s"TagEngine#apply", p.show) {
-    //   val r = p match {
-    //     case m: XmlContent => _apply(m)
-    //     case m => m
-    //   }
-    //   Result(r, r.show)
-    // }
-
-    def apply(p: Content): Content =
+  case class Call(
+    parcel: Parcel,
+    bindings: ViewEngine.Bindings
+  ) {
+    def apply(p: Content): Content = try {
       p match {
         case m: XmlContent => _apply(m).withCode(p.code)
         case m => m
       }
+    } catch {
+      case NonFatal(e) => ExceptionContent(e)
+    }
 
     private def _apply(p: XmlContent): XmlContent = p.xml match {
       case m: Text => p
@@ -102,7 +102,7 @@ class TagEngine(
     }
 
     private def _eval_element(p: Elem, children: Seq[XmlContent]): Option[XmlContent] = {
-      val expr = Expression(_normalize(p), children, parcel)
+      val expr = Expression(_normalize(p), children, parcel, bindings)
       tags.stream.flatMap(_.eval(expr)).headOption orElse Some(XmlContent(expr.element))
     }
 
@@ -160,14 +160,27 @@ object Tags {
     //
     DateTimeTag,
     DateTag,
-    TimeTag
+    TimeTag,
+    //
+    HeadDefTag,
+    FootDefTag,
+    HeaderTag,
+    FooterTag,
+    SidebarTag,
+    NavigationTag,
+    ContentHeaderTag,
+    ContentMainTag,
+    PageTitleTag,
+    LinkTag,
+    ScriptTag
   ))
 }
 
 case class Expression(
   elem: Elem,
   children: Seq[XmlContent],
-  parcel: Parcel
+  parcel: Parcel,
+  bindings: ViewEngine.Bindings
 ) {
   def prefix = elem.prefix
   def label = elem.label
@@ -225,6 +238,8 @@ case class Expression(
     case Some(s) => getModel(s)
     case None => getModel
   }
+
+  def viewModel: ViewModel = bindings.viewModel
 
   def applyModel: XmlContent = {
     val c = engine.applyComponentOption(parcel) getOrElse {

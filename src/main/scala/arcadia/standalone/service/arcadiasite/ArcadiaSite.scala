@@ -1,6 +1,7 @@
 package arcadia.standalone.arcadiasite
 
 import java.io.File
+import java.nio.file.Paths
 import com.typesafe.config.{Config => Hocon}
 import org.goldenport.RAISE
 import org.goldenport.context.Showable
@@ -10,13 +11,14 @@ import org.goldenport.tree.TreeTransformer
 import org.goldenport.tree.TreeTransformer.Directive
 import org.goldenport.realm.Realm
 import org.goldenport.realm.RealmTransformer
+import org.goldenport.util.StringUtils
 import arcadia._
 import arcadia.context._
 import arcadia.standalone.service.ArcadiaService.PROP_STANDALONE_WEB_APPLICATION_NAME
 
 /*
  * @since   Mar. 10, 2025
- * @version Mar. 15, 2025
+ * @version Mar. 21, 2025
  * @author  ASAMI, Tomoharu
  */
 case class ArcadiaSite(
@@ -37,7 +39,13 @@ object ArcadiaSite {
     realmTransformerContext: RealmTransformer.Context,
     engine: WebEngine
   ) extends RealmTransformer {
-    override protected def make_Node(node: TreeNode[Realm.Data], content: Realm.Data): Directive[Realm.Data] = {
+    override protected def make_Node(node: TreeNode[Realm.Data]) : Directive[Realm.Data] =
+      node.name match {
+        case "WEB-INF" => directive_empty
+        case _ => directive_default
+      }
+
+    override protected def make_Node(node: TreeNode[Realm.Data], content: Realm.Data): Directive[Realm.Data] =
       content match {
         case Realm.EmptyData => Directive.Empty()
         case m: Realm.StringData => _transform(node, m)
@@ -47,12 +55,13 @@ object ArcadiaSite {
         case m: Realm.ObjectData => RAISE.notImplementedYetDefect
         case m: Realm.ApplicationData => RAISE.notImplementedYetDefect
       }
-    }
 
     private def _transform(node: TreeNode[Realm.Data], p: Realm.StringData): Directive[Realm.Data] = {
       node.getNameSuffix match {
         case Some(s) => s match {
           case "html" => _transform_page(node, p)
+          case "jade" => _transform_page(node, p)
+          case "pug" => _transform_page(node, p)
           case _ => Directive.AsIs()
         }
         case None => Directive.Default()
@@ -60,17 +69,19 @@ object ArcadiaSite {
     }
 
     private def _transform_page(node: TreeNode[Realm.Data], p: Realm.StringData): Directive[Realm.Data] = {
-      val name = node.name
-      val pathname = _to_relative(node.pathname)
+//      val name = node.name
+      val pathname0 = _to_relative(node.pathname)
+      val pathname = StringUtils.toPathnameBody(pathname0) + ".html"
 //      val parcel: Parcel = Parcel.view(platformExecutionContext, pathname)
       val parcel: Parcel = Parcel.material(platformExecutionContext, pathname)
       val c = engine.apply(parcel)
+      val filename = Paths.get(pathname).getFileName.toString
       c match {
-        case m: StringContent => directive_leaf(Realm.StringData(m.string))
-        case m: XmlContent => directive_leaf(Realm.StringData(m.toHtmlString))
-        case m: BinaryContent => directive_leaf(Realm.BagData(m.binary))
+        case m: StringContent => directive_node(filename, Realm.StringData(m.string))
+        case m: XmlContent => directive_node(filename, Realm.StringData(m.toHtmlString))
+        case m: BinaryContent => directive_node(filename, Realm.BagData(m.binary))
         case m: RedirectContent => RAISE.notImplementedYetDefect
-        case m: ErrorContent => RAISE.notImplementedYetDefect
+        case m: ErrorContent => directive_node(filename + ".error", Realm.StringData(m.show))
       }
     }
 
@@ -83,7 +94,7 @@ object ArcadiaSite {
     libs: Seq[InputSource],
     realm: Realm
   ): ArcadiaSite = {
-    println(s"libs: ${libs}")
+    // println(s"libs: ${libs}")
     val ctx = RealmTransformer.Context.default
     val arcadia = createArcadia(pec.platformContext, config, libs, List(realm))
     val engine = createEngine(arcadia, PROP_STANDALONE_WEB_APPLICATION_NAME)
@@ -103,7 +114,7 @@ object ArcadiaSite {
     libs: Seq[InputSource],
     standalones: Seq[Realm]
   ) = {
-    val webengineconfig = WebEngine.Config.empty
+    val webengineconfig = WebEngine.Config.standalone
     Arcadia.make(pc, webengineconfig, config, libs, standalones).take
   }
 }

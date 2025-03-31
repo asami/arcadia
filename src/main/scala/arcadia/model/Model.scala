@@ -50,7 +50,8 @@ import arcadia.domain._
  *  version Nov.  6, 2022
  *  version Mar. 30, 2023
  *  version Jun. 23, 2023
- * @version Oct. 31, 2023
+ *  version Oct. 31, 2023
+ * @version Mar. 29, 2025
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -399,15 +400,21 @@ case class ErrorModel(
 ) extends Model {
   def code = conclusion.code
   def message: Option[I18NElement] = element orElse Some(I18NElement(conclusion.messageI18N))
-  def exception = conclusion.exception
+  def exception: Option[Throwable] = conclusion.exception
   val expiresKind = Some(NoCacheExpires)
-  def toRecord: IRecord = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = org.goldenport.exception.RAISE.notImplementedYetDefect
   override def apply(strategy: RenderStrategy): Content = XmlContent(render(strategy), expiresKind, code)
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, None
   ) {
     protected def render_Content: NodeSeq = error(code, message, exception, invalid, topUri, backUri, trace)
   }.apply
+
+  def RAISE: Nothing = {
+    val uri = backUri.fold("")(x => s"$x: ")
+    val msg = s"""${uri}${conclusion.message}"""
+    conclusion.withMessage(msg).RAISEC
+  }
 }
 object ErrorModel extends ModelClass {
   def apply(
@@ -471,7 +478,11 @@ object ErrorModel extends ModelClass {
     ErrorModel(401, None, None, None, None, backuri, parcel.trace)
   }
 
-  private def _back_uri(parcel: Parcel): Option[URI] = None // TODO
+  private def _back_uri(parcel: Parcel): Option[URI] =
+    parcel.command.flatMap {
+      case m: MaterialCommand => Some(new URI(m.pathname.v))
+      case _ => None
+    }
 
   def get(param: ModelParameter, response: Response): Option[Model] =
     if (response.code > 300)

@@ -23,6 +23,7 @@ import ViewEngine.{PROP_VIEW_SERVICE, PROP_VIEW_MODEL, PROP_VIEW_FORM}
 import ViewEngine.PROP_VIEW_PROPERTIES
 import ViewEngine.PROP_VIEW_IT
 import ViewEngine.Slot
+import ViewEngine.Bindings
 
 /*
  * @since   Jul. 15, 2017
@@ -40,7 +41,8 @@ import ViewEngine.Slot
  *  version May. 22, 2022
  *  version Oct.  1, 2022
  *  version Apr. 30, 2023
- * @version Jun. 25, 2023
+ *  version Jun. 25, 2023
+ * @version Mar. 20, 2025
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -65,44 +67,30 @@ abstract class View() {
 
   protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content =
     parcel.executeWithTrace(s"${show}#execute_apply", parcel.show) {
-      val c0 = execute_Apply(engine, parcel)
+      val bindings = _build_bindings(engine, parcel)
+      val c0 = execute_Apply(engine, parcel, bindings)
       val c = parcel.model.fold(c0) {
         case m: ErrorModel => c0.withCode(m.code)
         case _ => c0
       }
-      val r = engine.eval(parcel, c)
+      val r = engine.eval(parcel, c, bindings)
       Result(r, r.show)
     }
 
-  protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content
-}
+  protected def execute_Apply(
+    engine: ViewEngine,
+    parcel: Parcel,
+    bindings: Bindings
+  ): Content
 
-trait ModelViewBase[T <: Model] extends View {
-  def model: T
-  def guard: Guard = ModelNameGuard(model.featureName)
-  protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content = {
-    val p = parcel.forComponent(model)
-    def s = _strategy(engine, p)
-    engine.applyComponentOption(p) getOrElse model.apply(s)
-  }
+  private def _build_bindings(
+    engine: ViewEngine,
+    parcel: Parcel
+  ): ViewEngine.Bindings = ViewEngine.Bindings(
+    _build_bindings0(engine, parcel)
+  )
 
-  private def _strategy(engine: ViewEngine, parcel: Parcel) = parcel.render.map(_.forComponent(engine, parcel)) getOrElse {
-    RAISE.noReachDefect
-  }
-}
-
-abstract class TemplateViewBase(template: TemplateSource) extends View() {
-  def uri = template.uri
-  def sourceName: String = StringUtils.pathLastComponentBody(uri)
-
-  override def show_Info = StringUtils.shortUri(template.uri)
-
-  protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content = {
-    val bindings = _build_bindings(engine, parcel)
-    XmlContent(engine.render(template, bindings))
-  }
-
-  private def _build_bindings(engine: ViewEngine, parcel: Parcel): Map[String, AnyRef] = {
+  private def _build_bindings0(engine: ViewEngine, parcel: Parcel): Map[String, AnyRef] = {
     val strategy0 = parcel.render getOrElse PlainHtml
     val strategy = strategy0.withViewContext(engine, parcel)
     _model_bindings(strategy, parcel) ++
@@ -117,9 +105,10 @@ abstract class TemplateViewBase(template: TemplateSource) extends View() {
     val a = parcel.getEffectiveModel.map(model_bindings(strategy, _)) getOrElse {
       Map(PROP_VIEW_MODEL -> ViewModel(EmptyModel, strategy))
     }
-    a.get(PROP_VIEW_MODEL).
-      map(x => a + (PROP_VIEW_IT -> x)).
-      getOrElse(a)
+    a.get(PROP_VIEW_MODEL).fold(a) {
+      case m: ViewModel => (a + (PROP_VIEW_IT -> m)) ++ m.bindings
+      case m => a + (PROP_VIEW_IT -> m)
+    }
   }
 
   protected def model_bindings(strategy: RenderStrategy, model: Model): Map[String, AnyRef] =
@@ -139,16 +128,92 @@ abstract class TemplateViewBase(template: TemplateSource) extends View() {
       map(x => Map(PROP_VIEW_SERVICE -> ViewService(x, strategy, parcel.propertyModel))).
       getOrElse(Map.empty)
 
-  // Scalate uses variable context.
-  // private def _context_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
-  //   strategy.viewContext.
-  //     map(x => Map(PROP_VIEW_CONTEXT -> x)).
-  //     getOrElse(Map.empty)
-
   private def _properties_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
     (parcel.context orElse strategy.viewContext.flatMap(_.parcel.context)).
       map(x => Map(PROP_VIEW_PROPERTIES -> ViewProperties(x, strategy))).
       getOrElse(Map.empty)
+}
+
+trait ModelViewBase[T <: Model] extends View {
+  def model: T
+  def guard: Guard = ModelNameGuard(model.featureName)
+  protected def execute_Apply(
+    engine: ViewEngine,
+    parcel: Parcel,
+    bindings: Bindings
+  ): Content = {
+    val p = parcel.forComponent(model)
+    def s = _strategy(engine, p)
+    engine.applyComponentOption(p) getOrElse model.apply(s)
+  }
+
+  private def _strategy(engine: ViewEngine, parcel: Parcel) = parcel.render.map(_.forComponent(engine, parcel)) getOrElse {
+    RAISE.noReachDefect
+  }
+}
+
+abstract class TemplateViewBase(template: TemplateSource) extends View() {
+  def uri = template.uri
+  def sourceName: String = StringUtils.pathLastComponentBody(uri)
+
+  override def show_Info = StringUtils.shortUri(template.uri)
+
+  protected def execute_Apply(
+    engine: ViewEngine,
+    parcel: Parcel,
+    bindings: Bindings
+  ): Content = {
+//    val bindings = _build_bindings(engine, parcel)
+    XmlContent(engine.render(template, parcel, bindings))
+  }
+
+//   private def _build_bindings(engine: ViewEngine, parcel: Parcel): Map[String, AnyRef] = {
+//     val strategy0 = parcel.render getOrElse PlainHtml
+//     val strategy = strategy0.withViewContext(engine, parcel)
+//     _model_bindings(strategy, parcel) ++
+//     _form_bindings(strategy, parcel) ++
+//     property_Bindings(strategy) ++
+//     _service_bindings(strategy, parcel) ++
+//     _properties_bindings(strategy, parcel)
+// //    _context_bindings(strategy, parcel)
+//   }
+
+//   private def _model_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] = {
+//     val a = parcel.getEffectiveModel.map(model_bindings(strategy, _)) getOrElse {
+//       Map(PROP_VIEW_MODEL -> ViewModel(EmptyModel, strategy))
+//     }
+//     a.get(PROP_VIEW_MODEL).
+//       map(x => a + (PROP_VIEW_IT -> x)).
+//       getOrElse(a)
+//   }
+
+//   protected def model_bindings(strategy: RenderStrategy, model: Model): Map[String, AnyRef] =
+//     model.viewBindings(strategy)
+
+//   private def _form_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] = {
+//     val x = parcel.getEffectiveModel.collect {
+//       case m: FormModel => ViewForm(m, strategy)
+//     }.getOrElse(ViewForm.undefined(strategy))
+//     Map(PROP_VIEW_FORM -> x)
+//   }
+
+//   protected def property_Bindings(strategy: RenderStrategy): Map[String, AnyRef] = Map.empty
+
+//   private def _service_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
+//     (parcel.context orElse strategy.viewContext.flatMap(_.parcel.context)).
+//       map(x => Map(PROP_VIEW_SERVICE -> ViewService(x, strategy, parcel.propertyModel))).
+//       getOrElse(Map.empty)
+
+//   // Scalate uses variable context.
+//   // private def _context_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
+//   //   strategy.viewContext.
+//   //     map(x => Map(PROP_VIEW_CONTEXT -> x)).
+//   //     getOrElse(Map.empty)
+
+//   private def _properties_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] =
+//     (parcel.context orElse strategy.viewContext.flatMap(_.parcel.context)).
+//       map(x => Map(PROP_VIEW_PROPERTIES -> ViewProperties(x, strategy))).
+//       getOrElse(Map.empty)
 }
 
 case class TemplateView(
@@ -195,7 +260,11 @@ case class HtmlView(url: URL, pathname: Option[String] = None) extends View() {
 
   def sourceName: String = _pathname
 
-  protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content =
+  protected def execute_Apply(
+    engine: ViewEngine,
+    parcel: Parcel,
+    bindings: Bindings
+  ): Content =
     if (true)
       XmlContent.loadHtml(url)
     else
@@ -215,7 +284,11 @@ case class MaterialView(baseUrl: URL) extends View() {
     }
   }
 
-  protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content = {
+  protected def execute_Apply(
+    engine: ViewEngine,
+    parcel: Parcel,
+    bindings: Bindings
+  ): Content = {
     val c = parcel.takeCommand[MaterialCommand]
     val mime = {
       val a = for {
@@ -294,7 +367,11 @@ case class AssetView(baseUrl: URL) extends View() {
     }
   }
 
-  protected def execute_Apply(engine: ViewEngine, parcel: Parcel): Content = {
+  protected def execute_Apply(
+    engine: ViewEngine,
+    parcel: Parcel,
+    bindings: Bindings
+  ): Content = {
     val c = parcel.takeCommand[AssetsCommand]
     val mime = {
       val a = for {
@@ -456,7 +533,11 @@ case class EntityScenarioView(
       case m: PropertyShowFormModel => SAction.Show
     }
 
-  protected def execute_Apply(engine: ViewEngine, p: Parcel): Content = {
+  protected def execute_Apply(
+    engine: ViewEngine,
+    p: Parcel,
+    bindings: Bindings
+  ): Content = {
     val a = for {
       name <- _get_scenario_name(p.getOperationName)
       model <- p.model

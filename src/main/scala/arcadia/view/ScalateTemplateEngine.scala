@@ -7,7 +7,8 @@ import arcadia.context._
 
 /*
  * @since   May. 22, 2022
- * @version Sep. 10, 2022
+ *  version Sep. 10, 2022
+ * @version Mar. 19, 2025
  * @author  ASAMI, Tomoharu
  */
 class ScalateTemplateEngine(val platform: PlatformContext) extends TemplateEngine {
@@ -34,15 +35,15 @@ class ScalateTemplateEngine(val platform: PlatformContext) extends TemplateEngin
 
   def shutdown() = _scalate.shutdown()
 
-  def layout(template: TemplateSource, bindings: Map[String, Object]): String = {
-    val r = _scalate.layout(template, bindings)
+  def layout(template: TemplateSource, bindings: ViewEngine.Bindings): String = {
+    val r = _scalate.layout(template, bindings.bindings)
     // if (false)
     //   _refresh()
     r
   }
 
-  def layoutAsNodes(template: TemplateSource, bindings: Map[String, Object]): NodeSeq = {
-    val r = _scalate.layoutAsNodes(template.uri, bindings)
+  def layoutAsNodes(template: TemplateSource, bindings: ViewEngine.Bindings): NodeSeq = {
+    val r = _scalate.layoutAsNodes(template.uri, bindings.bindings)
     // if (flase)
     //   _refresh()
     r

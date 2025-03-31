@@ -11,6 +11,7 @@ import java.net.URL
 import java.io.OutputStream
 import org.joda.time.DateTime
 import org.goldenport.exception.RAISE
+import org.goldenport.context.Conclusion
 import org.goldenport.bag.{Bag, ChunkBag}
 import org.goldenport.io.IoUtils
 import org.goldenport.record.v2.Record
@@ -32,7 +33,8 @@ import arcadia.context.Session
  *  version Apr. 20, 2020
  *  version Feb. 27, 2022
  *  version Mar. 28, 2022
- * @version May. 28, 2022
+ *  version May. 28, 2022
+ * @version Mar. 21, 2025
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
@@ -328,6 +330,16 @@ case class NotFoundContent(pathname: String) extends ErrorContent {
   def code = 404
   val charset = None
   lazy val show = s"NotFoundContent: $pathname"
+}
+
+case class ExceptionContent(e: Throwable) extends ErrorContent {
+  val conclusion = Conclusion.make(e)
+  val code = conclusion.code
+  val charset = None
+  lazy val show = s"ExceptionContent: ${conclusion.message}"
+
+  override def asXml: NodeSeq = throw e
+  override def asXmlContent: XmlContent = throw e
 }
 
 // https://stackoverflow.com/questions/18148884/difference-between-no-cache-and-must-revalidate

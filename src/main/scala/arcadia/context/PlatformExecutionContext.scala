@@ -41,7 +41,7 @@ import arcadia.rule._
  *  version Feb. 28, 2022
  *  version May.  2, 2022
  *  version Nov. 27, 2022
- * @version Mar. 12, 2025
+ * @version Mar. 20, 2025
  * @author  ASAMI, Tomoharu
  */
 trait PlatformExecutionContext {
@@ -162,7 +162,7 @@ object PlatformExecutionContext {
     def inputQueryParameters: IRecord = Record.empty
     def inputFormParameters: IRecord = Record.empty
     def getFormParameter(key: String): Option[String] = None
-    def assets: String = RAISE.notImplementedYetDefect
+    def assets: String = "assets"
   }
   object StandalonePlatformExecutionContext {
     val develop = new StandalonePlatformExecutionContext(
