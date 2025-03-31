@@ -2,7 +2,7 @@ organization := "org.goldenport"
 
 name := "arcadia"
 
-version := "0.3.0"
+version := "0.3.1"
 
 scalaVersion := "2.10.3"
 // crossScalaVersions := Seq("2.10.39.2", "2.9.1")
@@ -28,7 +28,7 @@ resolvers += "GitHub Packages" at "https://maven.pkg.github.com/asami/maven-repo
 resolvers += "Asami Maven Repository" at "http://www.asamioffice.com/maven"
 
 // override goldenport-record
-libraryDependencies += "org.goldenport" %% "goldenport-scala-lib" % "1.4.1"
+libraryDependencies += "org.goldenport" %% "goldenport-scala-lib" % "1.4.2"
 
 libraryDependencies += "org.goldenport" %% "goldenport-record" % "1.4.0"
 
@@ -37,6 +37,8 @@ libraryDependencies += "com.typesafe.play" %% "play-json" % "2.2.2" % "provided"
 libraryDependencies += "org.scalatra.scalate" %% "scalate-core" % "1.8.0"
 
 libraryDependencies += "org.fusesource.scalamd" %% "scalamd" % "1.6"
+
+libraryDependencies += "de.neuland-bfi" % "pug4j" % "2.3.1"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.6" % "test"
 
