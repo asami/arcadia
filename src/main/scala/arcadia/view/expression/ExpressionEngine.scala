@@ -17,7 +17,8 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
 
 /*
  * @since   Mar. 21, 2025
- * @version Mar. 21, 2025
+ *  version Mar. 21, 2025
+ * @version Apr.  1, 2025
  * @author  ASAMI, Tomoharu
  */
 class ExpressionEngine(
@@ -96,7 +97,10 @@ class ExpressionEngine(
       case m: Text => Some(XmlContent(p))
       case m: Elem =>
         val xs = m.child.flatMap(eval_node)
-        eval_element(m, xs)
+        // println(s"${xs}")
+        val r = eval_element(m, xs)
+        // println(s"${m} => ${r}")
+        r
       case m: SpecialNode => Some(XmlContent(p))
       case Group(xs) => if (xs.isEmpty) None else Some(to_xml_content(xs.flatMap(eval_node)))
       case m if m.length > 0 => Some(to_xml_content(m.toList.flatMap(eval_node)))
@@ -108,8 +112,13 @@ class ExpressionEngine(
       eval_Element(elem, children)
     }
 
-    protected def eval_Element(p: Elem, children: Seq[XmlContent]): Option[XmlContent] =
-      Some(XmlContent(p))
+    protected def eval_Element(p: Elem, children: Seq[XmlContent]): Option[XmlContent] = {
+      val xs = children.map(_.xml).map {
+        case m: Node => m
+        case m: NodeSeq => RAISE.noReachDefect("eval_Element")
+      }
+      Some(XmlContent(p.copy(child = xs)))
+    }
 
     protected def eval_attributes(p: Elem): Elem = p.copy(attributes = eval_attributes(p.attributes))
 

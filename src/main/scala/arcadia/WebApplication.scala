@@ -47,7 +47,8 @@ import arcadia.domain.DomainModelSpace
  *  version Apr. 30, 2023
  *  version Jun. 22, 2023
  *  version Dec. 30, 2023
- * @version Mar. 30, 2025
+ *  version Mar. 30, 2025
+ * @version Apr.  4, 2025
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -308,8 +309,8 @@ object WebApplication {
         WebApplication(applicationname, version, config, controller, view, domainmodel, rootfile)
       }
 
-      private def _is_view(s: String, t: T): Boolean =
-        s === namebody(t) && _is_view(t)
+      private def _is_view(partialname: String, t: T): Boolean =
+        partialname === namebody(t) && _is_view(t)
 
       private def _is_view(t: T): Boolean = getNameSuffix(t).fold(false)(suffix =>
         WebModule.templateSuffixes.contains(suffix) ||
@@ -342,12 +343,14 @@ object WebApplication {
           def +(rhs: T) = {
             LayoutKind.elements.find(x => _is_view(x.name, rhs)).
               map(x =>
-                Z(r + (x -> LayoutView(to_template_source(rhs))))
+                copy(r + (x -> LayoutView(x, to_template_source(rhs))))
               ).getOrElse(
-                if (_is_view(rhs))
-                  Z(r + (PageLayout(namebody(rhs)) -> LayoutView(to_template_source(rhs))))
-                else
+                if (_is_view(rhs)) {
+                  val layout = PageLayout(namebody(rhs))
+                  copy(r + (layout -> LayoutView(layout, to_template_source(rhs))))
+                } else {
                   this
+                }
               )
           }
         }
@@ -356,16 +359,83 @@ object WebApplication {
       }
 
       protected def build_partials: Partials = {
-        case class Z(m: Map[PartialKind, PartialView] = Map.empty) {
-          val r = Partials(m)
+        case class Z(
+          default: Map[PartialKind, PartialView] = Map.empty,
+          layout: Map[LayoutKind, Map[PartialKind, PartialView]] = Map.empty
+        ) {
+          def r = Partials(default, layout)
+
           def +(rhs: T) = {
-            PartialKind.elements.find(x => _is_view(x.name, rhs)).
-              fold(this)(x => Z(m + (x -> PartialView(to_template_source(rhs)))))
+            case class ZZ(
+              d: Map[PartialKind, PartialView] = Map.empty,
+              l: Map[LayoutKind, Map[PartialKind, PartialView]] = Map.empty
+            ) {
+              def r = Z.this.copy(default = default ++ d, layout = layout ++ l)
+
+              def +(x: PartialKind) = {
+                if (_is_view(x.name, rhs))
+                  copy(d = d + (x -> PartialView(to_template_source(rhs))))
+                else if (_is_per_layout(rhs))
+                  copy(l = _merge(l, _per_layout(x, rhs)))
+                else
+                  this
+              }
+            }
+            PartialKind.elements./:(ZZ())(_+_).r
+          }
+
+          private def _merge(
+            lhs: Map[LayoutKind, Map[PartialKind, PartialView]],
+            rhs: Map[LayoutKind, Map[PartialKind, PartialView]]
+          ): Map[LayoutKind, Map[PartialKind, PartialView]] = {
+            val keys = (lhs.keys ++ rhs.keys).toVector.distinct
+            keys.foldLeft(Map.empty[LayoutKind, Map[PartialKind, PartialView]]) { (z, x) =>
+              val a: Map[LayoutKind, Map[PartialKind, PartialView]] = (lhs.get(x), rhs.get(x)) match {
+                case (Some(l), None) => Map(x -> l)
+                case (None, Some(r)) => Map(x -> r)
+                case (Some(l), Some(r)) => Map(x -> (l ++ r))
+                case (None, None) => Map.empty
+              }
+              z ++ a
+            }
           }
         }
         get_pathnode(PathName("WEB-INF/partials")).
           map(x => to_children(x)./:(Z())(_+_).r).getOrElse(Partials.empty)
       }
+
+      private def _is_per_layout(t: T): Boolean = is_directory(t)
+
+      private def _per_layout(p: PartialKind, t: T): Map[LayoutKind, Map[PartialKind, PartialView]] =
+        LayoutKind.get(name(t)) match {
+          case None => Map.empty
+          case Some(s) => _per_layout(s, p, t)
+        }
+
+      private def _per_layout(
+        l: LayoutKind,
+        p: PartialKind,
+        t: T
+      ): Map[LayoutKind, Map[PartialKind, PartialView]] = {
+        case class Z(xs: Map[PartialKind, PartialView] = Map.empty) {
+          def r = Map(l -> xs)
+
+          def +(rhs: T) = {
+            val x = _to_partial_view_map(rhs)
+            copy(xs = xs ++ x)
+          }
+        }
+
+        to_children(t)./:(Z())(_+_).r
+      }
+
+      private def _to_partial_view_map(rhs: T): Map[PartialKind, PartialView] =
+        PartialKind.elements.foldLeft(Map.empty[PartialKind, PartialView]) { (z, x) =>
+          if (_is_view(x.name, rhs))
+            z ++ Map(x -> PartialView(to_template_source(rhs)))
+          else
+            z
+        }
 
       protected def build_pages: Pages = {
         case class Z(views: Vector[(PathName, View)] = Vector.empty) {
@@ -568,7 +638,7 @@ object WebApplication {
           this
       }
       protected def html_view(p: T): (Guard, View) =
-        HtmlView(to_url(p)).gv
+        HtmlView(to_url(p), pathname(p)).gv
 
       protected def template_view(p: T): (Guard, View) = {
         val src = to_template_source(p)

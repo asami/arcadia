@@ -8,6 +8,7 @@ import arcadia._
 import arcadia.context.{Query => CQuery, ExecutionContext}
 import arcadia.domain._
 import arcadia.model._
+import arcadia.view.ViewEngine.LayoutKind
 
 /*
  * @since   Aug.  2, 2017
@@ -19,7 +20,8 @@ import arcadia.model._
  *  version Apr. 11, 2020
  *  version Mar.  5, 2022
  *  version Jun. 26, 2022
- * @version Mar. 28, 2025
+ *  version Mar. 28, 2025
+ * @version Apr.  4, 2025
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -80,16 +82,25 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   /*
    * Partial
    */
-  def headDef: NodeSeq = _render_partial(strategy.partials.headDef)
-  def footDef: NodeSeq = _render_partial(strategy.partials.footDef)
-  def header: NodeSeq = _render_partial(strategy.partials.header)
-  def footer: NodeSeq = _render_partial(strategy.partials.footer)
-  def sidebar: NodeSeq = _render_partial(strategy.partials.sidebar)
-  def sidebarContent: NodeSeq = strategy.theme.sidebar.content(this)
-  def navigation: NodeSeq = _render_partial(strategy.partials.navigation)
+  def headDef(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.headDef(l))
+  def headDef(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.headDef(l))
+  def footDef(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.footDef(l))
+  def footDef(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.footDef(l))
+  def header(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.header(l))
+  def header(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.header(l))
+  def footer(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.footer(l))
+  def footer(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.footer(l))
+  def sidebar(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.sidebar(l))
+  def sidebar(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.sidebar(l))
+  def sidebarContent(l: LayoutKind): NodeSeq = strategy.theme.sidebar.content(this)
+  def sidebarContent(l: Option[LayoutKind]): NodeSeq = strategy.theme.sidebar.content(this)
+  def navigation(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.navigation(l))
+  def navigation(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.navigation(l))
   def navigationContent: NodeSeq = strategy.theme.navigation.content(this)
-  def contentHeader: NodeSeq = _render_partial(strategy.partials.contentHeader)
-  def content: NodeSeq = _render_partial(strategy.partials.content, contentContent)
+  def contentHeader(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.contentHeader(l))
+  def contentHeader(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.contentHeader(l))
+  def content(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.content(l), contentContent)
+  def content(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.content(l), contentContent)
   def contentContent: NodeSeq = main
 
   private def main: NodeSeq = contentDocument.headOption.
@@ -131,7 +142,7 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
     case m: IAtomicModel => render_view_atomic(m)
     case EmptyModel => <div>No content</div>
   }
-  def partial(p: PartialKind): NodeSeq = _render_partial(strategy.partials.get(p))
+//  def partial(p: PartialKind): NodeSeq = _render_partial(strategy.partials.get(, p))
 
   private def _render_partial(p: PartialView): NodeSeq = 
     strategy.viewContext.fold {
@@ -218,10 +229,25 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
     }
   }
 
-  def assets: String =
-    strategy.viewContext.flatMap(_.parcel.context.map(_.assets)) getOrElse {
+  def assets: String = {
+    val pathOption: Option[String] = strategy.viewContext.
+      flatMap(_.parcel.view).
+      flatMap {
+        case m: HtmlView => m.pathname.flatMap { x =>
+          val pn = PathName(x)
+          val depth = pn.length - 1
+          if (depth <= 0)
+            None
+          else 
+            Some("../" * depth)
+        }
+      }
+    val path = pathOption getOrElse "./"
+    val base = strategy.viewContext.flatMap(_.parcel.context.map(_.assets)) getOrElse {
       "assets"
     }
+    s"$path$base"
+  }
 
   def assets(path: String): String = StringUtils.concatPath(assets, path)
 

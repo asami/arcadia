@@ -15,7 +15,8 @@ import arcadia.standalone.service.generators.ArcadiaSiteGenerator
 
 /*
  * @since   Mar. 10, 2025
- * @version Mar. 15, 2025
+ *  version Mar. 15, 2025
+ * @version Apr.  2, 2025
  * @author  ASAMI, Tomoharu
  */
 case object SiteOperationClass extends OperationClassWithOperation {
@@ -32,7 +33,12 @@ case object SiteOperationClass extends OperationClassWithOperation {
   def execute(env: Environment, cmd: SiteCommand): SiteResult = {
     val pce = PlatformExecutionContext.develop // TODO
     val config = cmd.config
-    val realm = Realm.create(cmd.in)
+    val realm = {
+      cmd.in.map(Realm.create) match {
+        case x :: Nil => x
+        case x :: xs => xs.foldLeft(x)((z, a) => z + a)
+      }
+    }
     val libs = cmd.library
     val ctx = ArcadiaContext.create(env, pce, config, libs)
     val site = new ArcadiaSiteGenerator(ctx)
@@ -47,22 +53,25 @@ case object SiteOperationClass extends OperationClassWithOperation {
   }
 
   case class SiteCommand(
-    in: File,
+    in: List[File],
     config: Hocon,
-    library: List[InputSource]
+    library: List[InputSource],
+    output: Option[File]
   ) extends Command {
   }
   object SiteCommand {
     object params {
-      val in = spec.Parameter.argumentFile("in")
+      val in = spec.Parameter.argumentFiles("in")
       val config = spec.Parameter.propertyConfigFileOrEmpty()
       val library = spec.Parameter.propertyInputSourceSequence("library")
+      val output = spec.Parameter.propertyFileOption("output")
     }
 
     def specification: spec.Request = spec.Request(
       params.in,
       params.config,
-      params.library
+      params.library,
+      params.output
     )
 
     def create(req: Request): SiteCommand =
@@ -70,11 +79,12 @@ case object SiteOperationClass extends OperationClassWithOperation {
 
     def cCreate(req: Request): Consequence[SiteCommand] = {
       for {
-        in <- req.cFile(params.in)
+        in <- req.cFiles(params.in)
         config <- req.cConfigOrZero(params.config)
         library <- req.cInputSourceList(params.library)
+        output <- req.cFileOption(params.output)
       } yield {
-        SiteCommand(in, config, library)
+        SiteCommand(in, config, library, output)
       }
     }
   }

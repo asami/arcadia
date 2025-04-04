@@ -34,7 +34,8 @@ import arcadia.model.{Model, ErrorModel}
  *  version Nov. 27, 2022
  *  version Nov. 28, 2023
  *  version Dec. 28, 2023
- * @version Mar. 29, 2025
+ *  version Mar. 29, 2025
+ * @version Apr.  3, 2025
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -127,8 +128,23 @@ class ViewEngine(
         )
     layout match {
       case Some(NoneLayout) => None
-      case Some(m) => getLayout(m) orElse getLayout(DefaultLayout)
-      case None => getLayout(DefaultLayout)
+      case Some(m) => getLayoutOrDefault(m)
+      case None =>
+        parcel.command match {
+          case Some(s) => s match {
+            case m: MaterialCommand =>
+              val pathname = m.pathname
+              if (pathname.leafBody.toLowerCase == "index")
+                if (pathname.length == 1)
+                  getLayoutOrDefault(HomepageLayout)
+                else
+                  getLayoutOrDefault(IndexLayout)
+              else
+                getDefaultLayout()
+            case _ => getDefaultLayout()
+          }
+          case None => getDefaultLayout()
+        }
     }
     // val uselayout = is_spa(parcel) || parcel.command.map(_.getUseLayout.getOrElse(true)).getOrElse(true)
     // if (uselayout)
@@ -136,6 +152,10 @@ class ViewEngine(
     // else
     //   None
   }
+
+  def getLayoutOrDefault(kind: LayoutKind): Option[LayoutView] = getLayout(kind) orElse getDefaultLayout()
+
+  def getDefaultLayout(): Option[LayoutView] = getLayout(DefaultLayout)
 
   def getLayout(kind: LayoutKind): Option[LayoutView] = rule.getLayout(kind).orElse(
     extend.toStream.flatMap(_.getLayout(kind)).headOption
@@ -421,7 +441,10 @@ object ViewEngine {
       DefaultLayout,
       NoneLayout,
       ErrorLayout,
-      PlainLayout
+      PlainLayout,
+      HomepageLayout,
+      IndexLayout,
+      ArticleLayout
     )
   }
   case object DefaultLayout extends LayoutKind {
@@ -435,6 +458,15 @@ object ViewEngine {
   }
   case object PlainLayout extends LayoutKind {
     val name = "plain"
+  }
+  case object HomepageLayout extends LayoutKind {
+    val name = "homepage"
+  }
+  case object IndexLayout extends LayoutKind {
+    val name = "index"
+  }
+  case object ArticleLayout extends LayoutKind {
+    val name = "article"
   }
   case class PageLayout(name: String) extends LayoutKind {
   }

@@ -38,7 +38,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Feb. 27, 2022
  *  version Mar. 30, 2022
  *  version May.  4, 2022
- * @version Mar. 28, 2025
+ *  version Mar. 28, 2025
+ * @version Apr.  2, 2025
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -210,7 +211,7 @@ case object ContentTag extends Tag with SelectByName {
   val name = "content"
 
   protected def eval_Expression(p: Expression): XmlContent = {
-    XmlContent(p.viewModel.content)
+    XmlContent(p.viewModel.content(p.getLayoutKind))
   }
 }
 
@@ -447,7 +448,7 @@ case object HeadDefTag extends Tag with SelectByName {
   val name = "head-def"
 
   protected def eval_Expression(p: Expression): XmlContent = {
-    XmlContent(p.viewModel.headDef)
+    XmlContent(p.viewModel.headDef(p.getLayoutKind))
   }
 }
 
@@ -455,7 +456,7 @@ case object FootDefTag extends Tag with SelectByName {
   val name = "foot-def"
 
   protected def eval_Expression(p: Expression): XmlContent = {
-    XmlContent(p.viewModel.footDef)
+    XmlContent(p.viewModel.footDef(p.getLayoutKind))
   }
 }
 
@@ -463,7 +464,7 @@ case object HeaderTag extends Tag with SelectByName {
   val name = "header"
 
   protected def eval_Expression(p: Expression): XmlContent = {
-    XmlContent(p.viewModel.header)
+    XmlContent(p.viewModel.header(p.getLayoutKind))
   }
 }
 
@@ -471,7 +472,7 @@ case object FooterTag extends Tag with SelectByName {
   val name = "footer"
 
   protected def eval_Expression(p: Expression): XmlContent = {
-    XmlContent(p.viewModel.footer)
+    XmlContent(p.viewModel.footer(p.getLayoutKind))
   }
 }
 
@@ -479,7 +480,7 @@ case object SidebarTag extends Tag with SelectByName {
   val name = "sidebar"
 
   protected def eval_Expression(p: Expression): XmlContent = {
-    XmlContent(p.viewModel.sidebar)
+    XmlContent(p.viewModel.sidebar(p.getLayoutKind))
   }
 }
 
@@ -487,7 +488,7 @@ case object NavigationTag extends Tag with SelectByName {
   val name = "navigation"
 
   protected def eval_Expression(p: Expression): XmlContent = {
-    XmlContent(p.viewModel.navigation)
+    XmlContent(p.viewModel.navigation(p.getLayoutKind))
   }
 }
 
@@ -495,7 +496,7 @@ case object ContentHeaderTag extends Tag with SelectByName {
   val name = "content-header"
 
   protected def eval_Expression(p: Expression): XmlContent = {
-    XmlContent(p.viewModel.contentHeader)
+    XmlContent(p.viewModel.contentHeader(p.getLayoutKind))
   }
 }
 

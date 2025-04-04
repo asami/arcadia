@@ -43,7 +43,8 @@ import arcadia.view.ViewEngine._
  *  version May.  3, 2022
  *  version Dec. 30, 2022
  *  version Nov. 28, 2023
- * @version Dec. 28, 2023
+ *  version Dec. 28, 2023
+ * @version Apr.  2, 2025
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -53,6 +54,7 @@ case class RenderStrategy(
   applicationRule: WebApplicationRule,
   partials: Partials,
   components: Components,
+  layoutKind: Option[LayoutKind],
   renderContext: RenderContext,
   viewContext: Option[ViewContext],
   history: RenderStrategy.History = RenderStrategy.History.empty // unused
@@ -130,6 +132,8 @@ case class RenderStrategy(
     partials = p
   )
   def complementApplicationRule(p: WebApplicationRule) = copy(applicationRule = applicationRule.complement(p))
+
+  def withLayoutKind(p: LayoutKind) = copy(layoutKind = Some(p))
 
   def push(p: RenderStrategy) = copy(history = history.append(p))
 
@@ -483,7 +487,8 @@ object RenderTheme extends EnumerationClass[RenderTheme] {
     LightBootstrapDashboardTheme,
     BootstrapTheme, // Latest Bootstrap 5
     BootstrapListTheme,
-    BootstrapGridTheme
+    BootstrapGridTheme,
+    MaterialKitProTheme
   )
 }
 
@@ -745,6 +750,10 @@ case object BootstrapListTheme extends Bootstrap5RenderThemeBase {
 }
 
 case object BootstrapGridTheme extends Bootstrap5RenderThemeBase {
+  override def default_TableKind = GridTable
+}
+
+case object MaterialKitProTheme extends Bootstrap5RenderThemeBase {
   override def default_TableKind = GridTable
 }
 
@@ -1088,26 +1097,40 @@ case object ContentPartial extends PartialKind {
 }
 
 case class Partials(
-  partials: Map[PartialKind, PartialView]
+  partials: Map[PartialKind, PartialView] = Map.empty,
+  byLayout: Map[LayoutKind, Map[PartialKind, PartialView]] = Map.empty
 ) {
-  def get(p: PartialKind): Option[PartialView] = partials.get(p)
-  def headDef: Option[PartialView] = get(HeadDefPartial)
-  def footDef: Option[PartialView] = get(FootDefPartial)
-  def header: Option[PartialView] = get(HeaderPartial)
-  def footer: Option[PartialView] = get(FooterPartial)
-  def navigation: Option[PartialView] = get(NavigationPartial)
-  def sidebar: Option[PartialView] = get(SidebarPartial)
-  def contentHeader: Option[PartialView] = get(ContentHeaderPartial)
-  def content: Option[PartialView] = get(ContentPartial)
+  private def _get(p: PartialKind): Option[PartialView] = partials.get(p)
+  def get(l: LayoutKind, p: PartialKind): Option[PartialView] =
+    byLayout.get(l).flatMap(_.get(p)) orElse _get(p)
+  def get(l: Option[LayoutKind], p: PartialKind): Option[PartialView] =
+    l.fold(_get(p))(get(_, p))
+  def headDef(l: LayoutKind): Option[PartialView] = get(l, HeadDefPartial)
+  def headDef(l: Option[LayoutKind]): Option[PartialView] = get(l, HeadDefPartial)
+  def footDef(l: LayoutKind): Option[PartialView] = get(l, FootDefPartial)
+  def footDef(l: Option[LayoutKind]): Option[PartialView] = get(l, FootDefPartial)
+  def header(l: LayoutKind): Option[PartialView] = get(l, HeaderPartial)
+  def header(l: Option[LayoutKind]): Option[PartialView] = get(l, HeaderPartial)
+  def footer(l: LayoutKind): Option[PartialView] = get(l, FooterPartial)
+  def footer(l: Option[LayoutKind]): Option[PartialView] = get(l, FooterPartial)
+  def navigation(l: LayoutKind): Option[PartialView] = get(l, NavigationPartial)
+  def navigation(l: Option[LayoutKind]): Option[PartialView] = get(l, NavigationPartial)
+  def sidebar(l: LayoutKind): Option[PartialView] = get(l, SidebarPartial)
+  def sidebar(l: Option[LayoutKind]): Option[PartialView] = get(l, SidebarPartial)
+  def contentHeader(l: LayoutKind): Option[PartialView] = get(l, ContentHeaderPartial)
+  def contentHeader(l: Option[LayoutKind]): Option[PartialView] = get(l, ContentHeaderPartial)
+  def content(l: LayoutKind): Option[PartialView] = get(l, ContentPartial)
+  def content(l: Option[LayoutKind]): Option[PartialView] = get(l, ContentPartial)
 
   def complement(rhs: Partials): Partials = Partials(
-    MapUtils.complement(partials, rhs.partials)
+    MapUtils.complement(partials, rhs.partials),
+    MapUtils.complement(byLayout, rhs.byLayout)
   )
   def complements(rhs: Seq[Partials]): Partials =
     rhs./:(this)(_ complement _)
 }
 object Partials {
-  val empty = Partials(Map.empty)
+  val empty = Partials()
 }
 
 case class Pages(

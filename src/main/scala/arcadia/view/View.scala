@@ -24,6 +24,7 @@ import ViewEngine.PROP_VIEW_PROPERTIES
 import ViewEngine.PROP_VIEW_IT
 import ViewEngine.Slot
 import ViewEngine.Bindings
+import ViewEngine.LayoutKind
 
 /*
  * @since   Jul. 15, 2017
@@ -42,7 +43,8 @@ import ViewEngine.Bindings
  *  version Oct.  1, 2022
  *  version Apr. 30, 2023
  *  version Jun. 25, 2023
- * @version Mar. 20, 2025
+ *  version Mar. 20, 2025
+ * @version Apr.  4, 2025
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -65,8 +67,9 @@ abstract class View() {
     }
   def gv: (Guard, View) = (guard, this)
 
-  protected def execute_apply(engine: ViewEngine, parcel: Parcel): Content =
-    parcel.executeWithTrace(s"${show}#execute_apply", parcel.show) {
+  protected def execute_apply(engine: ViewEngine, pparcel: Parcel): Content =
+    pparcel.executeWithTrace(s"${show}#execute_apply", pparcel.show) {
+      val parcel = bind_Parcel(pparcel)
       val bindings = _build_bindings(engine, parcel)
       val c0 = execute_Apply(engine, parcel, bindings)
       val c = parcel.model.fold(c0) {
@@ -76,6 +79,8 @@ abstract class View() {
       val r = engine.eval(parcel, c, bindings)
       Result(r, r.show)
     }
+
+  protected def bind_Parcel(p: Parcel): Parcel = p
 
   protected def execute_Apply(
     engine: ViewEngine,
@@ -272,6 +277,8 @@ case class HtmlView(url: URL, pathname: Option[String] = None) extends View() {
 }
 object HtmlView {
   def apply(p: File): HtmlView = HtmlView(p.toURI.toURL)
+
+  def apply(p: URL, pathname: String): HtmlView = HtmlView(p, Some(pathname))
 }
 
 case class MaterialView(baseUrl: URL) extends View() {
@@ -392,8 +399,10 @@ object AssetView {
   }
 }
 
-case class LayoutView(template: TemplateSource) extends TemplateViewBase(template) {
+case class LayoutView(layoutKind: LayoutKind, template: TemplateSource) extends TemplateViewBase(template) {
   val guard = NotImplementedYetGuard
+
+  override protected def bind_Parcel(p: Parcel) = p.withLayoutKind(layoutKind)
 }
 
 case class PartialView(template: TemplateSource) extends TemplateViewBase(template) {

@@ -20,6 +20,7 @@ import arcadia.view.{ViewEngine, RenderStrategy, Partials, View,
   UsageKind, TableKind, CardKind
 }
 import arcadia.view.RenderTheme
+import arcadia.view.ViewEngine.LayoutKind
 import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
 
 /*
@@ -44,7 +45,8 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Mar. 31, 2023
  *  version Nov. 28, 2023
  *  version Dec. 28, 2023
- * @version Mar. 12, 2025
+ *  version Mar. 12, 2025
+ * @version Apr.  2, 2025
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -76,6 +78,8 @@ case class Parcel(
     case Some(s) => copy(render = Some(p.push(s)))
     case None => copy(render = Some(p))
   }
+
+  def withLayoutKind(p: LayoutKind) = copy(render = render.map(_.withLayoutKind(p)))
 
   // def withPartials(p: Partials) = render.fold(this)(r => copy(render = Some(r.copy(partials = p))))
 
