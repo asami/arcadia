@@ -1,6 +1,7 @@
 package arcadia.view
 
 import scala.xml.{NodeSeq, Group, Elem, Node, Text}
+import org.goldenport.RAISE
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.{Record => _, Table => _, _}
 import org.goldenport.i18n.{I18NString, I18NElement}
@@ -15,7 +16,9 @@ import Renderer._
  *  version May.  1, 2018
  *  version Jul.  8, 2018
  *  version Sep.  1, 2018
- * @version Apr. 16, 2019
+ *  version Apr. 16, 2019
+ *  version Nov. 28, 2023
+ * @version Dec.  2, 2023
  * @author  ASAMI, Tomoharu
  */
 trait RendererCardPart { self: Renderer =>
@@ -78,11 +81,11 @@ trait RendererCardPart { self: Renderer =>
 
   private def _card_component(kind: CardKind, card: Card): Option[NodeSeq] =
     kind match {
-      case m: ComponentCard =>
-        strategy.viewContext.flatMap { x =>
-          val a = x.parcel.withModel(CardModel(card, s"card__${m.name}"))
-          strategy.viewContext.flatMap(_.engine.renderComponentOption(a))
-        }
+      case m: ComponentCard => strategy.viewContext.flatMap { x =>
+        val a = x.parcel.withModel(CardModel(card, s"card__${kind.name}"))
+        strategy.viewContext.flatMap(_.engine.renderComponentOption(a))
+      }
+      case ImageTitleCard => None
       case _ => None
     }
 
@@ -123,10 +126,11 @@ trait RendererCardPart { self: Renderer =>
 
   protected def card_full(card: Card): NodeSeq = {
     strategy.theme match {
-      case m if m.isCardDiv => card_div(card)
-      case m if m.isCardTable => card_table(card)
+      case m: Bootstrap5RenderThemeBase => card_bootstrap(card)
       case m: Bootstrap4RenderThemeBase => card_bootstrap(card)
       case m: Bootstrap3RenderThemeBase => card_paperdashboard(card)
+      case m if m.isCardDiv => card_div(card)
+      case m if m.isCardTable => card_table(card)
       case m => card_table(card)
     }
   }
@@ -151,7 +155,7 @@ trait RendererCardPart { self: Renderer =>
         i.href.fold {
           img(i)
         } { href =>
-          <a href={href.toString} target="_blank">{img(i)}</a>
+          Group(<a href={href.toString} target="_blank">{img(i)}</a>)
         }
       ).toVector ++ card.header.map(h =>
         <div class="card-header">{
@@ -239,10 +243,13 @@ trait RendererCardPart { self: Renderer =>
   }
 
   protected def card_div(card: Card): Elem = {
-    def f(p: Picture): Elem = { // MyColor
-      <div class="c-card__imageArea">
-        <img class="c-card__imageArea__image" src={p.src.toString} alt={p.alt.map(node)} />
-      </div>
+    def f(p: Picture): Elem = p match {
+      case m: Picture.UriPicture => { // MyColor
+        <div class="c-card__imageArea">
+          <img class="c-card__imageArea__image" src={m.src.toString} alt={m.alt.map(node)} />
+        </div>
+      }
+      case m: Picture.IconPicture => RAISE.notImplementedYetDefect
     }
     def render = {
       def tl(p: TitleLine): Vector[Node] = Vector(
@@ -296,7 +303,7 @@ trait RendererCardPart { self: Renderer =>
 
   // TODO card layout mechanism for list
   protected def card_media_object_body_bootstrap(p: Card): Group = {
-    def img(p: Picture): Elem = card_img(p, "mr-3 arcadia-list-icon") // TODO
+    def img(p: Picture): Group = card_img(p, "mr-3 arcadia-list-icon") // TODO
     val i = p.image_top.map(img)
     val b = <div class="media-body">{
       xmlutils.childrenOption(
@@ -326,19 +333,36 @@ trait RendererCardPart { self: Renderer =>
     def childrenOption(ps: Seq[Option[NodeSeq]]): Seq[NodeSeq] = ps.flatten
   }
 
-  protected def card_img(p: Picture, classname: String): Elem =
-    XmlUtils.element("img",
-      SeqUtils.buildTupleVector(
-        Vector(
-          "class" -> classname,
-          "src" -> p.src.toString
-        ),
-        Vector(
-          "alt" -> p.alt.map(node).map(_.text)
+  protected def card_img(p: Picture, classname: String): Group = p match {
+    case m: Picture.UriPicture =>
+      Group(
+        XmlUtils.element("img",
+          SeqUtils.buildTupleVector(
+            Vector(
+              "class" -> classname,
+              "src" -> m.src.toString
+            ),
+            Vector(
+              "alt" -> m.alt.map(node).map(_.text)
+            )
+          ),
+          Nil
         )
-      ),
-      Nil
-    )
+      )
+    case m: Picture.IconPicture =>
+      val iconmark = "bi"
+      val iconname = "bi-image-alt"
+      Group(
+        List(
+          XmlUtils.element("i",
+            Vector(
+              "class" -> s"responsive-icon $iconmark $iconname card-img-top img-fluid bi-3x",
+              "style" -> "font-size: 10rem;"
+            )
+          )
+        )
+      )
+  }
 
   protected def card_media_object_div(p: Card) = card_media_object_bootstrap(p) // XXX
 }

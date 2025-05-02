@@ -1,6 +1,7 @@
 package arcadia.domain
 
 import java.net.URI
+import play.api.libs.json._
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.{Record => Record2}
@@ -17,7 +18,8 @@ import arcadia.model.Picture
  *  version Mar. 13, 2018
  *  version Aug. 31, 2018
  *  version Sep.  1, 2018
- * @version Nov.  7, 2018
+ *  version Nov.  7, 2018
+ * @version Mar. 30, 2023
  * @author  ASAMI, Tomoharu
  */
 trait DomainObject {
@@ -73,8 +75,8 @@ case class StringDomainObjectId(v: String) extends AnyRef with DomainObjectId {
   override def toString() = v
 }
 
-case class DomainEntityType(v: String) {
-  lazy val resouceName: ResourceName = ResourceName(v)
+case class DomainEntityType(name: String) {
+  lazy val resouceName: ResourceName = ResourceName(name)
 }
 object DomainEntityType {
 }

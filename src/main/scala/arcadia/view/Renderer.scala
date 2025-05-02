@@ -36,7 +36,11 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Sep.  1, 2018
  *  version Nov.  7, 2018
  *  version Aug.  5, 2019
- * @version Apr. 15, 2020
+ *  version Apr. 15, 2020
+ *  version Mar. 30, 2023
+ *  version Oct. 31, 2023
+ *  version Nov. 29, 2023
+ * @version Dec.  2, 2023
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -61,6 +65,12 @@ abstract class Renderer(
   protected lazy val theme_grid = theme.grid
   protected lazy val theme_card = theme.card
   protected lazy val render_context = strategy.renderContext
+
+  protected val card_title_keys = List(KEY_DOMAIN_OBJECT_TITLE, KEY_DOMAIN_OBJECT_NAME)
+  protected val card_subtitle_keys = List(KEY_DOMAIN_OBJECT_SUBTITLE)
+  protected val card_content_keys = List(KEY_DOMAIN_OBJECT_CONTENT)
+  protected val card_content_summary_keys = List(KEY_DOMAIN_OBJECT_SUMMARY)
+  protected val card_icon_keys = List(KEY_DOMAIN_OBJECT_IMAGE_ICON)
 
   def apply: NodeSeq = strategy.scope match {
     case Html => render_html
@@ -216,7 +226,7 @@ abstract class Renderer(
   }
 
   protected def table_data_url(p: Table, record: IRecord): Option[Link] = {
-    def base = (p.dataHref.map(x => StringUtils.toPathnameBody(x.toString)) orElse p.entityType.map(_.v)).map(make_html_uri) orElse {
+    def base = (p.dataHref.map(x => StringUtils.toPathnameBody(x.toString)) orElse p.entityType.map(_.name)).map(make_html_uri) orElse {
       _get_href_base(record)
     }
     DomainObjectId.get(record, p.entityType) flatMap {
@@ -313,27 +323,42 @@ abstract class Renderer(
   protected def property_sheet_confirm(): NodeSeq = RAISE.notImplementedYetDefect
 
   protected def get_title(rec: IRecord): Option[I18NElement] =
-    rec.getString(KEY_DOMAIN_OBJECT_TITLE).map(I18NElement.parse)
+    _get_string(rec, card_title_keys).map(I18NElement.parse)
 
   protected def get_subtitle(rec: IRecord): Option[I18NElement] =
-    rec.getString(KEY_DOMAIN_OBJECT_SUBTITLE).map(I18NElement.parse)
+    _get_string(rec, card_subtitle_keys).map(I18NElement.parse)
 
   protected def get_content(rec: IRecord): Option[Node] =
-    rec.getString(KEY_DOMAIN_OBJECT_CONTENT).map(table_value_html)
+    _get_string(rec, card_content_keys).map(table_value_html)
 
   protected def get_content_summary(rec: IRecord): Option[Node] =
-    rec.getString(KEY_DOMAIN_OBJECT_SUMMARY).map(table_value_html_summary)
+    _get_string(rec, card_content_summary_keys).map(table_value_html_summary)
 
   protected def picture_icon(rec: IRecord): Picture =
-    rec.get(KEY_DOMAIN_OBJECT_IMAGE_ICON).fold {
-      Picture.create(theme.default.noImageIcon)
+    _get_any(rec, card_icon_keys).fold {
+      if (false)
+        Picture.create(theme.default.noImageIcon)
+      else
+        Picture.createIcon("bi-image-alt")
     } {
       case m: URL => Picture.create(m.toURI)
       case m: URI => Picture.create(m)
-      case m: String => Picture.create(new URI(m))
+      case m: String =>
+        if (_is_image(m))
+          Picture.create(new URI(m))
+        else
+          Picture.createIcon(m)
       case m: Picture => m
       case m => RAISE.noReachDefect
     }
+
+  private def _is_image(p: String) = p.contains('/') || p.contains('.')
+
+  private def _get_string(rec: IRecord, keys: Seq[Symbol]): Option[String] =
+    keys.toStream.flatMap(x => rec.getString(x)).headOption
+
+  private def _get_any(rec: IRecord, keys: Seq[Symbol]): Option[Any] =
+    keys.toStream.flatMap(x => rec.get(x)).headOption
 
   protected def carousel(
     ps: List[Picture],
@@ -360,7 +385,7 @@ abstract class Renderer(
         for ((x, i) <- ps.zipWithIndex) yield {
           val c = if (i == 0) "carousel-item active" else "carousel-item"
           <div class={c}>
-  	    <img class="d-block w-100" src={x.l} alt={x.alt(locale)}></img>
+            _carousel_image(x)
             {
               if (!isCaption || (x.caption.isEmpty && x.description.isEmpty))
                 Group(Nil)
@@ -392,6 +417,15 @@ abstract class Renderer(
     </div>
   }
 
+  private def _carousel_image(p: Picture): Elem = p match {
+    case m: Picture.UriPicture => _carousel_image(m)
+    case m: Picture.IconPicture => RAISE.notImplementedYetDefect
+  }
+
+  private def _carousel_image(p: Picture.UriPicture): Elem = {
+    <img class="d-block w-100" src={p.l} alt={p.alt(locale)}></img>
+  }
+
   protected def banner(ps: List[Picture]): Elem =
     if (ps.length == 0)
       empty_block
@@ -411,7 +445,12 @@ abstract class Renderer(
       <a href={href.toString} target="_blank">{img(p)}</a>
     }
 
-  def img(p: Picture): Elem = XmlUtils.element("img",
+  def img(p: Picture): Elem = p match {
+    case m: Picture.UriPicture => img(m)
+    case m: Picture.IconPicture => img(m)
+  }
+
+  def img(p: Picture.UriPicture): Elem = XmlUtils.element("img",
     SeqUtils.buildTupleVector(
       Vector(
         "class" -> "card-img-top",
@@ -423,6 +462,8 @@ abstract class Renderer(
     ),
     Nil
   )
+
+  def img(p: Picture.IconPicture): Elem = RAISE.notImplementedYetDefect
 
   protected def badge(p: Badge): Elem = {
     val c = s"badge badge-${p.asIndicatorName}"
@@ -465,37 +506,155 @@ object Renderer {
     schema: Option[Schema],
     entityType: Option[DomainEntityType],
     dataHref: Option[URI],
+    paging: Option[TableOrder.Paging],
     records: Option[Seq[IRecord]]
   )
   object TableOrder {
+    case class Paging(
+      uri: URI,
+      offset: Int, // base 0
+      pageSize: Int,
+      windowSize: Int = 10,
+      totalSize: Option[Int] = None
+    ) {
+      import Paging._
+
+      private val _total_size: Int = totalSize getOrElse 10000
+
+      val currentPageNumber = offset / pageSize
+      val lastPageNumber =
+        if (_total_size % pageSize == 0)
+          (_total_size / pageSize) - 1
+        else
+          _total_size / pageSize
+      val lastWindowNumber =
+        if (_total_size % (pageSize * windowSize) == 0)
+          (_total_size / (pageSize * windowSize)) - 1
+        else
+          _total_size / (pageSize * windowSize)
+      val currentWindowNumber = {
+        val r = if (offset == 0)
+          0
+        else if (offset % (pageSize * windowSize) == 0)
+          (offset / (pageSize * windowSize)) - 1
+        else
+          offset / (pageSize * windowSize)
+        // println(s"currentWindowNumber offset: $offset")
+        // println(s"currentWindowNumber offset % pageSize * windowSize: ${offset % (pageSize * windowSize)}")
+        // println(s"currentWindowNumber offset / pageSize * windowSize: ${offset / (pageSize * windowSize)}")
+        // println(s"currentWindowNumber: $r")
+        r
+      }
+
+      def isFirstPage: Boolean = currentPageNumber == 0
+      def isLastPage: Boolean = currentPageNumber == lastPageNumber
+      def isFirstWindow: Boolean = currentWindowNumber == 0
+      def isLastWindow: Boolean = currentWindowNumber == lastWindowNumber
+
+      def getPrev: Option[Navigation.Prev] =
+        if (isFirstPage) {
+          None
+        } else {
+          val o = math.max(0, offset - (pageSize * windowSize))
+          Some(Navigation.Prev(_location(o)))
+        }
+
+      def getNext: Option[Navigation.Next] =
+        if (isLastWindow) {
+          None
+        } else {
+          val o = (currentWindowNumber + 1) * windowSize
+          // println(s"z: $o")
+          if (o >= _total_size)
+            None
+          else
+            Some(Navigation.Next(_location(o)))
+        }
+
+      def pages: List[Navigation.Slot] =
+        for (i <- (currentPageNumber to lastPageNumber).take(windowSize).toList) yield {
+          Navigation.Slot(i, _location(i))
+        }
+
+      private def _get_page(pagenumber: Int) =
+        if (pagenumber <= lastPageNumber)
+          Some(_page(pagenumber))
+        else
+          None
+
+      private def _location(pagenumber: Int) =
+        Navigation.Location(_page(pagenumber), _offset(pagenumber), pageSize)
+
+      private def _offset(pagenumber: Int) = pagenumber * pageSize
+
+      private def _page(pagenumber: Int) = {
+        val o = _offset(pagenumber)
+        s"$uri?offset=$o&limit=$pageSize"
+      }
+
+      def navigation: Navigation = Navigation(getPrev, getNext, pages)
+    }
+    object Paging {
+      case class Navigation(
+        prev: Option[Navigation.Prev],
+        next: Option[Navigation.Next],
+        slots: List[Navigation.Slot]
+      )
+      object Navigation {
+        case class Location(
+          uri: String,
+          offset: Int,
+          limit: Int
+        ) {
+          def query = s"?offset=$offset&limit=$limit"
+        }
+        object Location {
+          trait Holder {
+            def location: Location
+
+            def uri = location.uri
+            def offset = location.offset
+            def limit = location.limit
+            def query = location.query
+          }
+        }
+        case class Prev(location: Location) extends Location.Holder
+        case class Next(location: Location) extends Location.Holder
+        case class Slot(number: Int, location: Location) extends Location.Holder {
+          def numberBase1 = number + 1
+        }
+      }
+    }
+
     def apply(
       kind: TableKind,
       schema: Option[Schema],
       entitytype: DomainEntityType,
       records: Seq[IRecord]
-    ): TableOrder = TableOrder(Some(kind), None, schema, Some(entitytype), None, Some(records))
+    ): TableOrder = TableOrder(Some(kind), None, schema, Some(entitytype), None, None, Some(records))
 
     def apply(
       kind: TableKind,
       schema: Option[Schema],
       entitytype: Option[DomainEntityType],
       records: Seq[IRecord]
-    ): TableOrder = TableOrder(Some(kind), None, schema, entitytype, None, Some(records))
+    ): TableOrder = TableOrder(Some(kind), None, schema, entitytype, None, None, Some(records))
 
     def apply(
       kind: Option[TableKind],
       schema: Option[Schema],
       entitytype: DomainEntityType,
       records: Seq[IRecord]
-    ): TableOrder = TableOrder(kind, None, schema, Some(entitytype), None, Some(records))
+    ): TableOrder = TableOrder(kind, None, schema, Some(entitytype), None, None, Some(records))
 
     def apply(
       kind: Option[TableKind],
       schema: Option[Schema],
       entitytype: Option[DomainEntityType],
       datahref: Option[URI],
+      paging: Option[Paging],
       records: Seq[IRecord]
-    ): TableOrder = TableOrder(kind, None, schema, entitytype, datahref, Some(records))
+    ): TableOrder = TableOrder(kind, None, schema, entitytype, datahref, paging, Some(records))
   }
 
   case class Table(
@@ -517,7 +676,8 @@ object Renderer {
 
   case class TableWithRecords(
     table: Table,
-    records: Seq[IRecord]
+    records: Seq[IRecord],
+    paging: Option[TableOrder.Paging]
   ) {
     def kind = table.kind
     def size = table.size
@@ -525,6 +685,9 @@ object Renderer {
     def entityType = table.entityType
   }
   object TableWithRecords {
+    // case class Paging(
+    // )
+
     def apply(
       kind: TableKind,
       size: RenderSize,
@@ -533,7 +696,8 @@ object Renderer {
       records: Seq[IRecord]
     ): TableWithRecords = TableWithRecords(
       Table(kind, size, schema, Some(entitytype), None),
-      records
+      records,
+      None
     )
 
     def apply(
@@ -542,10 +706,12 @@ object Renderer {
       schema: Schema,
       entitytype: Option[DomainEntityType],
       datahref: Option[URI],
+      paging: Option[TableOrder.Paging],
       records: Seq[IRecord]
     ): TableWithRecords = TableWithRecords(
       Table(kind, size, schema, entitytype, datahref),
-      records
+      records,
+      paging
     )
 
     def apply(
@@ -555,7 +721,8 @@ object Renderer {
       records: Seq[IRecord]
     ): TableWithRecords = TableWithRecords(
       Table(kind, size, schema),
-      records
+      records,
+      None
     )
   }
 

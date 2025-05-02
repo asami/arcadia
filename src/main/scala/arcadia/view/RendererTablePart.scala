@@ -18,7 +18,9 @@ import Renderer._
  *  version May.  1, 2018
  *  version Sep.  1, 2018
  *  version Nov.  7, 2018
- * @version Apr. 16, 2019
+ *  version Apr. 16, 2019
+ *  version Oct. 31, 2023
+ * @version Dec.  2, 2023
  * @author  ASAMI, Tomoharu
  */
 trait RendererTablePart { self: Renderer =>
@@ -30,7 +32,7 @@ trait RendererTablePart { self: Renderer =>
 //    val schema = p.schema getOrElse build_schema(records)
     val entitytype = p.entityType
     val datahref = p.dataHref
-    val t = TableWithRecords(kind, size, schema, entitytype, datahref, records)
+    val t = TableWithRecords(kind, size, schema, entitytype, datahref, p.paging, records)
     table(t)
   }
 
@@ -46,10 +48,10 @@ trait RendererTablePart { self: Renderer =>
     table(strategy.tableKind, schema, records, None)
 
   protected def table(kind: TableKind, schema: Option[Schema], records: Seq[IRecord], datahref: Option[URI]): NodeSeq =
-    table(TableOrder(Some(kind), None, schema, None, datahref, Some(records)))
+    table(TableOrder(Some(kind), None, schema, None, datahref, None, Some(records)))
 
   protected def table(kind: TableKind, schema: Schema, records: Seq[IRecord], datahref: Option[URI]): NodeSeq =
-    table(TableOrder(Some(kind), None, Some(schema), None, datahref, Some(records)))
+    table(TableOrder(Some(kind), None, Some(schema), None, datahref, None, Some(records)))
 
   protected def table(p: TableWithRecords): NodeSeq =
     p.kind match {
@@ -59,7 +61,62 @@ trait RendererTablePart { self: Renderer =>
       case _ => table_standard(p)
     }
 
-  protected def table_standard(p: TableWithRecords): NodeSeq = theme_table.container(p.table,
+  protected def table_standard(p: TableWithRecords): NodeSeq = {
+    val table = _get_table_page_navigation(p).fold(_table_standard(p))(x =>
+      <div>
+        {_table_standard(p)}
+        {x}
+      </div>
+    )
+    theme_table.container(p.table, table)
+  }
+
+  private def _get_table_page_navigation(p: TableWithRecords): Option[Node] =
+    p.paging.map(_table_page_navigation(p, _))
+
+  private def _table_page_navigation(
+    p: TableWithRecords,
+    paging: TableOrder.Paging
+  ): Node = {
+    val prevLabel = "Prev"
+    val nextLabel = "Next"
+    val navi = paging.navigation
+
+    def _table_page_navigation_bar_(): NodeSeq = {
+      val xs = _table_page_navigation_prev_ +: _table_page_navigation_list_ :+ _table_page_navigation_next_
+      NodeSeq.fromSeq(xs)
+    }
+
+    def _table_page_navigation_prev_(): Node =
+      navi.prev match {
+        case Some(s) => <td><a href={s"#${_query_(s)}"}>{prevLabel}</a></td>
+        case None => <td>{prevLabel}</td>
+      }
+    
+
+    def _table_page_navigation_next_(): Node =
+      navi.next match {
+        case Some(s) => <td><a href={s"#${_query_(s)}"}>{nextLabel}</a></td>
+        case None => <td>{nextLabel}</td>
+      }
+
+    def _table_page_navigation_list_(): List[Node] =
+     for (s <- navi.slots) yield {
+        <td><a href={s"#${_query_(s)}"}>{s.numberBase1}</a></td>
+      }
+
+    import Renderer.TableOrder.Paging.Navigation.Location
+
+    def _query_(p: Location.Holder) = s"?query.offset=${p.offset}&query.page.size=${p.limit}"
+
+    <table>
+      <tr>
+        {_table_page_navigation_bar_}
+      </tr>
+    </table>
+  }
+
+  private def _table_standard(p: TableWithRecords): Node =
     <table class={theme_table.css.table(p.table)}>{
       seq(
         caption.map(x => <caption class={theme_table.css.caption(p.table)}>{nodeseq(x)}</caption>),
@@ -68,7 +125,6 @@ trait RendererTablePart { self: Renderer =>
         None.map(x => <tfoot class={theme_table.css.tfoot(p.table)}></tfoot>)
       )
     }</table>
-  )
 
   protected def table_head(tablekind: TableKind, schema: Schema): Node =
     table_head(Table(tablekind, strategy.size, schema))
@@ -334,11 +390,20 @@ trait RendererTablePart { self: Renderer =>
     <span data-toggle="tooltip" title={p.toString}>{s}</span>
   }
 
-  protected def table_value_image_link_picture(p: Picture): Node = {
+  protected def table_value_image_link_picture(p: Picture): Node = p match {
+    case m: Picture.UriPicture => table_value_image_link_picture(m)
+    case m: Picture.IconPicture => table_value_image_link_picture(m)
+  }
+
+  protected def table_value_image_link_picture(p: Picture.UriPicture): Node = {
     val src = p.src.toString
     val a = p.alt.map(string).getOrElse(src)
     val s = StringUtils.pathLastComponentBody(a)
     <span data-toggle="tooltip" title={src}>{s}</span>
+  }
+
+  protected def table_value_image_link_picture(p: Picture.IconPicture): Node = {
+    RAISE.notImplementedYetDefect
   }
 
   protected def table_value_img(column: TableColumn, p: Any): Node = p match {
@@ -358,13 +423,23 @@ trait RendererTablePart { self: Renderer =>
   protected def table_value_img_uri(column: TableColumn, p: URI): Node =
     <img src={p.toString}></img>
 
-  protected def table_value_img_picture(column: TableColumn, p: Picture): Node = {
+  protected def table_value_img_picture(column: TableColumn, p: Picture): Node =
+    p match {
+      case m: Picture.UriPicture => table_value_img_picture(m)
+      case m: Picture.IconPicture => table_value_img_picture(m)
+    }
+
+  protected def table_value_img_picture(column: TableColumn, p: Picture.UriPicture): Node = {
     val alt: String = p.alt.map(string).getOrElse("")
     val src = column.kind match {
       case PropertyTable => p.l
       case _ => p.xs
     }
     <img class={theme_table.css.img(strategy.tableKind)} src={src} alt={alt}></img>
+  }
+
+  protected def table_value_img_picture(column: TableColumn, p: Picture.IconPicture): Node = {
+    RAISE.notImplementedYetDefect
   }
 
   protected def table_value_img(p: Any): Node = p match {
@@ -384,13 +459,22 @@ trait RendererTablePart { self: Renderer =>
   protected def table_value_img_uri(p: URI): Node =
     <img src={p.toString}></img>
 
-  protected def table_value_img_picture(p: Picture): Node = {
+  protected def table_value_img_picture(p: Picture): Node = p match {
+    case m: Picture.UriPicture => table_value_img_picture(m)
+    case m: Picture.IconPicture => table_value_img_picture(m)
+  }
+
+  protected def table_value_img_picture(p: Picture.UriPicture): Node = {
     val alt: String = p.alt.map(string).getOrElse("")
     val src = strategy.tableKind match {
       case PropertyTable => p.l
       case _ => p.xs
     }
     <img class={theme_table.css.img(strategy.tableKind)} src={src} alt={alt}></img>
+  }
+
+  protected def table_value_img_picture(p: Picture.IconPicture): Node = {
+    RAISE.notImplementedYetDefect
   }
 
   protected def table_value_html(p: Any): Node = p match {

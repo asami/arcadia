@@ -3,6 +3,7 @@ package arcadia
 import scala.util.control.NonFatal
 import java.util.Locale
 import java.net.URI
+import play.api.libs.json._
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.Invalid
@@ -10,11 +11,16 @@ import org.goldenport.trace.{TraceContext, Result}
 import org.goldenport.values.PathName
 import org.goldenport.util.{SeqUtils, MapUtils, StringUtils}
 import arcadia.context._
+import arcadia.service.ServiceFacility
 import arcadia.domain._
 import arcadia.model.{Model, ErrorModel, Badge, IRecordModel, CandidatesModel}
+import arcadia.model.PropertySheetModel
+import arcadia.model.Property
 import arcadia.view.{ViewEngine, RenderStrategy, Partials, View,
   UsageKind, TableKind, CardKind
 }
+import arcadia.view.RenderTheme
+import arcadia.view.ViewEngine.LayoutKind
 import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
 
 /*
@@ -32,20 +38,29 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version May.  1, 2019
  *  version Mar. 31, 2020
  *  version Apr. 20, 2020
- * @version Jun.  3, 2020
+ *  version Jun.  3, 2020
+ *  version Mar. 21, 2022
+ *  version May.  3, 2022
+ *  version Dec. 29, 2022
+ *  version Mar. 31, 2023
+ *  version Nov. 28, 2023
+ *  version Dec. 28, 2023
+ *  version Mar. 12, 2025
+ * @version Apr.  2, 2025
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
-  command: Option[Command],
-  model: Option[Model],
-  modelHanger: Map[String, Model],
-  view: Option[View],
-  content: Option[Content],
-  render: Option[RenderStrategy],
-  session: Option[Session],
-  platformExecutionContextOption: Option[PlatformExecutionContext],
-  context: Option[ExecutionContext],
-  trace: Option[TraceContext]
+  command: Option[Command] = None,
+  model: Option[Model] = None,
+  modelHanger: Map[String, Model] = Map.empty,
+  propertyModel: Option[PropertySheetModel] = None,
+  view: Option[View] = None,
+  content: Option[Content] = None,
+  render: Option[RenderStrategy] = None,
+  session: Option[Session] = None,
+  platformExecutionContextOption: Option[PlatformExecutionContext] = None,
+  context: Option[ExecutionContext] = None,
+  trace: Option[TraceContext] = None
 ) {
   def getPlatformExecutionContext: Option[PlatformExecutionContext] =
     platformExecutionContextOption orElse context.map(_.platformExecutionContext)
@@ -58,13 +73,20 @@ case class Parcel(
   def withView(view: View) = copy(view = Some(view))
   def withContent(p: Content) = copy(content = Some(p))
   def withRenderStrategy(render: RenderStrategy) = copy(render = Some(render))
+  // unused
+  private def setRenderStrategy(p: RenderStrategy) = render match {
+    case Some(s) => copy(render = Some(p.push(s)))
+    case None => copy(render = Some(p))
+  }
+
+  def withLayoutKind(p: LayoutKind) = copy(render = render.map(_.withLayoutKind(p)))
 
   // def withPartials(p: Partials) = render.fold(this)(r => copy(render = Some(r.copy(partials = p))))
 
   // def withApplicationRule(p: WebApplicationRule) = copy(render = render.map(_.withApplicationRule(p)))
   def complementApplicationRule(p: WebApplicationRule) = copy(render = render.map(_.complementApplicationRule(p)))
-  def withApplication(p: WebApplication) = getPlatformExecutionContext.
-    map(x => copy(context = Some(ExecutionContext(x, p)))).
+  def withExecutionContext(service: ServiceFacility, app: WebApplication) = getPlatformExecutionContext.
+    map(x => copy(context = Some(ExecutionContext(x, service, app)))).
     getOrElse(RAISE.noReachDefect)
   def withTrace(p: TraceContext) = copy(trace = Some(p))
 
@@ -119,6 +141,22 @@ case class Parcel(
   //   s"Parcel(${b})"
   // }
 
+  def addProperties(p: List[Property]) = {
+    val a = propertyModel.map(x => Record.create(x.record)).getOrElse(Record.empty)
+    val b = p./:(a)((z, x) => z.update(x.name, _value(x)))
+    val c = if (b.isEmpty)
+      None
+    else
+      Some(PropertySheetModel(b))
+    copy(propertyModel = c)
+  }
+
+  private def _value(p: Property) = p.value match {
+    case JsNumber(v) => v
+    case JsString(s) => s
+    case _ => ???
+  }
+
   lazy val show: String = try {
     val a = Vector(
       command.map(_.show),
@@ -149,11 +187,15 @@ case class Parcel(
   def pathUri: URI = new URI(getPathName.map(_.v) getOrElse RAISE.noReachDefect) // XXX
   def getPathName: Option[PathName] = command.flatMap {
     case MaterialCommand(pathname) => Some(pathname)
+    case m: IndexCommand => Some(m.pathname)
+    case ViewCommand(pathname) => Some(pathname)
     case _ => None
   }.orElse(context.flatMap(_.getPathName))
   def getOperationName: Option[String] =
     command flatMap {
       case MaterialCommand(pathname) => Some(pathname.body)
+      case m: IndexCommand => Some(m.body)
+      case ViewCommand(pathname) => Some(pathname.body)
       case _ => context.flatMap(_.getOperationName)
     }
   def isOperationPathName(p: String): Boolean = {
@@ -162,6 +204,7 @@ case class Parcel(
     //   p == pathname.body || pathname.getParent.fold(false)(_.body == p)
     command.flatMap {
       case MaterialCommand(pathname) => Some(_is_operation_pathname(basename, pathname))
+      case m: IndexCommand => Some(_is_operation_pathname(basename, m.pathname))
       case ViewCommand(pathname) => Some(_is_operation_pathname(basename, pathname))
       case _ => None
     }.getOrElse(
@@ -190,6 +233,14 @@ case class Parcel(
         }
     }
     pn.components./:(Z(basename.components))(_+_).r
+  }
+
+  def getPathDepthForRedirect: Option[Int] = getPathName.map { x =>
+    val cs = x.components
+    if (x.v.endsWith("/"))
+      cs.length
+    else
+      cs.length - 1
   }
 
   def getDomainObjectId: Option[DomainObjectId] = {
@@ -231,6 +282,10 @@ case class Parcel(
   def isShowTrace: Boolean = webMeta.contains("show.trace")
 
   def locale: Locale = context.map(_.locale) orElse getPlatformExecutionContext.map(_.locale) getOrElse Locale.US
+
+  def getDomainModel: Option[DomainModel] = context.map(_.webapp.domain)
+
+  def getTheme: Option[RenderTheme] = context.flatMap(_.theme)
 
 //  def eventName: String = context.flatMap(_.getFormParameter("Submit")) getOrElse RAISE.notImplementedYetDefect
 //  def exception: Throwable = RAISE.notImplementedYetDefect
@@ -276,9 +331,23 @@ case class Parcel(
 }
 
 object Parcel {
+  val empty = Parcel()
+
   def apply(model: Model, strategy: RenderStrategy): Parcel = Parcel(
-    None, Some(model), Map.empty, None, None, Some(strategy), None, None, None, None
+    None, Some(model), Map.empty, None, None, None, Some(strategy), None, None, None, None
   )
+
+  def view(
+    pc: PlatformExecutionContext,
+    pathname: String
+  ): Parcel = Parcel.empty.withCommand(ViewCommand(pathname)).
+    copy(platformExecutionContextOption = Some(pc))
+
+  def material(
+    pc: PlatformExecutionContext,
+    pathname: String
+  ): Parcel = Parcel.empty.withCommand(MaterialCommand(pathname)).
+    copy(platformExecutionContextOption = Some(pc))
 
   // def apply(command: Command, req: ServiceRequest): Parcel = Parcel(
   //   Some(command), command.getModel, None, None, Some(req)

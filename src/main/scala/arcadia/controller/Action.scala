@@ -5,6 +5,7 @@ import java.net.{URL, URI}
 import play.api.libs.json._
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
+import org.goldenport.context.Conclusion
 import org.goldenport.collection.NonEmptyVector
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.{Record => _, _}
@@ -42,7 +43,15 @@ import arcadia.scenario._
  *  version May.  1, 2019
  *  version Mar. 31, 2020
  *  version Apr. 18, 2020
- * @version May. 28, 2020
+ *  version May. 28, 2020
+ *  version Apr. 25, 2022
+ *  version May.  3, 2022
+ *  version Nov. 27, 2022
+ *  version Dec. 30, 2022
+ *  version Jan. 29, 2023
+ *  version Mar. 30, 2023
+ *  version Jun. 24, 2023
+ * @version Aug. 31, 2023
  * @author  ASAMI, Tomoharu
  */
 trait Action {
@@ -90,7 +99,6 @@ trait Action {
       case m: BrokenSource => RAISE.notImplementedYetDefect
     }
   }
-
 
   protected final def fetch_picture_list(parcel: Parcel, s: Source): List[Picture] =
     fetch_source_via_string(Picture.parseList)(parcel, s) getOrElse Nil
@@ -191,7 +199,17 @@ object Action {
     }
     def writes(p: Source): JsValue = RAISE.notImplementedYetDefect
   }
+  implicit val DomainEntityTypeFormat = Json.format[DomainEntityType]
+  implicit val DomainObjectIdFormat = new Format[DomainObjectId] {
+    def reads(json: JsValue): JsResult[DomainObjectId] = json match {
+      case JsString(s) => JsSuccess(StringDomainObjectId(s))
+      case _ => JsError(s"Unavailabel DomainObjectId: $json")
+    }
+    def writes(p: DomainObjectId): JsValue = RAISE.notImplementedYetDefect
+  }
   implicit val FormColumnFormat = Json.format[FormColumn]
+  implicit val PropertyFormat = Json.format[Property]
+  implicit val PropertyActionFormat = Json.format[PropertyAction]
   implicit val OperationActionFormat = Json.format[OperationAction]
   implicit val GetEntityActionFormat = Json.format[GetEntityAction]
   implicit val ReadEntityListActionFormat = Json.format[ReadEntityListAction]
@@ -207,6 +225,10 @@ object Action {
   implicit val ContentActionFormat = Json.format[ContentAction]
   implicit val SearchBoxActionFormat = Json.format[SearchBoxAction]
   implicit val InvokeOperationScenarioActionFormat = Json.format[InvokeOperationScenarioAction]
+  implicit val ExecuteScriptScenarioActionFormat = Json.format[ExecuteScriptScenarioAction]
+  implicit val CreateEntityScenarioActionFormat = Json.format[CreateEntityScenarioAction]
+  implicit val UpdateEntityScenarioActionFormat = Json.format[UpdateEntityScenarioAction]
+  implicit val DeleteEntityScenarioActionFormat = Json.format[DeleteEntityScenarioAction]
   implicit val LoginScenarioActionFormat = Json.format[LoginScenarioAction]
   implicit val ResetPasswordScenarioActionFormat = Json.format[ResetPasswordScenarioAction]
 
@@ -225,6 +247,9 @@ object Action {
   def parseJsObject(json: JsObject): JsResult[Action] =
     (json \ "action").asOpt[String] match {
       case Some(s) => s match {
+        // control
+        case "property" => Json.fromJson[PropertyAction](json)
+        // operation
         case "operation" => Json.fromJson[OperationAction](json)
         case "get-entity" => Json.fromJson[GetEntityAction](json)
         case "read-entity-list" => Json.fromJson[ReadEntityListAction](json)
@@ -233,13 +258,17 @@ object Action {
         case "invoke-with-id-directive" => Json.fromJson[InvokeWithIdDirectiveAction](json)
 //        case "reset-password-directive" => Json.fromJson[ResetPasswordDirectiveAction](json)
 //        case "reset-password-operation" => Json.fromJson[ResetPasswordOperationAction](json)
+        // widget
         case "carousel" => Json.fromJson[CarouselAction](json)
         case "banner" => Json.fromJson[BannerAction](json)
         case "badge" => Json.fromJson[BadgeAction](json)
         case "notice" => Json.fromJson[NoticeAction](json)
         case "content" => Json.fromJson[ContentAction](json)
         case "searchbox" => Json.fromJson[SearchBoxAction](json)
+        // scenario
         case "invoke-operation-scenario" => Json.fromJson[InvokeOperationScenarioAction](json)
+        case "script-scenario" => Json.fromJson[ExecuteScriptScenarioAction](json)
+        case "create-entity-scenario" => Json.fromJson[CreateEntityScenarioAction](json)
         case "login-scenario" => Json.fromJson[LoginScenarioAction](json)
         case "reset-password-scenario" => Json.fromJson[ResetPasswordScenarioAction](json)
         case _ => JsError(s"Unknown action '$s'")
@@ -295,6 +324,17 @@ trait SourceSinkAction extends Action {
     )
 }
 
+case class PropertyAction(
+  properties: List[Property]
+) extends Action {
+  
+  protected def execute_Apply(parcel: Parcel): Parcel =
+    parcel.addProperties(properties)
+}
+
+object PropertyAction {
+}
+
 case class IndexAction(
 ) extends Action {
   import IndexAction._
@@ -331,15 +371,34 @@ object IndexAction {
     private def _read_entity_list_news() = {
       val rsc = DomainEntityType("news")
       val q = Query(rsc, 0, 10, 20)
-      rsc.v -> context.readEntityList(q)
+      rsc.name -> context.readEntityList(q)
     }
 
     private def _read_entity_list_blog() = {
       val rsc = DomainEntityType("blog")
       val q = Query(rsc, 0, 10, 20)
-      rsc.v -> context.readEntityList(q)
+      rsc.name -> context.readEntityList(q)
     }
   }
+}
+
+case class DomainModelAction(
+) extends Action {
+  import DomainModel.Strategy
+
+  protected def execute_Apply(parcel: Parcel): Parcel = execute_pathname(parcel) { pathname =>
+    val s = parcel.getDomainModel.map(_.strategy(parcel, pathname)).getOrElse(Strategy.Skip)
+    s match {
+      case Strategy.ReadEntityList(entity) => ReadEntityListAction(entity).apply(parcel)
+      case Strategy.GetEntity(entity, id) => GetEntityAction(entity, Some(id)).apply(parcel)
+      case Strategy.CreateEntity(entity) => CreateEntityScenarioAction(entity).apply(parcel)
+      case Strategy.UpdateEntity(entity, id) => UpdateEntityScenarioAction(entity, id).apply(parcel)
+      case Strategy.DeleteEntity(entity, id) => DeleteEntityScenarioAction(entity, id).apply(parcel)
+      case Strategy.Skip => parcel
+    }
+  }
+}
+object DomainModelAction {
 }
 
 case class ResourceDetailAction(
@@ -389,38 +448,38 @@ case class OperationAction(
 }
 
 case class GetEntityAction(
-  entity: String,
-  id: Option[String],
-  source: Option[Source],
-  sink: Option[Sink]
+  entity: DomainEntityType,
+  id: Option[DomainObjectId],
+  source: Option[Source] = None,
+  sink: Option[Sink] = None
 ) extends SourceSinkAction {
   override protected def show_Info =
     SeqUtils.buildTupleVector(
-      "entity" -> Some(entity),
-      "id" -> id
+      "entity" -> Some(entity.name),
+      "id" -> id.map(_.v)
     ) ++ super.show_Info
 
   protected def execute_Apply(parcel: Parcel): Parcel = parcel.applyOnContext { context =>
     (
       for {
-        did <- id.map(StringDomainObjectId) orElse context.getIdInRequest
-        r <- context.getEntity(DomainEntityType(entity), did)
+        did <- id orElse context.getIdInRequest
+        r <- context.getEntity(entity, did)
       } yield parcel.withModel(r)
     ).getOrElse(parcel)
   }
 }
 
 case class ReadEntityListAction(
-  entity: String,
-  query: Option[Map[String, Any]],
-  form: Option[Map[String, Any]],
-  data_href: Option[URI],
-  source: Option[Source],
-  sink: Option[Sink]
+  entity: DomainEntityType,
+  query: Option[Map[String, Any]] = None,
+  form: Option[Map[String, Any]] = None,
+  data_href: Option[URI] = None,
+  source: Option[Source] = None,
+  sink: Option[Sink] = None
 ) extends SourceSinkAction {
   override protected def show_Info =
     SeqUtils.buildTupleVector(
-      "entity" -> Some(entity),
+      "entity" -> Some(entity.name),
       "query" -> query.map(x => s"query${MapUtils.show(x)}"),
       "form" -> form.map(x => s"form${MapUtils.show(x)}"),
       "data_href" -> data_href.map(_.toString)
@@ -569,6 +628,105 @@ case class InvokeOperationScenarioAction(
   //   )
   //   set_sink(parcel, model)
   // }
+}
+
+case class ExecuteScriptScenarioAction(
+  formAction: Option[URI],
+  script: String,
+  method: Option[Method],
+  title: Option[I18NElement],
+  description: Option[I18NElement],
+  submitLabel: Option[I18NElement],
+  parameters: Parameters,
+  successView: Option[String],
+  errorView: Option[String],
+  source: Option[Source],
+  sink: Option[Sink]
+) extends SourceSinkAction {
+  def effectiveMethod: Method = method getOrElse Get
+
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    parcel.getPlatformContext.map { ctx =>
+      val x = ExecuteScriptScenario.launch(parcel, this)
+      val rule = ScenarioEngine.Rule()
+      val engine = new ScenarioEngine(ctx, rule)
+      engine.apply(x)
+    }.getOrElse(RAISE.noReachDefect)
+  }
+}
+
+case class CreateEntityScenarioAction(
+  entityType: DomainEntityType,
+  formAction: Option[URI] = None,
+  title: Option[I18NElement] = None,
+  description: Option[I18NElement] = None,
+  usernameLabel: Option[I18NElement] = None,
+  passwordLabel: Option[I18NElement] = None,
+  submitLabel: Option[I18NElement] = None,
+  successRedirect: Option[String] = None,
+  successView: Option[String] = None,
+  errorView: Option[String] = None,
+  source: Option[Source] = None,
+  sink: Option[Sink] = None
+) extends SourceSinkAction {
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    parcel.getPlatformContext.map { ctx =>
+      val x = CreateEntityScenario.launch(parcel, this)
+      val rule = ScenarioEngine.Rule()
+      val engine = new ScenarioEngine(ctx, rule)
+      engine.apply(x)
+    }.getOrElse(RAISE.noReachDefect)
+  }
+}
+
+case class UpdateEntityScenarioAction(
+  entityType: DomainEntityType,
+  id: Option[DomainObjectId],
+  formAction: Option[URI] = None,
+  title: Option[I18NElement] = None,
+  description: Option[I18NElement] = None,
+  usernameLabel: Option[I18NElement] = None,
+  passwordLabel: Option[I18NElement] = None,
+  submitLabel: Option[I18NElement] = None,
+  successRedirect: Option[String] = None,
+  successView: Option[String] = None,
+  errorView: Option[String] = None,
+  source: Option[Source] = None,
+  sink: Option[Sink] = None
+) extends SourceSinkAction {
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    parcel.getPlatformContext.map { ctx =>
+      val x = UpdateEntityScenario.launch(parcel, this)
+      val rule = ScenarioEngine.Rule()
+      val engine = new ScenarioEngine(ctx, rule)
+      engine.apply(x)
+    }.getOrElse(RAISE.noReachDefect)
+  }
+}
+
+case class DeleteEntityScenarioAction(
+  entityType: DomainEntityType,
+  id: Option[DomainObjectId],
+  formAction: Option[URI] = None,
+  title: Option[I18NElement] = None,
+  description: Option[I18NElement] = None,
+  usernameLabel: Option[I18NElement] = None,
+  passwordLabel: Option[I18NElement] = None,
+  submitLabel: Option[I18NElement] = None,
+  successRedirect: Option[String] = None,
+  successView: Option[String] = None,
+  errorView: Option[String] = None,
+  source: Option[Source] = None,
+  sink: Option[Sink] = None
+) extends SourceSinkAction {
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    parcel.getPlatformContext.map { ctx =>
+      val x = DeleteEntityScenario.launch(parcel, this)
+      val rule = ScenarioEngine.Rule()
+      val engine = new ScenarioEngine(ctx, rule)
+      engine.apply(x)
+    }.getOrElse(RAISE.noReachDefect)
+  }
 }
 
 case class LoginScenarioAction(
@@ -1003,7 +1161,12 @@ case class BrokenAction(
   json: Option[JsValue],
   jsonError: Option[JsError]
 ) extends Action {
-  protected def execute_Apply(parcel: Parcel): Parcel = parcel
+  protected def execute_Apply(parcel: Parcel): Parcel = {
+    val c = Conclusion.config.illegalConfigurationDefect(message.en)
+    val model = ErrorModel.create(parcel, c)
+    val command = ErrorCommand(model)
+    parcel.withCommandModel(command, model)
+  }
 }
 object BrokenAction {
   def apply(msg: String, json: JsValue): BrokenAction = BrokenAction(I18NString(msg), Some(json), None)

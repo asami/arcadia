@@ -3,11 +3,13 @@ package arcadia.model
 import scala.xml.{NodeSeq, Group, Text}
 import java.net.URI
 import java.util.Locale
+import org.goldenport.context.{Conclusion => CConclusion, StatusCode}
 import org.goldenport.exception.RAISE
 import org.goldenport.collection.{NonEmptyVector, VectorMap}
 import org.goldenport.record.v3.{IRecord, Record}
 import org.goldenport.record.v2.{Record => _, Conclusion => RConclusion, _}
 import org.goldenport.record.v2.util.RecordUtils
+import org.goldenport.record.util.AnyUtils
 import org.goldenport.i18n.{I18NString, I18NElement}
 import org.goldenport.value._
 import org.goldenport.trace.TraceContext
@@ -41,7 +43,15 @@ import arcadia.domain._
  *  version Mar. 21, 2020
  *  version Apr. 18, 2020
  *  version May. 28, 2020
- * @version Jun.  1, 2020
+ *  version Jun.  1, 2020
+ *  version May. 28, 2022
+ *  version Sep. 27, 2022
+ *  version Oct. 30, 2022
+ *  version Nov.  6, 2022
+ *  version Mar. 30, 2023
+ *  version Jun. 23, 2023
+ *  version Oct. 31, 2023
+ * @version Mar. 29, 2025
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -381,23 +391,49 @@ case object EmptyModel extends Model {
 }
 
 case class ErrorModel(
-  code: Int,
-  message: Option[I18NElement],
-  exception: Option[Throwable],
+  conclusion: CConclusion,
+  element: Option[I18NElement],
   invalid: Option[Invalid],
   topUri: Option[URI],
   backUri: Option[URI],
   trace: Option[TraceContext]
 ) extends Model {
+  def code = conclusion.code
+  def message: Option[I18NElement] = element orElse Some(I18NElement(conclusion.messageI18N))
+  def exception: Option[Throwable] = conclusion.exception
   val expiresKind = Some(NoCacheExpires)
-  def toRecord: IRecord = RAISE.notImplementedYetDefect
+  def toRecord: IRecord = org.goldenport.exception.RAISE.notImplementedYetDefect
+  override def apply(strategy: RenderStrategy): Content = XmlContent(render(strategy), expiresKind, code)
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, None
   ) {
     protected def render_Content: NodeSeq = error(code, message, exception, invalid, topUri, backUri, trace)
   }.apply
+
+  def RAISE: Nothing = {
+    val uri = backUri.fold("")(x => s"$x: ")
+    val msg = s"""${uri}${conclusion.message}"""
+    conclusion.withMessage(msg).RAISEC
+  }
 }
 object ErrorModel extends ModelClass {
+  def apply(
+    code: Int,
+    element: Option[I18NElement],
+    exception: Option[Throwable],
+    invalid: Option[Invalid],
+    topUri: Option[URI],
+    backUri: Option[URI],
+    trace: Option[TraceContext]
+  ): ErrorModel = ErrorModel(
+    CConclusion(StatusCode(code), exception = exception),
+    element,
+    invalid,
+    topUri,
+    backUri,
+    trace
+  ) // compatibility
+
   def create(parcel: Parcel, code: Int): ErrorModel = {
     val backuri = _back_uri(parcel)
     ErrorModel(code, None, None, None, None, backuri, parcel.trace)
@@ -424,10 +460,14 @@ object ErrorModel extends ModelClass {
     ErrorModel(500, Some(I18NElement(m)), None, None, None, backuri, parcel.trace)
   }
   def create(parcel: Parcel, evt: scenario.Event): ErrorModel = RAISE.notImplementedYetDefect
+  def create(parcel: Parcel, c: CConclusion): ErrorModel = {
+    val backuri = _back_uri(parcel)
+    ErrorModel(c, None, None, None, backuri, parcel.trace)
+  }
   def create(code: Int, message: Option[String], exception: Option[Throwable]): ErrorModel =
     ErrorModel(code, message.map(I18NElement(_)), exception, None, None, None, None)
   def create(res: Response): ErrorModel =
-    ErrorModel(res.code, None, None, None, None, None, None)
+    ErrorModel(res.code, res.getString.map(I18NElement(_)), None, None, None, None, None)
   def notFound(parcel: Parcel, m: String): ErrorModel = {
     val backuri = _back_uri(parcel)
     val msg = I18NElement(m)
@@ -438,7 +478,11 @@ object ErrorModel extends ModelClass {
     ErrorModel(401, None, None, None, None, backuri, parcel.trace)
   }
 
-  private def _back_uri(parcel: Parcel): Option[URI] = None // TODO
+  private def _back_uri(parcel: Parcel): Option[URI] =
+    parcel.command.flatMap {
+      case m: MaterialCommand => Some(new URI(m.pathname.v))
+      case _ => None
+    }
 
   def get(param: ModelParameter, response: Response): Option[Model] =
     if (response.code > 300)
@@ -453,7 +497,7 @@ sealed trait ValueModel extends Model with IAtomicModel {
 case class SingleValueModel(datatype: DataType, v: Option[Any]) extends ValueModel {
   val expiresKind = None
   def toRecord: IRecord = RAISE.notImplementedYetDefect
-  def render(strategy: RenderStrategy) = Text(v.toString) // TODO
+  def render(strategy: RenderStrategy) = Text(v.fold("")(AnyUtils.toString))
 }
 case class MultipleValueModel(datatype: DataType, v: List[Any]) extends Model with ValueModel {
   val expiresKind = None
@@ -637,7 +681,7 @@ object EntityDetailModel extends ModelClass {
     klass: DomainEntityType,
     record: IRecord
   ): EntityDetailModel = EntityDetailModel(
-    Some(I18NElement(klass.v)), klass, None, record
+    Some(I18NElement(klass.name)), klass, None, record
   )
 
   def get(param: ModelParameter, response: Response): Option[Model] =
@@ -657,7 +701,8 @@ case class EntityListModel(
   transfer: Transfer,
   tableKind: Option[TableKind] = None,
   expiresKind: Option[ExpiresKind] = Some(AgilePageExpires),
-  dataHref: Option[URI] = None
+  dataHref: Option[URI] = None,
+  paging: Option[Renderer.TableOrder.Paging] = None
 ) extends Model with IEntityListModel with IComponentModel {
   override def getEntityType: Option[DomainEntityType] = Some(entityType)
   override protected def view_Bindings(strategy: RenderStrategy) = Map(
@@ -695,11 +740,13 @@ case class EntityListModel(
   )
 
   def withDataHref(p: Option[URI]): EntityListModel = copy(dataHref = p)
+  def withPaging(p: Option[Renderer.TableOrder.Paging]) = copy(paging = p)
+  def withPaging(p: Renderer.TableOrder.Paging) = copy(paging = Some(p))
 
   def render(strategy: RenderStrategy) = new Renderer(
     strategy, None, None, None, caption
   ){
-    protected def render_Content: NodeSeq = table(Renderer.TableOrder(tableKind, getSchema, getEntityType, dataHref, records))
+    protected def render_Content: NodeSeq = table(Renderer.TableOrder(tableKind, getSchema, getEntityType, dataHref, paging, records))
   }.apply
   lazy val effectiveSchema = getSchema.getOrElse(IRecord.makeSchema(records))
   lazy val thead: TableHeadModel = TableHeadModel(effectiveSchema, tableKind)
@@ -711,8 +758,22 @@ object EntityListModel extends ModelClass {
     records: List[IRecord],
     transfer: Transfer
   ): EntityListModel = EntityListModel(
-    Some(I18NElement(klass.v)), klass, None, records, transfer
+    Some(I18NElement(klass.name)), klass, None, records, transfer
   )
+
+  // def paging(
+  //   klass: DomainEntityType,
+  //   records: List[IRecord],
+  //   transfer: Transfer,
+  //   paging: Option[Renderer.TableOrder.Paging]
+  // ): EntityListModel = EntityListModel(
+  //   Some(I18NElement(klass.name)),
+  //   klass,
+  //   None,
+  //   records,
+  //   transfer,
+  //   paging = paging
+  // )
 
   def empty(name: String): EntityListModel = EntityListModel(
     DomainEntityType(name),
@@ -730,6 +791,23 @@ object EntityListModel extends ModelClass {
       else
         None
     }
+
+  def paging(
+    klass: DomainEntityType,
+    records: List[IRecord],
+    transfer: Transfer,
+    paging: Renderer.TableOrder.Paging
+  ): EntityListModel = {
+    val xs = records.take(paging.pageSize)
+    EntityListModel(
+      Some(I18NElement(klass.name)),
+      klass,
+      None,
+      xs,
+      transfer,
+      paging = Some(paging)
+    )
+  }
 }
 
 case class PropertySheetModel(
@@ -750,6 +828,8 @@ case class PropertySheetModel(
   }.apply
 }
 object PropertySheetModel extends ModelClass {
+  val empty = PropertySheetModel(Record.empty)
+
   def apply(caption: String, schema: Schema, record: IRecord): PropertySheetModel = PropertySheetModel(
     Some(I18NElement(caption)), Some(schema), record
   )
@@ -1168,6 +1248,31 @@ case class PropertyConfirmFormModel(
   ) {
     protected def render_Content: NodeSeq =
       property_confirm_form(action, method, schema, data, hiddens, submit)
+  }.apply
+}
+
+case class PropertyShowFormModel(
+  action: URI,
+  method: Method,
+  schema: Schema,
+  data: IRecord,
+  hiddens: Hiddens,
+  submit: Submits,
+  expiresKind: Option[ExpiresKind] = Some(NoCacheExpires),
+  conclusion: FormModel.Conclusion = FormModel.Conclusion.empty
+) extends Model with FormModel with IComponentModel {
+  def toRecord: IRecord = data // TODO hiddens
+  def get(name: String): Option[Any] = data.get(name)
+
+  def getPlaceholder(name: String): Option[String] = schema.getColumn(name).flatMap(_.form.placeholder).map(_.c)
+
+  def setError(p: RConclusion) = copy(conclusion = FormModel.Conclusion(p))
+
+  def render(strategy: RenderStrategy): NodeSeq = new Renderer(
+    strategy, None, None, None, None
+  ) {
+    protected def render_Content: NodeSeq =
+      property_show_form(action, method, schema, data, hiddens, submit)
   }.apply
 }
 

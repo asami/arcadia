@@ -18,7 +18,8 @@ import arcadia.scenario.ScenarioEngine
  *  version Mar. 26, 2018
  *  version Jul. 21, 2019
  *  version Mar. 23, 2020
- * @version May. 29, 2020
+ *  version May. 29, 2020
+ * @version Dec. 30, 2022
  * @author  ASAMI, Tomoharu
  */
 abstract class Controller(rule: Controller.Rule) {
@@ -69,6 +70,16 @@ object Controller {
   case class Rule(actions: List[Action]) {
     def apply(parcel: Parcel): Parcel = actions./:(parcel)((z, x) => x apply z)
     def applyAjax(parcel: Parcel): Parcel = actions./:(parcel)((z, x) => x applyAjax z)
+  }
+}
+
+case object DomainModelController extends Controller(
+  Controller.Rule(List(DomainModelAction()))
+) {
+  override val guard = new Guard {
+    def isAccept(p: Parcel): Boolean = predicate_pathname(p)(pathname =>
+      p.getDomainModel.fold(false)(_.isAvailableResource(pathname))
+    )
   }
 }
 

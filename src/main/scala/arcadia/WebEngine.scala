@@ -5,12 +5,18 @@ import org.goldenport.exception.RAISE
 import org.goldenport.values.ResourceName
 import org.goldenport.record.v2.Record
 import org.goldenport.trace.{TraceContext, Result}
+import org.goldenport.realm.Realm
 import arcadia.context._
 import arcadia.controller.ControllerEngine
 import arcadia.view.ViewEngine
+import arcadia.view.TemplateEngineHangar
+import arcadia.view.ScalateTemplateEngine
 import arcadia.controller._
 import arcadia.model.ErrorModel
 import arcadia.scenario._
+import arcadia.service.ServiceFacility
+import arcadia.service.Service
+import arcadia.domain.DomainModelSpace
 
 /*
  * @since   Jul. 15, 2017
@@ -26,17 +32,36 @@ import arcadia.scenario._
  *  version Jul. 20, 2019
  *  version Mar. 31, 2020
  *  version Apr.  1, 2020
- * @version May.  8, 2020
+ *  version May.  8, 2020
+ *  version Mar. 20, 2022
+ *  version Sep. 10, 2022
+ *  version Oct. 23, 2022
+ *  version Dec. 25, 2022
+ *  version Jan.  1, 2023
+ * @version Mar. 18, 2025
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
   val platform: PlatformContext,
+  val templateengines: TemplateEngineHangar,
+  val services: ServiceFacility,
   val application: WebApplication,
   val extend: List[WebEngine],
   val config: WebApplicationConfig = WebApplicationConfig.empty
+//  val webConfig: WebEngine.Config = WebEngine.Config.empty
 ) {
   val rule: WebApplicationRule = extend./:(application.config.toRule)(_ complement _.application.config.toRule).complement(config.toRule)
-  val view: ViewEngine = new ViewEngine(platform, application.view, extend.map(_.view))
+  // val templateengines = {
+  //   val a = webConfig.templateEngineHangarFactory.create(platform)
+  //   val b = TemplateEngineHangar(new ScalateTemplateEngine(platform))
+  //   a + b
+  // }
+  val view: ViewEngine = new ViewEngine(
+    platform,
+    application.view,
+    extend.map(_.view),
+    templateengines
+  )
   val scenariorule = ScenarioEngine.Rule.create() // TODO
   val scenario = new ScenarioEngine(platform, scenariorule)
   val prologuecontroller = {
@@ -63,8 +88,8 @@ class WebEngine(
   val isTrace = true
 
   def apply(p: Parcel): Content = {
-    val parcel0 =
-      p.complementApplicationRule(rule).withApplication(application)
+    val parcel0 = p.complementApplicationRule(rule).
+      withExecutionContext(services, application)
     val parcel1 = _normalize_auth(parcel0)
     val parcel =
       if (isTrace)
@@ -135,6 +160,20 @@ class WebEngine(
   }
 
   def shutdown(): Unit = view.shutdown()
+
+  def applicationRealms: List[Realm] = application.getRealm.toList ::: extend.flatMap(_.applicationRealms)
+
+  def extendRealms: List[Realm] = extend.flatMap(_.applicationRealms)
 }
 object WebEngine {
+  case class Config(
+    templateEngineHangarFactory: TemplateEngineHangar.Factory = TemplateEngineHangar.Factory.empty,
+    domainModelFactory: DomainModelSpace.Factory = DomainModelSpace.Factory.empty,
+    services: Seq[Service] = Nil,
+    useScalate: Boolean = true
+  )
+  object Config {
+    val empty = Config()
+    val standalone = Config(useScalate = false)
+  }
 }

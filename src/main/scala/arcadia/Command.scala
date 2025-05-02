@@ -23,7 +23,9 @@ import arcadia.context.{Request, PlatformExecutionContext}
  *  version Aug. 31, 2018
  *  version Apr. 30, 2019
  *  version Mar. 23, 2020
- * @version Apr. 17, 2020
+ *  version Apr. 17, 2020
+ *  version Mar.  6, 2022
+ * @version Nov. 28, 2022
  * @author  ASAMI, Tomoharu
  */
 trait Command {
@@ -71,7 +73,11 @@ object UnauthorizedCommand {
 case class RerunCommand(parcel: Parcel) extends Command {
 }
 
-case class IndexCommand() extends Command {
+case class IndexCommand(pathname: PathName) extends Command {
+  def body = pathname.body
+}
+object IndexCommand {
+  def apply(): IndexCommand = IndexCommand(PathName("index.html"))
 }
 
 case class SetupCommand() extends Command {
@@ -176,4 +182,12 @@ case class InvokePlatformCommand(service: Any) extends Command {
 }
 
 case class InvokeOperationCommand(context: PlatformExecutionContext, request: Request) extends Command {
+}
+
+case class ExecuteScriptCommand(
+  context: PlatformExecutionContext,
+  schema: Schema,
+  script: String,
+  request: Request
+) extends Command {
 }

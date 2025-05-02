@@ -8,6 +8,7 @@ import arcadia._
 import arcadia.context.{Query => CQuery, ExecutionContext}
 import arcadia.domain._
 import arcadia.model._
+import arcadia.view.ViewEngine.LayoutKind
 
 /*
  * @since   Aug.  2, 2017
@@ -16,7 +17,11 @@ import arcadia.model._
  *  version Jan. 21, 2018
  *  version Aug.  5, 2018
  *  version Mar. 31, 2020
- * @version Apr. 11, 2020
+ *  version Apr. 11, 2020
+ *  version Mar.  5, 2022
+ *  version Jun. 26, 2022
+ *  version Mar. 28, 2025
+ * @version Apr.  4, 2025
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -77,18 +82,53 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   /*
    * Partial
    */
-  def headDef: NodeSeq = _render_partial(strategy.partials.headDef)
-  def footDef: NodeSeq = _render_partial(strategy.partials.footDef)
-  def header: NodeSeq = _render_partial(strategy.partials.header)
-  def footer: NodeSeq = _render_partial(strategy.partials.footer)
-  def sidebar: NodeSeq = _render_partial(strategy.partials.sidebar)
-  def sidebarContent: NodeSeq = strategy.theme.sidebar.content(this)
-  def navigation: NodeSeq = _render_partial(strategy.partials.navigation)
+  def headDef(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.headDef(l))
+  def headDef(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.headDef(l))
+  def footDef(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.footDef(l))
+  def footDef(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.footDef(l))
+  def header(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.header(l))
+  def header(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.header(l))
+  def footer(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.footer(l))
+  def footer(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.footer(l))
+  def sidebar(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.sidebar(l))
+  def sidebar(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.sidebar(l))
+  def sidebarContent(l: LayoutKind): NodeSeq = strategy.theme.sidebar.content(this)
+  def sidebarContent(l: Option[LayoutKind]): NodeSeq = strategy.theme.sidebar.content(this)
+  def navigation(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.navigation(l))
+  def navigation(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.navigation(l))
   def navigationContent: NodeSeq = strategy.theme.navigation.content(this)
-  def contentHeader: NodeSeq = _render_partial(strategy.partials.contentHeader)
-  def content: NodeSeq = _render_partial(strategy.partials.content)
+  def contentHeader(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.contentHeader(l))
+  def contentHeader(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.contentHeader(l))
+  def content(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.content(l), contentContent)
+  def content(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.content(l), contentContent)
+  def contentContent: NodeSeq = main
 
-  def contentContent: NodeSeq =
+  private def main: NodeSeq = contentDocument.headOption.
+    flatMap(_to_body_content).
+    getOrElse(contentDocument)
+
+  def contentHeadTitle: NodeSeq = getContentHeadTitle.getOrElse(NodeSeq.Empty)
+
+  def getContentHeadTitle: Option[NodeSeq] = 
+    contentDocument.headOption.flatMap(_to_head_title)
+
+  private def _to_body_content(p: Node): Option[NodeSeq] =
+    p.label match {
+      case "html" => p.child.find(_.label == "body").
+          map(x => NodeSeq.fromSeq(x.child)).
+          orElse(Some(NodeSeq.Empty))
+      case "body" => Some(p.child)
+      case _ => None
+    }
+
+  private def _to_head_title(p: Node): Option[NodeSeq] =
+    p.label match {
+      case "html" => p.child.find(_.label == "head").map(_\\("title"))
+      case "body" => Some(p.child)
+      case _ => None
+    }
+
+  lazy val contentDocument: NodeSeq =
     strategy.viewContext.
       flatMap(_content_content_from_view).
       getOrElse(_content_content_from_model)
@@ -102,16 +142,27 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
     case m: IAtomicModel => render_view_atomic(m)
     case EmptyModel => <div>No content</div>
   }
-  def partial(p: PartialKind): NodeSeq = _render_partial(strategy.partials.get(p))
+//  def partial(p: PartialKind): NodeSeq = _render_partial(strategy.partials.get(, p))
 
-  private def _render_partial(p: Option[PartialView]): NodeSeq = 
-    p.map { view =>
-      strategy.viewContext.fold {
-        RAISE.noReachDefect
-      } { c =>
-        view.render(c.engine, c.parcel)
-      }
-    }.getOrElse(Group(Nil))
+  private def _render_partial(p: PartialView): NodeSeq = 
+    strategy.viewContext.fold {
+      RAISE.noReachDefect
+    } { c =>
+      p.render(c.engine, c.parcel)
+    }
+
+  private def _render_partial(p: Option[PartialView]): NodeSeq =
+    p.map(_render_partial).getOrElse(Group(Nil))
+    // p.map { view =>
+    //   strategy.viewContext.fold {
+    //     RAISE.noReachDefect
+    //   } { c =>
+    //     view.render(c.engine, c.parcel)
+    //   }
+    // }.getOrElse(Group(Nil))
+
+  private def _render_partial(p: Option[PartialView], default: => NodeSeq): NodeSeq = 
+    p.map(_render_partial).getOrElse(default)
 
   protected def render_view_section(p: ISectionModel with Model): NodeSeq = {
     val parcel = Parcel(p, strategy.withScopeContent)
@@ -145,7 +196,12 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   def resolvePathName(p: String): PathName = resolvePathName(PathName(p))
   def resolvePathName(pn: PathName): PathName = getExecutionContext.fold(pn)(_.resolvePathName(pn))
 
-  def pageTitle: NodeSeq = strategy.getPage.map(_.title(locale)).getOrElse(Text("No title"))
+  def pageTitle: NodeSeq = {
+    val a = getContentHeadTitle
+    val b = a orElse strategy.getPage.map(_.title(locale))
+    b.getOrElse(NodeSeq.Empty) // Text("No title")
+  }
+  def pageHeaderStyle: String = "" // TODO
   def pageContentHeaderStyle: String = strategy.getPage.flatMap(_.contentHeaderStyle).getOrElse("background-image: url('assets/img/bg37.jpg') ;") // TODO
   def pageIsHeadText: Boolean = _page_is(_.isHeadText)
   def pageHeadText: String = _page_text(_.headText)
@@ -173,10 +229,35 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
     }
   }
 
-  def assets: String =
-    strategy.viewContext.flatMap(_.parcel.context.map(_.assets)) getOrElse {
+  def assets: String = {
+    val pathOption: Option[String] = strategy.viewContext.
+      flatMap(_.parcel.view).
+      flatMap {
+        case m: HtmlView => m.pathname.flatMap { x =>
+          val pn = PathName(x)
+          val depth = pn.length - 1
+          if (depth <= 0)
+            None
+          else 
+            Some("../" * depth)
+        }
+      }
+    val path = pathOption getOrElse "./"
+    val base = strategy.viewContext.flatMap(_.parcel.context.map(_.assets)) getOrElse {
       "assets"
     }
+    s"$path$base"
+  }
 
   def assets(path: String): String = StringUtils.concatPath(assets, path)
+
+  /*
+   * Properties for template engine
+   */
+  def bindings: Map[String, AnyRef] = Map(
+    "assets" -> assets,
+    "body_class_name" -> bodyClassName,
+    "page_header_style" -> pageHeaderStyle,
+    "page_content_header_style" -> pageContentHeaderStyle
+  )
 }

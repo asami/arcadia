@@ -34,7 +34,12 @@ import arcadia.domain._
  *  version Oct. 24, 2018
  *  version Nov.  7, 2018
  *  version Apr. 24, 2019
- * @version Apr. 17, 2020
+ *  version Apr. 17, 2020
+ *  version Apr. 25, 2022
+ *  version May.  3, 2022
+ *  version Mar. 31, 2023
+ *  version Apr. 22, 2023
+ * @version Dec. 29, 2023
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -81,44 +86,72 @@ case class TitleLine(
       None
     else
       Some(this)
+
+  def title(locale: Locale): NodeSeq =
+    XmlUtils.orEmptyNodeSeq(title.map(_.apply(locale)))
 }
 object TitleLine {
   val blank = TitleLine(Some(I18NElement("")), None)
   def create(title: I18NElement): TitleLine = TitleLine(Some(title), None)
 }
 
-case class Picture( // HTML5 picture
-  // TODO source
-  // TODO map/area
-  src: URI, // (1280)
-  src_l: Option[URI], // 1280
-  src_m: Option[URI], // 640
-  src_s: Option[URI], // 320
-  src_xs: Option[URI], // 160
-  src_raw: Option[URI],
-  alt: Option[I18NString],
-  href: Option[URI],
-  size: Option[Int],
-  height: Option[Int],
-  width: Option[Int],
-  caption: Option[I18NElement],
-  description: Option[I18NElement]
-) extends Particle {
-  // def srcString = src.toString
-  lazy val large = src_l getOrElse src
-  lazy val medium = src_m orElse src_l getOrElse src
-  lazy val small = src_s orElse src_m orElse src_l getOrElse src
-  lazy val extrasmall = src_xs orElse src_s orElse src_m orElse src_l getOrElse src
-  lazy val img = src.toString
-  lazy val l = large.toString
-  lazy val m = medium.toString
-  lazy val s = small.toString
-  lazy val xs = extrasmall.toString
+sealed trait Picture extends Particle {
+  def attributes: Picture.Attributes
+
+  def alt = attributes.alt
+  def href = attributes.href
+  def size = attributes.size
+  def height = attributes.height
+  def width = attributes.width
+  def caption = attributes.caption
+  def description = attributes.description
   // def altString(locale: Locale): String = alt(locale)
   def alt(locale: Locale): String = alt.map(_.as(locale)).getOrElse("")
 }
 object Picture {
-  def create(src: URI): Picture = Picture(src, None, None, None, None, None, None, None, None, None, None, None, None)
+  case class Attributes(
+    alt: Option[I18NString] = None,
+    href: Option[URI] = None,
+    size: Option[Int] = None,
+    height: Option[Int] = None,
+    width: Option[Int] = None,
+    caption: Option[I18NElement] = None,
+    description: Option[I18NElement] = None
+  )
+  object Attributes {
+    val empty = Attributes()
+  }
+
+  case class UriPicture( // HTML5 picture
+    // TODO source
+    // TODO map/area
+    src: URI, // (1280)
+    src_l: Option[URI] = None, // 1280
+    src_m: Option[URI] = None, // 640
+    src_s: Option[URI] = None, // 320
+    src_xs: Option[URI] = None, // 160
+    src_raw: Option[URI] = None,
+    attributes: Attributes = Attributes.empty
+  ) extends Picture {
+    // def srcString = src.toString
+    lazy val large = src_l getOrElse src
+    lazy val medium = src_m orElse src_l getOrElse src
+    lazy val small = src_s orElse src_m orElse src_l getOrElse src
+    lazy val extrasmall = src_xs orElse src_s orElse src_m orElse src_l getOrElse src
+    lazy val img = src.toString
+    lazy val l = large.toString
+    lazy val m = medium.toString
+    lazy val s = small.toString
+    lazy val xs = extrasmall.toString
+  }
+
+  case class IconPicture( // Bootstrap Icon
+    name: String,
+    attributes: Attributes = Attributes.empty
+  ) extends Picture {
+  }
+
+  def create(src: URI): Picture = UriPicture(src)
 
   def create(src: URL): Picture = create(src.toURI)
 
@@ -133,6 +166,8 @@ object Picture {
       }
     else
       create(UURL.getURLFromFileOrURLName(src))
+
+  def createIcon(p: String): Picture = IconPicture(p)
 
   def parseList(p: String): List[Picture] = Particle.parseParticleList(p) match {
     case JsSuccess(xs, _) => xs.collect {
@@ -283,7 +318,7 @@ object Submits {
 }
 
 case class Submit(kind: SubmitKind, label: I18NString) extends Particle {
-  def name = ScenarioCommand.PROP_SUBMIT_PREFIX + kind.name
+  def name = ScenarioCommand.PROP_SUBMIT // ScenarioCommand.PROP_SUBMIT_PREFIX + kind.name
   def value(locale: Locale) = label(locale)
 }
 object Submit {
@@ -300,6 +335,9 @@ sealed trait SubmitKind {
 }
 case object OkSubmitKind extends SubmitKind {
   def name: String = Event.EVENT_OK
+}
+case object OkShowSubmitKind extends SubmitKind {
+  def name: String = Event.EVENT_OK_SHOW
 }
 case object CancelSubmitKind extends SubmitKind {
   def name: String = Event.EVENT_CANCEL
@@ -371,6 +409,15 @@ case object Put extends Method {
 }
 case object Delete extends Method {
   def name = "DELETE"
+}
+
+case class Property(
+  name: String,
+  value: JsValue
+) {
+  
+}
+object Property {
 }
 
 case class RequestParameter(
@@ -569,6 +616,7 @@ object Particle {
   //   }
   //   def writes(p: Record): JsValue = RAISE.notImplementedYetDefect
   // }
+  implicit val PropertyFormat = Json.format[Property]
   implicit val RequestParameterFormat = Json.format[RequestParameter]
   implicit object LabelIndicatorFormat extends Format[LabelIndicator] {
     def reads(json: JsValue): JsResult[LabelIndicator] = LabelIndicator.parseJsValue(json)
@@ -577,7 +625,10 @@ object Particle {
   implicit val DomainEntityLinkFormat = Json.format[DomainEntityLink]
   implicit val BadgeFormat = Json.format[Badge]
   implicit val TitleLineleFormat = Json.format[TitleLine]
-  implicit val PictureFormat = Json.format[Picture]
+  implicit object PictureFormat extends Format[Picture] {
+    def reads(json: JsValue): JsResult[Picture] = RAISE.notImplementedYetDefect
+    def writes(p: Picture): JsValue = RAISE.notImplementedYetDefect
+  }
   implicit val CardFormat = Json.format[Card]
   implicit val XmlFormat = Json.format[Xml]
   implicit val FormColumnFormat = Json.format[FormColumn]

@@ -23,10 +23,15 @@ import org.goldenport.hocon.RichConfig.Implicits._
  *  version Aug.  6, 2018
  *  version Apr. 28, 2019
  *  version Mar. 24, 2020
- * @version Apr. 23, 2020
+ *  version Apr. 23, 2020
+ *  version Jul. 25, 2022
+ *  version Nov. 26, 2022
+ *  version Dec. 27, 2023
+ * @version Mar. 15, 2025
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationConfig(
+  name: Option[String],
   theme: Option[String],
   application_title: Option[I18NElement],
   logo_title: Option[I18NElement],
@@ -47,6 +52,7 @@ case class WebApplicationConfig(
   http: Option[WebApplicationConfig.HttpConfig],
   route: Option[WebApplicationConfig.RouteConfig],
   page: Option[WebApplicationConfig.Pages],
+  render_strategy: Option[WebApplicationConfig.RenderStrategyConfig],
   //
   lifecycle: Option[WebApplicationConfig.LifecycleConfig],
   extend: Option[List[String]] // related feature: mixin
@@ -62,6 +68,7 @@ case class WebApplicationConfig(
   def complement(rhs: WebApplicationConfig) = {
     import scalaz._, Scalaz._
     WebApplicationConfig(
+      name orElse rhs.name,
       theme orElse rhs.theme,
       application_title orElse rhs.application_title,
       logo_title orElse rhs.logo_title,
@@ -79,6 +86,7 @@ case class WebApplicationConfig(
       http orElse rhs.http,
       route orElse rhs.route, // TODO
       page orElse rhs.page, // ? complement
+      render_strategy orElse rhs.render_strategy, // ? complement
       lifecycle orElse rhs.lifecycle,
       extend |+| rhs.extend
     )
@@ -101,6 +109,7 @@ case class WebApplicationConfig(
     http.map(_.toRule),
     route.map(_.toRule) getOrElse Route.empty,
     page.map(_.toRule) getOrElse WebApplicationRule.Pages.empty,
+    render_strategy.map(_.toRule) getOrElse WebApplicationRule.RenderStrategyRule.empty,
     Record.empty // TODO
   )
 
@@ -114,6 +123,8 @@ case class WebApplicationConfig(
 
 object WebApplicationConfig {
   val empty = WebApplicationConfig(
+    None,
+    None,
     None,
     None,
     None,
@@ -164,6 +175,21 @@ object WebApplicationConfig {
       headImage,
       mailAddress,
       properties.getOrElse(Record.empty)
+    )
+  }
+
+  case class RenderStrategyConfig(
+    tableKind: Option[String] = None,
+    cardKind: Option[String] = None,
+    cardKindInGrid: Option[String] = None
+  ) {
+    def isEmpty = tableKind.isEmpty && cardKind.isEmpty && cardKindInGrid.isEmpty
+    def toOption = if (isEmpty) None else Some(this)
+
+    def toRule: WebApplicationRule.RenderStrategyRule = WebApplicationRule.RenderStrategyRule.create(
+      tableKind,
+      cardKind,
+      cardKindInGrid
     )
   }
 
@@ -293,7 +319,9 @@ object WebApplicationConfig {
 
   def create(name: String): WebApplicationConfig = WebApplicationConfig(
     None,
+    None,
     Some(I18NElement(name)),
+    None,
     None,
     None,
     None,
@@ -358,6 +386,7 @@ object WebApplicationConfig {
   implicit val RouteConfigFormat = Json.format[RouteConfig]
   implicit val PagesFormat = Json.format[Pages]
   implicit val LifecycleConfigFormat = Json.format[LifecycleConfig]
+  implicit val RenderStrategyConfigFormat = Json.format[RenderStrategyConfig]
   implicit val WebApplicationConfigFormat = Json.format[WebApplicationConfig]
 
   private def _parse_json(s: String): WebApplicationConfig = {
@@ -371,10 +400,10 @@ object WebApplicationConfig {
   private def _parse_hocon(s: String): WebApplicationConfig = {
     val c = ConfigFactory.parseString(s)
     val expires = ExpiresConfig(
-      c.getDurationOption("expires.assets"),
-      c.getDurationOption("expires.static_page"),
-      c.getDurationOption("expires.common_page"),
-      c.getDurationOption("expires.private_page")
+      c.getFiniteDurationOption("expires.assets"),
+      c.getFiniteDurationOption("expires.static_page"),
+      c.getFiniteDurationOption("expires.common_page"),
+      c.getFiniteDurationOption("expires.private_page")
     )
     val cdn = CdnConfig(
       c.getUriOption("cdn.assets"),
@@ -386,13 +415,19 @@ object WebApplicationConfig {
     )
     val http = HttpConfig(
       c.getStringOption("http.cookie.secure").map(CookieSecureKind(_)),
-      c.getDurationOption("http.login.maxAge"),
-      c.getDurationOption("http.access.maxAge")
+      c.getFiniteDurationOption("http.login.maxAge"),
+      c.getFiniteDurationOption("http.access.maxAge")
     )
     val route = Some(RouteConfig("???"))
     val pages = None
+    val renderstrategy = RenderStrategyConfig(
+      c.getStringOption("render.table_kind"),
+      c.getStringOption("render.card_kind"),
+      c.getStringOption("render.card_kind_in_grid")
+    ).toOption
     val lifecycle = LifecycleConfig(expires.toOption, cdn.toOption)
     WebApplicationConfig(
+      c.getStringOption("name"),
       c.getStringOption("theme"),
       c.getI18NElementOption("application_title"),
       c.getI18NElementOption("logo_title"),
@@ -410,6 +445,7 @@ object WebApplicationConfig {
       http.toOption,
       route,
       pages,
+      renderstrategy,
       lifecycle.toOption,
       c.getEagerStringListOption("extend")
     )

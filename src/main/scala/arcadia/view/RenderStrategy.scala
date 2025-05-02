@@ -39,7 +39,13 @@ import arcadia.view.ViewEngine._
  *  version Nov.  7, 2018
  *  version Aug.  5, 2019
  *  version Mar. 31, 2020
- * @version Apr.  1, 2020
+ *  version Apr.  1, 2020
+ *  version Apr. 30, 2022
+ *  version May.  3, 2022
+ *  version Dec. 30, 2022
+ *  version Nov. 28, 2023
+ *  version Dec. 28, 2023
+ * @version Apr.  2, 2025
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -49,23 +55,45 @@ case class RenderStrategy(
   applicationRule: WebApplicationRule,
   partials: Partials,
   components: Components,
+  layoutKind: Option[LayoutKind],
   renderContext: RenderContext,
-  viewContext: Option[ViewContext]
+  viewContext: Option[ViewContext],
+  history: RenderStrategy.History = RenderStrategy.History.empty // unused
 ) {
   def scope = renderContext.scope
   def size = renderContext.size getOrElse NormalSize
-  def tableKind = renderContext.tableKind getOrElse theme.default.tableKind
-  def tableKind(p: Option[TableKind]) = renderContext.tableKind orElse p getOrElse theme.default.tableKind
-  def cardKind = renderContext.cardKind getOrElse theme.default.cardKind
-  def cardKind(p: Option[TableKind]) = renderContext.cardKind orElse p getOrElse theme.default.cardKind
-  def cardKindInGrid = renderContext.cardKindInGrid getOrElse theme.default.cardKindInGrid
+  def tableKind = (
+    renderContext.tableKind orElse
+      history.tableKind orElse // unused
+      applicationRule.renderStrategy.tableKind
+      getOrElse theme.default.tableKind
+  )
+  def tableKind(p: Option[TableKind]) = (
+    renderContext.tableKind orElse
+      history.tableKind orElse // unused
+      applicationRule.renderStrategy.tableKind orElse
+      p getOrElse theme.default.tableKind
+  )
+  def cardKind = (
+    renderContext.cardKind orElse
+      history.cardKind orElse // unused
+      applicationRule.renderStrategy.cardKind getOrElse theme.default.cardKind
+  )
+  def cardKind(p: Option[TableKind]) = (
+    renderContext.cardKind orElse
+      history.cardKind orElse
+      applicationRule.renderStrategy.cardKind orElse
+      p getOrElse theme.default.cardKind
+  )
+  def cardKindInGrid = renderContext.cardKindInGrid orElse applicationRule.renderStrategy.cardKindInGrid getOrElse theme.default.cardKindInGrid
   def isLogined = executeOption(_.isLogined) getOrElse false
   def getOperationName: Option[String] = executeOption(_.getOperationName).flatten
   def gridContext: GridContext = renderContext.gridContext getOrElse theme.default.gridContext(this)
   lazy val noImageIcon: Picture = Picture.create(theme.default.noImageIcon)
   lazy val noImagePicture: Picture = Picture.create(theme.default.noImagePicture)
-  lazy val formatter = renderContext.formatter.withLocale(locale)
+//  lazy val formatter = renderContext.formatter.withLocale(locale)
 
+  def formatter = renderContext.formatter
   lazy val getWebApplicationRule: Option[WebApplicationRule] = viewContext.flatMap(_.parcel.render.map(_.applicationRule))
   lazy val getView: Option[View] = viewContext.flatMap(_.parcel.view)
   lazy val getPage: Option[WebApplicationRule.Page] = for {
@@ -99,11 +127,16 @@ case class RenderStrategy(
   def withFormatter(p: FormatterContext) = copy(renderContext = renderContext.withFormatter(p))
 
   def withViewContext(engine: ViewEngine, parcel: Parcel) = copy(viewContext = Some(ViewContext(engine, parcel)))
-  def withThemePartials(t: RenderTheme, p: Partials) = copy(
+  def withThemeComponentsPartials(t: RenderTheme, cs: Components, p: Partials) = copy(
     theme = t,
+    components = cs,
     partials = p
   )
   def complementApplicationRule(p: WebApplicationRule) = copy(applicationRule = applicationRule.complement(p))
+
+  def withLayoutKind(p: LayoutKind) = copy(layoutKind = Some(p))
+
+  def push(p: RenderStrategy) = copy(history = history.append(p))
 
   def forComponent(engine: ViewEngine, parcel: Parcel) = forView(engine, parcel)
   def forView(engine: ViewEngine, parcel: Parcel) =
@@ -141,13 +174,16 @@ case class RenderStrategy(
   }
 
   def formatDateTime(p: Any): String =
-    formatter.datetime.print(AnyUtils.toDateTime(p))
+    formatter.formatDateTime(p)
+//    formatter.datetime.print(AnyUtils.toDateTime(p))
 
   def formatDate(p: Any): String =
-    formatter.date.print(AnyUtils.toLocalDate(p))
+    formatter.formatDate(p)
+//    formatter.date.print(AnyUtils.toLocalDate(p))
 
   def formatTime(p: Any): String =
-    formatter.time.print(AnyUtils.toLocalTime(p))
+    formatter.formatTime(p)
+//    formatter.time.print(AnyUtils.toLocalTime(p))
 
   def formatXml(p: Any): NodeSeq =
     XhtmlUtils.parseNode(p.toString)
@@ -159,6 +195,21 @@ case class RenderStrategy(
     def buttonSearch: I18NElement = renderContext.label.buttonSearch
     def placeholderStart: I18NElement = renderContext.label.placeholderStart
     def placeholderEnd: I18NElement = renderContext.label.placeholderEnd
+  }
+}
+object RenderStrategy {
+  // Unused
+  case class History(
+    history: Vector[RenderStrategy] = Vector.empty
+  ) {
+    def append(p: RenderStrategy) = copy(history = history :+ p)
+
+    def tableKind: Option[TableKind] = history.toStream.flatMap(_.applicationRule.renderStrategy.tableKind).headOption
+
+    def cardKind: Option[CardKind] = history.toStream.flatMap(_.applicationRule.renderStrategy.cardKind).headOption
+  }
+  object History {
+    val empty = History()
   }
 }
 
@@ -434,11 +485,19 @@ object RenderTheme extends EnumerationClass[RenderTheme] {
     NowUiKitTheme,
     NowUiDashboardProTheme,
     MyColorTheme,
-    LightBootstrapDashboardTheme
+    LightBootstrapDashboardTheme,
+    BootstrapTheme, // Latest Bootstrap 5
+    BootstrapListTheme,
+    BootstrapGridTheme,
+    MaterialKitProTheme
   )
 }
 
 sealed trait BootstrapRenderThemeBase extends RenderTheme {
+  override def isGridDiv = true
+  override def isCardDiv = true
+  // protected def default_CardKind_In_Grid: CardKind = ComponentCard
+
   override protected def table_Container(p: Renderer.Table, body: => Node): Node = p.kind match {
     case StandardTable => _table_container_standard(body)
     case ListTable => _table_container_list(body)
@@ -498,6 +557,9 @@ trait Bootstrap3RenderThemeBase extends BootstrapRenderThemeBase {
 }
 
 trait Bootstrap4RenderThemeBase extends BootstrapRenderThemeBase {
+}
+
+trait Bootstrap5RenderThemeBase extends BootstrapRenderThemeBase {
 }
 
 case object PlainTheme extends RenderTheme {
@@ -679,6 +741,21 @@ case object NowUiDashboardProTheme extends Bootstrap4RenderThemeBase {
       </a>
     </li>
   }
+}
+
+case object BootstrapTheme extends Bootstrap5RenderThemeBase {
+}
+
+case object BootstrapListTheme extends Bootstrap5RenderThemeBase {
+  override def default_TableKind = ListTable
+}
+
+case object BootstrapGridTheme extends Bootstrap5RenderThemeBase {
+  override def default_TableKind = GridTable
+}
+
+case object MaterialKitProTheme extends Bootstrap5RenderThemeBase {
+  override def default_TableKind = GridTable
 }
 
 sealed trait TableKind extends NamedValueInstance {
@@ -929,8 +1006,12 @@ case class SchemaRule(
     usage: UsageKind,
     schema: Schema
   ): Schema = {
-    val systemschema = rule(op)(screen)(entitytype)(usage)
-    _converge(schema, systemschema)
+    if (true) {
+      schema
+    } else {
+      val systemschema = rule(op)(screen)(entitytype)(usage)
+      _converge(schema, systemschema)
+    }
   }
 
   private def _converge(app: Schema, system: Schema): Schema = {
@@ -1017,26 +1098,40 @@ case object ContentPartial extends PartialKind {
 }
 
 case class Partials(
-  partials: Map[PartialKind, PartialView]
+  partials: Map[PartialKind, PartialView] = Map.empty,
+  byLayout: Map[LayoutKind, Map[PartialKind, PartialView]] = Map.empty
 ) {
-  def get(p: PartialKind): Option[PartialView] = partials.get(p)
-  def headDef: Option[PartialView] = get(HeadDefPartial)
-  def footDef: Option[PartialView] = get(FootDefPartial)
-  def header: Option[PartialView] = get(HeaderPartial)
-  def footer: Option[PartialView] = get(FooterPartial)
-  def navigation: Option[PartialView] = get(NavigationPartial)
-  def sidebar: Option[PartialView] = get(SidebarPartial)
-  def contentHeader: Option[PartialView] = get(ContentHeaderPartial)
-  def content: Option[PartialView] = get(ContentPartial)
+  private def _get(p: PartialKind): Option[PartialView] = partials.get(p)
+  def get(l: LayoutKind, p: PartialKind): Option[PartialView] =
+    byLayout.get(l).flatMap(_.get(p)) orElse _get(p)
+  def get(l: Option[LayoutKind], p: PartialKind): Option[PartialView] =
+    l.fold(_get(p))(get(_, p))
+  def headDef(l: LayoutKind): Option[PartialView] = get(l, HeadDefPartial)
+  def headDef(l: Option[LayoutKind]): Option[PartialView] = get(l, HeadDefPartial)
+  def footDef(l: LayoutKind): Option[PartialView] = get(l, FootDefPartial)
+  def footDef(l: Option[LayoutKind]): Option[PartialView] = get(l, FootDefPartial)
+  def header(l: LayoutKind): Option[PartialView] = get(l, HeaderPartial)
+  def header(l: Option[LayoutKind]): Option[PartialView] = get(l, HeaderPartial)
+  def footer(l: LayoutKind): Option[PartialView] = get(l, FooterPartial)
+  def footer(l: Option[LayoutKind]): Option[PartialView] = get(l, FooterPartial)
+  def navigation(l: LayoutKind): Option[PartialView] = get(l, NavigationPartial)
+  def navigation(l: Option[LayoutKind]): Option[PartialView] = get(l, NavigationPartial)
+  def sidebar(l: LayoutKind): Option[PartialView] = get(l, SidebarPartial)
+  def sidebar(l: Option[LayoutKind]): Option[PartialView] = get(l, SidebarPartial)
+  def contentHeader(l: LayoutKind): Option[PartialView] = get(l, ContentHeaderPartial)
+  def contentHeader(l: Option[LayoutKind]): Option[PartialView] = get(l, ContentHeaderPartial)
+  def content(l: LayoutKind): Option[PartialView] = get(l, ContentPartial)
+  def content(l: Option[LayoutKind]): Option[PartialView] = get(l, ContentPartial)
 
   def complement(rhs: Partials): Partials = Partials(
-    MapUtils.complement(partials, rhs.partials)
+    MapUtils.complement(partials, rhs.partials),
+    MapUtils.complement(byLayout, rhs.byLayout)
   )
   def complements(rhs: Seq[Partials]): Partials =
     rhs./:(this)(_ complement _)
 }
 object Partials {
-  val empty = Partials(Map.empty)
+  val empty = Partials()
 }
 
 case class Pages(
@@ -1055,9 +1150,8 @@ object Pages {
 }
 
 case class Components(
-  components: Vector[ComponentView]
+  components: Vector[Slot]
 ) {
-  def toSlots: Vector[ViewEngine.Slot] = components.map(x => x.guard -> x).map(Slot(_))
 }
 object Components {
   val empty = Components(Vector.empty)
@@ -1110,7 +1204,7 @@ case class RenderContext(
     )(suffix =>
       new URI(s"${b}/${id.presentationId}.${suffix}"))
   }
-  def uri(base: DomainEntityType, id: DomainObjectId): URI = new URI("${base.v}/${id.presentationId}${suffix}")
+  def uri(base: DomainEntityType, id: DomainObjectId): URI = new URI(s"${base.name}/${id.presentationId}${suffix}")
 
   def suffix: String = ".html" // TODO
 
@@ -1147,45 +1241,45 @@ object RenderContext {
   )
 }
 
-case class FormatterContext(
-  datetime: DateTimeFormatter,
-  date: DateTimeFormatter,
-  time: DateTimeFormatter
-) {
-  def withLocale(locale: Locale) = FormatterContext(
-    datetime.withLocale(locale),
-    date.withLocale(locale),
-    time.withLocale(locale)
-  )
-}
-object FormatterContext {
-  val default = FormatterContext(
-    DateTimeFormat.mediumDateTime().withLocale(Locale.ENGLISH),
-    DateTimeFormat.mediumDate().withLocale(Locale.ENGLISH),
-    DateTimeFormat.mediumTime().withLocale(Locale.ENGLISH)
-  )
+// case class FormatterContext(
+//   datetime: DateTimeFormatter,
+//   date: DateTimeFormatter,
+//   time: DateTimeFormatter
+// ) {
+//   def withLocale(locale: Locale) = FormatterContext(
+//     datetime.withLocale(locale),
+//     date.withLocale(locale),
+//     time.withLocale(locale)
+//   )
+// }
+// object FormatterContext {
+//   val default = FormatterContext(
+//     DateTimeFormat.mediumDateTime().withLocale(Locale.ENGLISH),
+//     DateTimeFormat.mediumDate().withLocale(Locale.ENGLISH),
+//     DateTimeFormat.mediumTime().withLocale(Locale.ENGLISH)
+//   )
 
-  def create(locale: Locale, style: String): FormatterContext =
-    FormatterContext(
-      DateTimeFormat.forStyle(style).withLocale(locale),
-      DateTimeFormat.forStyle(style).withLocale(locale),
-      DateTimeFormat.forStyle(style).withLocale(locale)
-    )
+//   def create(locale: Locale, style: String): FormatterContext =
+//     FormatterContext(
+//       DateTimeFormat.forStyle(style).withLocale(locale),
+//       DateTimeFormat.forStyle(style).withLocale(locale),
+//       DateTimeFormat.forStyle(style).withLocale(locale)
+//     )
 
-  def createStyle(style: String): FormatterContext =
-    FormatterContext(
-      DateTimeFormat.forStyle(style),
-      DateTimeFormat.forStyle(style),
-      DateTimeFormat.forStyle(style)
-    )
-}
+//   def createStyle(style: String): FormatterContext =
+//     FormatterContext(
+//       DateTimeFormat.forStyle(style),
+//       DateTimeFormat.forStyle(style),
+//       DateTimeFormat.forStyle(style)
+//     )
+// }
 
-case class ViewContext(
-  engine: ViewEngine,
-  parcel: Parcel
-) {
-  def isMatch(e: ViewEngine, p: Parcel) = engine == e && parcel == p
-}
+// case class ViewContext(
+//   engine: ViewEngine,
+//   parcel: Parcel
+// ) {
+//   def isMatch(e: ViewEngine, p: Parcel) = engine == e && parcel == p
+// }
 
 class EpilogueContext {
   private val _javascripts = mutable.ArrayBuffer.empty[String]

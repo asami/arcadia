@@ -3,6 +3,7 @@ package arcadia.view.tag
 import scalaz.{Node => _, _}, Scalaz._
 import scala.xml._
 import java.net.URI
+import com.github.nscala_time.time.Imports._
 import org.goldenport.Strings
 import org.goldenport.exception.RAISE
 import org.goldenport.collection.NonEmptyVector
@@ -12,6 +13,7 @@ import org.goldenport.record.v2.{Schema, Column, Invalid, Warning}
 import org.goldenport.i18n.{I18NElement, I18NString}
 import org.goldenport.trace.Result
 import org.goldenport.values.PathName
+import org.goldenport.util.StringUtils
 import arcadia._
 import arcadia.context._
 import arcadia.view._
@@ -32,7 +34,12 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Apr. 28, 2019
  *  version May.  1, 2019
  *  version Mar. 21, 2020
- * @version Apr. 18, 2020
+ *  version Apr. 18, 2020
+ *  version Feb. 27, 2022
+ *  version Mar. 30, 2022
+ *  version May.  4, 2022
+ *  version Mar. 28, 2025
+ * @version Apr.  2, 2025
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -87,6 +94,16 @@ case object ModelTag extends Tag with SelectByName {
 
   protected def eval_Expression(p: Expression): XmlContent = {
     p.applyModel
+  }
+}
+
+case object ValueTag extends Tag with SelectByName {
+  val name = "value"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val name = p.get("name")
+    val v = p.service.get(name)
+    XmlContent.text(v.print)
   }
 }
 
@@ -194,8 +211,7 @@ case object ContentTag extends Tag with SelectByName {
   val name = "content"
 
   protected def eval_Expression(p: Expression): XmlContent = {
-    val model = p.effectiveModel
-    p.applyModel(model)
+    XmlContent(p.viewModel.content(p.getLayoutKind))
   }
 }
 
@@ -384,5 +400,144 @@ case object TabsTag extends Tag with SelectByName {
       protected def render_Content: NodeSeq = tabs(b)
     }.apply
     XmlContent(r)
+  }
+}
+
+case object FormTag extends Tag with SelectByName {
+  val name = "form"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val model = p.effectiveModel match {
+      case m: FormModel => m
+    }
+    p.applyModel(model)
+  }
+}
+
+case object DateTimeTag extends Tag with SelectByName {
+  val name = "datetime"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val dt = p.service.dateTime
+    XmlContent.text(dt.print)
+  }
+}
+
+case object DateTag extends Tag with SelectByName {
+  val name = "date"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val dt = p.service.date
+    XmlContent.text(dt.print)
+  }
+}
+
+case object TimeTag extends Tag with SelectByName {
+  val name = "time"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val dt = p.service.time
+    XmlContent.text(dt.print)
+  }
+}
+
+/*
+ * Layout Tags
+ */
+case object HeadDefTag extends Tag with SelectByName {
+  val name = "head-def"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.headDef(p.getLayoutKind))
+  }
+}
+
+case object FootDefTag extends Tag with SelectByName {
+  val name = "foot-def"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.footDef(p.getLayoutKind))
+  }
+}
+
+case object HeaderTag extends Tag with SelectByName {
+  val name = "header"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.header(p.getLayoutKind))
+  }
+}
+
+case object FooterTag extends Tag with SelectByName {
+  val name = "footer"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.footer(p.getLayoutKind))
+  }
+}
+
+case object SidebarTag extends Tag with SelectByName {
+  val name = "sidebar"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.sidebar(p.getLayoutKind))
+  }
+}
+
+case object NavigationTag extends Tag with SelectByName {
+  val name = "navigation"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.navigation(p.getLayoutKind))
+  }
+}
+
+case object ContentHeaderTag extends Tag with SelectByName {
+  val name = "content-header"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.contentHeader(p.getLayoutKind))
+  }
+}
+
+case object ContentMainTag extends Tag with SelectByName {
+  val name = "content-main"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.contentContent)
+  }
+}
+
+case object PageTitleTag extends Tag with SelectByName {
+  val name = "page-title"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.pageTitle)
+  }
+}
+
+case object LinkTag extends Tag with SelectByName {
+  val name = "link"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val assets = p.viewModel.assets
+    val path = p.take("path", "Missing path")
+    val src = StringUtils.concatPath(assets, path)
+    val rel = p.get("rel") getOrElse ""
+    val xml = <link href={src} type={rel}/>
+    XmlContent(xml)
+  }
+}
+
+case object ScriptTag extends Tag with SelectByName {
+  val name = "script"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val assets = p.viewModel.assets
+    val path = p.take("path", "Missing path")
+    val src = StringUtils.concatPath(assets, path)
+    val t = p.get("type") getOrElse ""
+    val xml = <script src={src} type={t}/>
+    XmlContent(xml)
   }
 }

@@ -23,7 +23,8 @@ import arcadia.view._
  *  version Mar. 13, 2018
  *  version Aug.  6, 2018
  *  version Mar. 24, 2020
- * @version Apr. 11, 2020
+ *  version Apr. 11, 2020
+ * @version Dec. 27, 2023
  * @author  ASAMI, Tomoharu
  */
 case class WebApplicationRule(
@@ -41,6 +42,7 @@ case class WebApplicationRule(
   http: Option[WebApplicationRule.Http],
   route: Route,
   extraPages: WebApplicationRule.Pages,
+  renderStrategy: WebApplicationRule.RenderStrategyRule,
   properties: Record
 ) {
   import WebApplicationRule.{Pages, Page}
@@ -72,6 +74,7 @@ case class WebApplicationRule(
       },
       route.complement(rhs.route),
       extraPages.complement(rhs.extraPages),
+      renderStrategy.complement(rhs.renderStrategy),
       properties.complement(rhs.properties)
     )
   }
@@ -112,6 +115,7 @@ object WebApplicationRule {
     None,
     Route.empty,
     Pages.empty,
+    RenderStrategyRule.empty,
     Record.empty
   )
 
@@ -234,6 +238,33 @@ object WebApplicationRule {
       PublicCookieSecureKind,
       SecureProductionCookieSecureKind
     )
+  }
+
+  case class RenderStrategyRule(
+    tableKind: Option[TableKind] = None,
+    cardKind: Option[CardKind] = None,
+    cardKindInGrid: Option[CardKind] = None
+  ) {
+    def complement(rhs: RenderStrategyRule) = RenderStrategyRule(
+      tableKind orElse rhs.tableKind,
+      cardKind orElse rhs.cardKind,
+      cardKindInGrid orElse rhs.cardKindInGrid
+    )
+  }
+  object RenderStrategyRule {
+    val empty = RenderStrategyRule()
+
+    def create(
+      tableKind: Option[String],
+      cardKind: Option[String],
+      cardKindInGrid: Option[String]
+    ): RenderStrategyRule = RenderStrategyRule(
+        tableKind.flatMap(TableKind.get),
+        cardKind.map(_card_kind),
+        cardKindInGrid.map(_card_kind)
+    )
+
+    private def _card_kind(p: String) = CardKind.get(p) getOrElse ComponentCard(p)
   }
 
   def parse(s: String): WebApplicationRule = WebApplicationConfig.parse(s).toRule
