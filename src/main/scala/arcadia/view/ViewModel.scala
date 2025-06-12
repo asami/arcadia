@@ -21,7 +21,8 @@ import arcadia.view.ViewEngine.LayoutKind
  *  version Mar.  5, 2022
  *  version Jun. 26, 2022
  *  version Mar. 28, 2025
- * @version Apr.  4, 2025
+ *  version Apr.  4, 2025
+ * @version Jun. 10, 2025
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -230,17 +231,22 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   }
 
   def assets: String = {
+    def _resolve_(pathname: Option[String]): Option[String] =
+      pathname.flatMap { x =>
+        val pn = PathName(x)
+        val depth = pn.length - 1
+        if (depth <= 0)
+          None
+        else
+          Some("../" * depth)
+      }
+
     val pathOption: Option[String] = strategy.viewContext.
       flatMap(_.parcel.view).
       flatMap {
-        case m: HtmlView => m.pathname.flatMap { x =>
-          val pn = PathName(x)
-          val depth = pn.length - 1
-          if (depth <= 0)
-            None
-          else 
-            Some("../" * depth)
-        }
+        case m: HtmlView => _resolve_(m.pathname)
+        case m: IndexView => _resolve_(m.pathname)
+        case m => None
       }
     val path = pathOption getOrElse "./"
     val base = strategy.viewContext.flatMap(_.parcel.context.map(_.assets)) getOrElse {

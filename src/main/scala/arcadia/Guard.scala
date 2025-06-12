@@ -12,7 +12,8 @@ import arcadia.model._
  *  version Nov.  5, 2017
  *  version Jul. 21, 2019
  *  version Mar.  6, 2022
- * @version Dec. 29, 2022
+ *  version Dec. 29, 2022
+ * @version Jun. 12, 2025
  * @author  ASAMI, Tomoharu
  */
 trait Guard {
@@ -49,7 +50,7 @@ object CommandGuard {
 case class PathnameGuard(pathname: PathName) extends Guard {
   val operationName = pathname.body
   def isAccept(p: Parcel) = p.getOperationName.fold(false)(op =>
-    op == pathname || op == operationName
+    op == pathname.v || op == operationName
   )
 }
 object PathnameGuard {

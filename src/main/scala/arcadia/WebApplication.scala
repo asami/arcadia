@@ -48,7 +48,8 @@ import arcadia.domain.DomainModelSpace
  *  version Jun. 22, 2023
  *  version Dec. 30, 2023
  *  version Mar. 30, 2025
- * @version Apr.  4, 2025
+ *  version Apr.  4, 2025
+ * @version Jun. 10, 2025
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -213,7 +214,7 @@ object WebApplication {
           Some(HtmlView(to_url(p)))
         }
       }
-      xs./:(Z())(_+_).r
+      xs.foldLeft(Z())(_+_).r
     }
 
     def apply(platform: PlatformContext): WebApplication =
@@ -284,7 +285,7 @@ object WebApplication {
         // }
         val config = build_config
         val view = {
-          val applicationslots = root_children./:(TopPagesBuilder())(_+_).r
+          val applicationslots = root_children.foldLeft(TopPagesBuilder())(_+_).r
           val layouts = build_layouts
           val partials = build_partials
           val pages = build_pages
@@ -355,7 +356,7 @@ object WebApplication {
           }
         }
         get_pathnode(PathName("WEB-INF/layouts")).
-          map(x => to_children(x)./:(Z())(_+_).r).getOrElse(Map.empty)
+          map(x => to_children(x).foldLeft(Z())(_+_).r).getOrElse(Map.empty)
       }
 
       protected def build_partials: Partials = {
@@ -381,7 +382,7 @@ object WebApplication {
                   this
               }
             }
-            PartialKind.elements./:(ZZ())(_+_).r
+            PartialKind.elements.foldLeft(ZZ())(_+_).r
           }
 
           private def _merge(
@@ -401,7 +402,7 @@ object WebApplication {
           }
         }
         get_pathnode(PathName("WEB-INF/partials")).
-          map(x => to_children(x)./:(Z())(_+_).r).getOrElse(Partials.empty)
+          map(x => to_children(x).foldLeft(Z())(_+_).r).getOrElse(Partials.empty)
       }
 
       private def _is_per_layout(t: T): Boolean = is_directory(t)
@@ -426,7 +427,7 @@ object WebApplication {
           }
         }
 
-        to_children(t)./:(Z())(_+_).r
+        to_children(t).foldLeft(Z())(_+_).r
       }
 
       private def _to_partial_view_map(rhs: T): Map[PartialKind, PartialView] =
@@ -463,7 +464,7 @@ object WebApplication {
 
           private def directoryview(p: T): Vector[(PathName, View)] = {
             val name = StringUtils.pathLastComponentBody(to_url(p).toString) // TODO
-            to_children(p)./:(ZZ(PathName(name), name))(_+_).r
+            to_children(p).foldLeft(ZZ(PathName(name), name))(_+_).r
           }
         }
         case class ZZ(
@@ -492,13 +493,13 @@ object WebApplication {
             PageView(toname(p), src)
           }
           protected def directoryview(pn: PathName, p: T): Vector[(PathName, View)] =
-            to_children(p)./:(ZZ(pn, toname(p)))(_+_).r
+            to_children(p).foldLeft(ZZ(pn, toname(p)))(_+_).r
 
           protected def toname(p: T): String =
             s"base/${StringUtils.pathLastComponentBody(to_url(p).toString)}"
         }
         get_pathnode(PathName("WEB-INF/pages")).
-          map(x => to_children(x)./:(Z())(_+_).r).getOrElse(Pages.empty)
+          map(x => to_children(x).foldLeft(Z())(_+_).r).getOrElse(Pages.empty)
       }
 
       protected def build_components: Components = {
@@ -514,7 +515,7 @@ object WebApplication {
         }
         val a = get_pathnode(PathName("WEB-INF/widgets")).map(x => to_children(x)).getOrElse(Nil)
         val b = get_pathnode(PathName("WEB-INF/components")).map(x => to_children(x)).getOrElse(Nil)
-        (a ++ b)./:(Z())(_+_).r
+        (a ++ b).foldLeft(Z())(_+_).r
       }
 
       protected def build_controllers: Vector[ControllerEngine.Slot] = {
@@ -531,7 +532,7 @@ object WebApplication {
           }
         }
         get_pathnode(PathName("WEB-INF/controllers")).
-          map(x => to_descendants(x)./:(Z(x))(_+_).r).getOrElse(Vector.empty)
+          map(x => to_descendants(x).foldLeft(Z(x))(_+_).r).getOrElse(Vector.empty)
       }
 
       private def _json_controller(root: T, rhs: T): ControllerEngine.Slot = {
@@ -553,7 +554,7 @@ object WebApplication {
 
         def _build_(pathname: String): DomainModel = {
           get_pathnode(PathName(pathname)).
-            map(x => to_descendants(x)./:(Z())(_+_).r).getOrElse(DomainModel.empty)
+            map(x => to_descendants(x).foldLeft(Z())(_+_).r).getOrElse(DomainModel.empty)
         }
 
         val names = Vector("WEB-INF/models", s"WEB-INF/${platform.mode.name}/models")
@@ -605,10 +606,11 @@ object WebApplication {
       }
 
       protected def template_view(p: T): (Guard, View) = {
-        val name = StringUtils.pathLastComponentBody(to_url(p).toString)
+        val pathname = to_url(p).toString
+        val name = StringUtils.pathLastComponentBody(pathname)
         val src = to_template_source(p)
         name match {
-          case "index" => IndexView(src).gv
+          case "index" => IndexView(src, Some(pathname)).gv
           //            case "detail" => ResourceDetailView(src).gv
           //            case "list" => ResourceListView(src).gv
           case "dashboard" => DashboardView(src).gv
@@ -620,7 +622,7 @@ object WebApplication {
         if (is_web_info(p) || is_assets(p))
           Vector.empty
         else
-          to_children(p)./:(DirectoryPagesBuilder(name(p)))(_+_).views
+          to_children(p).foldLeft(DirectoryPagesBuilder(name(p)))(_+_).views
     }
 
     case class DirectoryPagesBuilder(
@@ -646,7 +648,7 @@ object WebApplication {
       }
 
       protected def directory_view(p: T): Vector[(Guard, View)] =
-        to_children(p)./:(DirectoryPagesBuilder(pathname(p)))(_+_).views
+        to_children(p).foldLeft(DirectoryPagesBuilder(pathname(p)))(_+_).views
 
       protected def pathname(p: T): String =
         s"$base/${StringUtils.pathLastComponentBody(to_url(p).toString)}"

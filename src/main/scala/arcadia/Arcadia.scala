@@ -12,6 +12,7 @@ import java.io.File
 import com.typesafe.config.{Config => Hocon}
 import org.goldenport.RAISE
 import org.goldenport.context._
+import org.goldenport.collection.NonEmptyVector
 import org.goldenport.io.{InputSource, FileInputSource, UrlInputSource}
 import org.goldenport.realm.Realm
 import org.goldenport.hocon.RichConfig.Implicits._
@@ -39,7 +40,8 @@ import arcadia.standalone.service.ArcadiaService.PROP_STANDALONE_WEB_APPLICATION
  *  version Oct. 23, 2022
  *  version Nov. 27, 2022
  *  version Dec. 25, 2022
- * @version Mar. 19, 2025
+ *  version Mar. 19, 2025
+ * @version Jun. 11, 2025
  * @author  ASAMI, Tomoharu
  */
 class Arcadia(
@@ -110,7 +112,8 @@ object Arcadia {
     webengineconfig: WebEngine.Config,
     config: Hocon,
     libs: Seq[InputSource],
-    standalones: Seq[Realm]
+    standalones: NonEmptyVector[Realm]
+
   ): Consequence[Arcadia] = for {
     services <- _make_services(pc, webengineconfig, config)
     apps <- _make_applications(pc, webengineconfig, config, libs, standalones)
@@ -131,7 +134,7 @@ object Arcadia {
     webengineconfig: WebEngine.Config,
     config: Hocon,
     libs: Seq[InputSource],
-    standalones: Seq[Realm]
+    standalones: NonEmptyVector[Realm]
   ): Consequence[Map[String, WebApplication]] = {
     val tmpdir = config.getFileOption(PROP_TMP_DIRECTORY) getOrElse new File("target/war")
     tmpdir.mkdirs
@@ -193,6 +196,16 @@ object Arcadia {
     def _make_module_url_(p: URL) =
       WebModule.create(p, tmpdir, None, None)
 
+    def _make_standalone_unified_application_(ps: NonEmptyVector[Realm]): Consequence[WebApplication] = Consequence run {
+      val realm = ps.tailVector.foldLeft(ps.head)(_ + _)
+      val name = PROP_STANDALONE_WEB_APPLICATION_NAME
+      val dir = new File(tmpdir, s"${name}.d")
+      _make_standalone_application_(realm, dir, name) flatMap {
+        case Some(s) => Consequence.success(s)
+        case None => Consequence.invalidArgumentFault("in")
+      }
+    }
+
     def _make_standalone_applications_(ps: Seq[Realm]): Consequence[List[WebApplication]] =
       (ps.zipWithIndex).toList.traverse {
         case (realm, index) =>
@@ -217,8 +230,8 @@ object Arcadia {
       a <- config.consequenceAsObjectList("application", _make_application_)
       b <- _make_applications_in_webapps_()
       c <- _make_library_applications_(libs)
-      d <- _make_standalone_applications_(standalones)
-    } yield (a ++ b ++ c ++ d).map(x => x.name -> x).toMap
+      d <- _make_standalone_unified_application_(standalones)
+    } yield (a ++ b ++ c :+ d).map(x => x.name -> x).toMap
   }
 
 //   private def _make_applications(pc: PlatformContext, config: Hocon, urls: Seq[URL]): Consequence[Map[String, WebApplication]] = Consequence {
@@ -258,7 +271,7 @@ object Arcadia {
 
       private def _add(name: String, p: WebApplication) = copy(r = r + (name -> p))
     }
-    ps./:(Z())(_+_).r
+    ps.foldLeft(Z())(_+_).r
   }
 
   private def _make_configs(config: Hocon): Consequence[Map[String, WebApplicationConfig]] =

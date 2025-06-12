@@ -38,7 +38,8 @@ import arcadia.domain.DomainModelSpace
  *  version Oct. 23, 2022
  *  version Dec. 25, 2022
  *  version Jan.  1, 2023
- * @version Mar. 18, 2025
+ *  version Mar. 18, 2025
+ * @version Jun. 11, 2025
  * @author  ASAMI, Tomoharu
  */
 class WebEngine(
@@ -50,7 +51,7 @@ class WebEngine(
   val config: WebApplicationConfig = WebApplicationConfig.empty
 //  val webConfig: WebEngine.Config = WebEngine.Config.empty
 ) {
-  val rule: WebApplicationRule = extend./:(application.config.toRule)(_ complement _.application.config.toRule).complement(config.toRule)
+  val rule: WebApplicationRule = extend.foldLeft(application.config.toRule)(_ complement _.application.config.toRule).complement(config.toRule)
   // val templateengines = {
   //   val a = webConfig.templateEngineHangarFactory.create(platform)
   //   val b = TemplateEngineHangar(new ScalateTemplateEngine(platform))

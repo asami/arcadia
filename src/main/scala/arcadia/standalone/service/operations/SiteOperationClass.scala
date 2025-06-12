@@ -6,6 +6,7 @@ import org.goldenport.RAISE
 import org.goldenport.context.Consequence
 import org.goldenport.i18n.I18NString
 import org.goldenport.cli._
+import org.goldenport.collection.NonEmptyVector
 import org.goldenport.io.InputSource
 import org.goldenport.realm.Realm
 import org.goldenport.util.StringUtils
@@ -16,7 +17,8 @@ import arcadia.standalone.service.generators.ArcadiaSiteGenerator
 /*
  * @since   Mar. 10, 2025
  *  version Mar. 15, 2025
- * @version Apr.  2, 2025
+ *  version Apr.  2, 2025
+ * @version Jun. 10, 2025
  * @author  ASAMI, Tomoharu
  */
 case object SiteOperationClass extends OperationClassWithOperation {
@@ -33,16 +35,17 @@ case object SiteOperationClass extends OperationClassWithOperation {
   def execute(env: Environment, cmd: SiteCommand): SiteResult = {
     val pce = PlatformExecutionContext.develop // TODO
     val config = cmd.config
-    val realm = {
-      cmd.in.map(Realm.create) match {
-        case x :: Nil => x
-        case x :: xs => xs.foldLeft(x)((z, a) => z + a)
-      }
-    }
+    // val realm = {
+    //   cmd.in.map(Realm.create) match {
+    //     case x :: Nil => x
+    //     case x :: xs => xs.foldLeft(x)((z, a) => z + a)
+    //   }
+    // }
+    val realms = cmd.in.map(Realm.create)
     val libs = cmd.library
     val ctx = ArcadiaContext.create(env, pce, config, libs)
     val site = new ArcadiaSiteGenerator(ctx)
-    val out = site.generate(libs, realm)
+    val out = site.generate(libs, realms)
     SiteResult(out)
   }
 
@@ -53,7 +56,7 @@ case object SiteOperationClass extends OperationClassWithOperation {
   }
 
   case class SiteCommand(
-    in: List[File],
+    in: NonEmptyVector[File],
     config: Hocon,
     library: List[InputSource],
     output: Option[File]
@@ -79,7 +82,7 @@ case object SiteOperationClass extends OperationClassWithOperation {
 
     def cCreate(req: Request): Consequence[SiteCommand] = {
       for {
-        in <- req.cFiles(params.in)
+        in <- req.cFileOneMore(params.in)
         config <- req.cConfigOrZero(params.config)
         library <- req.cInputSourceList(params.library)
         output <- req.cFileOption(params.output)

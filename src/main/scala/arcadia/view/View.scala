@@ -4,6 +4,7 @@ import scalaz._, Scalaz._
 import scala.xml.NodeSeq
 import java.io.File
 import java.net.URL
+import java.net.URI
 import org.fusesource.scalate._
 import org.goldenport.exception.RAISE
 import org.goldenport.Strings
@@ -44,7 +45,8 @@ import ViewEngine.LayoutKind
  *  version Apr. 30, 2023
  *  version Jun. 25, 2023
  *  version Mar. 20, 2025
- * @version Apr.  4, 2025
+ *  version Apr.  4, 2025
+ * @version Jun. 10, 2025
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -228,7 +230,10 @@ case class TemplateView(
 ) extends TemplateViewBase(template) {
 }
 
-case class IndexView(template: TemplateSource) extends TemplateViewBase(template) {
+case class IndexView(
+  template: TemplateSource,
+  pathname: Option[String]
+) extends TemplateViewBase(template) {
   val guard = IndexGuard
 }
 
@@ -285,7 +290,7 @@ case class MaterialView(baseUrl: URL) extends View() {
   val guard = new Guard {
     def isAccept(p: Parcel): Boolean = p.command.fold(false) {
       case MaterialCommand(pathname) =>
-        val url = new URL(baseUrl, pathname.v)
+        val url = baseUrl.toURI.resolve(pathname.v).toURL
         UrlUtils.isExist(url)
       case _ => false
     }
@@ -306,7 +311,7 @@ case class MaterialView(baseUrl: URL) extends View() {
       a.getOrElse(MimeType.application_octet_stream)
     }
     _get_control_content(parcel, c.pathname.v) getOrElse {
-      val url = new URL(baseUrl, c.pathname.v)
+      val url = baseUrl.toURI.resolve(c.pathname.v).toURL
       def loadedstring = parcel.context.map(_.loadString(url)).getOrElse(IoUtils.toText(url))
       if (mime.isXml)
         XmlContent.load(mime, url)
@@ -328,7 +333,7 @@ case class MaterialView(baseUrl: URL) extends View() {
     parcel: Parcel,
     pathname: String
   ): Option[Content] = {
-    val url = new URL(baseUrl, pathname)
+    val url = baseUrl.toURI.resolve(pathname).toURL
     if (UrlUtils.isExist(url)) {
       if (StringUtils.getSuffix(pathname).isEmpty)
         Some(RedirectContent(_redirect_pathname(parcel, pathname, "index.html")))
@@ -368,7 +373,7 @@ case class AssetView(baseUrl: URL) extends View() {
   val guard = new Guard {
     def isAccept(p: Parcel): Boolean = p.command.fold(false) {
       case AssetsCommand(pathname) =>
-        val url = new URL(baseUrl, pathname)
+        val url = baseUrl.toURI.resolve(pathname).toURL
         UrlUtils.isExist(url)
       case _ => false
     }
@@ -388,7 +393,7 @@ case class AssetView(baseUrl: URL) extends View() {
       } yield mime
       a.getOrElse(MimeType.application_octet_stream)
     }
-    val url = new URL(baseUrl, c.pathname)
+    val url = baseUrl.toURI.resolve(c.pathname).toURL
     BinaryContent(mime, new UrlBag(url), AssetsExpires)
   }
 }

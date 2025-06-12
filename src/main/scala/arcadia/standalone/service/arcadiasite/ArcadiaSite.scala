@@ -1,4 +1,4 @@
-package arcadia.standalone.arcadiasite
+package arcadia.standalone.service.arcadiasite
 
 import java.io.File
 import java.nio.file.Paths
@@ -6,6 +6,7 @@ import com.typesafe.config.{Config => Hocon}
 import org.goldenport.RAISE
 import org.goldenport.context.Showable
 import org.goldenport.io.InputSource
+import org.goldenport.collection.NonEmptyVector
 import org.goldenport.tree.TreeNode
 import org.goldenport.tree.TreeTransformer
 import org.goldenport.tree.TreeTransformer.Directive
@@ -18,7 +19,8 @@ import arcadia.standalone.service.ArcadiaService.PROP_STANDALONE_WEB_APPLICATION
 
 /*
  * @since   Mar. 10, 2025
- * @version Mar. 21, 2025
+ *  version Mar. 21, 2025
+ * @version Jun. 12, 2025
  * @author  ASAMI, Tomoharu
  */
 case class ArcadiaSite(
@@ -92,17 +94,18 @@ object ArcadiaSite {
     pec: PlatformExecutionContext,
     config: Hocon,
     libs: Seq[InputSource],
-    realm: Realm
+    realms: NonEmptyVector[Realm]
   ): ArcadiaSite = {
     // println(s"libs: ${libs}")
     val ctx = RealmTransformer.Context.default
-    val arcadia = createArcadia(pec.platformContext, config, libs, List(realm))
+    val arcadia = createArcadia(pec.platformContext, config, libs, realms)
     val engine = createEngine(arcadia, PROP_STANDALONE_WEB_APPLICATION_NAME)
     val dependencies = engine.extendRealms
     val tf = ArcadiaTransformer(pec, ctx, engine)
-    val a = realm.transform(tf)
+    val a = realms.head.transform(tf)
+    val rs = realms.tailVector.map(_.transform(tf))
     val xs = dependencies.map(_.transform(tf))
-    val r = xs.foldLeft(a)((z, x) => z + x)
+    val r = (rs ++ xs).foldLeft(a)((z, x) => z + x)
     ArcadiaSite(r)
   }
 
@@ -112,7 +115,7 @@ object ArcadiaSite {
     pc: PlatformContext,
     config: Hocon,
     libs: Seq[InputSource],
-    standalones: Seq[Realm]
+    standalones: NonEmptyVector[Realm]
   ) = {
     val webengineconfig = WebEngine.Config.standalone
     Arcadia.make(pc, webengineconfig, config, libs, standalones).take
