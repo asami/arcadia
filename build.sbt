@@ -2,7 +2,7 @@ organization := "org.goldenport"
 
 name := "arcadia"
 
-version := "0.6.1"
+version := "0.6.2"
 
 scalaVersion := "2.12.18"
 // crossScalaVersions := Seq("2.10.39.2", "2.9.1")
@@ -36,7 +36,7 @@ resolvers += "GitHub Packages" at "https://maven.pkg.github.com/asami/maven-repo
 // resolvers += "Asami Maven Repository" at "http://www.asamioffice.com/maven"
 
 // override goldenport-record
-libraryDependencies += "org.goldenport" %% "goldenport-scala-lib" % "2.2.2"
+libraryDependencies += "org.goldenport" %% "goldenport-scala-lib" % "2.2.5"
 
 libraryDependencies += "org.goldenport" %% "goldenport-record" % "2.2.1"
 
@@ -64,6 +64,17 @@ dependencyOverrides ++= Seq(
 
 //
 // AutoMkcol.globalSettings
+
+lazy val exportClasspath = taskKey[Unit]("Export full classpath to a file")
+
+exportClasspath := {
+  val cp = (Compile / fullClasspath).value.files
+  val out = (Compile / target).value / "classpath.txt"
+  IO.write(out, cp.mkString(":"))
+  println(s"Classpath written to: $out")
+}
+
+Compile / mainClass := Some("arcadia.standalone.Standalone")
 
 publishTo := Some(
   "GitHub Packages" at "https://maven.pkg.github.com/asami/maven-repository"
