@@ -3,6 +3,7 @@ package arcadia
 import scalaz._, Scalaz._
 import java.io.File
 import java.net.URL
+import java.net.URI
 import org.fusesource.scalate._
 import org.fusesource.scalate.support.URLTemplateSource
 import com.typesafe.config.{Config => Hocon}
@@ -32,7 +33,8 @@ import arcadia.domain.DomainModelSpace
  *  version Nov. 27, 2022
  *  version Dec. 25, 2022
  *  version Jan.  1, 2023
- * @version Mar. 11, 2025
+ *  version Mar. 11, 2025
+ * @version Jun. 14, 2025
  * @author  ASAMI, Tomoharu
  */
 abstract class WebModule() {
@@ -120,6 +122,7 @@ class DirectoryWebModule(base: File) extends WebModule {
       protected def path(p: File): String = p.getPath
       protected def name(p: File): String = p.getName
       protected def to_url(p: File): URL = p.toURI.toURL
+      protected def to_uri(p: File): URI = p.toURI
       protected def to_template_source(p: File): TemplateSource = TemplateSource.fromFile(p)
       protected def root_node: File = base
       protected def to_children(p: File): List[File] = p.listFiles.toList

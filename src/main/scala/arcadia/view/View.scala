@@ -46,7 +46,7 @@ import ViewEngine.LayoutKind
  *  version Jun. 25, 2023
  *  version Mar. 20, 2025
  *  version Apr.  4, 2025
- * @version Jun. 10, 2025
+ * @version Jun. 14, 2025
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -414,16 +414,25 @@ case class PartialView(template: TemplateSource) extends TemplateViewBase(templa
   val guard = NotImplementedYetGuard
 }
 
-case class ComponentView(guard: Guard, template: TemplateSource) extends TemplateViewBase(template) {
+case class ComponentView(
+  guard: Guard,
+  template: TemplateSource
+) extends TemplateViewBase(template) {
 }
 object ComponentView {
+  def makeModelName(name: String) = s"widget__$name"
+
   // val RESOURCE_LIST = "resource_list"
   // val RESOURCE_DETAIL = "resource_detail"
   // val RECORD_LIST = "record_list"
   // val RECORD_DETAIL = "record_detail"
 
-  def create(name: String, template: TemplateSource): ComponentView =
-    ComponentView(ModelNameGuard(name), template)
+  def create(
+    name: String,
+    template: TemplateSource
+  ): ComponentView = {
+    ComponentView(ModelNameGuard(makeModelName(name)), template)
+  }
 }
 
 trait TableViewBase extends ModelViewBase[ITableModel with Model] {

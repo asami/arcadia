@@ -51,7 +51,8 @@ import arcadia.domain._
  *  version Mar. 30, 2023
  *  version Jun. 23, 2023
  *  version Oct. 31, 2023
- * @version Mar. 29, 2025
+ *  version Mar. 29, 2025
+ * @version Jun. 14, 2025
  * @author  ASAMI, Tomoharu
  */
 trait Model {
@@ -91,7 +92,7 @@ trait Model {
       def r = l.copy(columns = xs)
       def +(rhs: String) = l.getColumn(rhs).fold(this)(x => Z(xs :+ x))
     }
-    r./:(Z())(_+_).r
+    r.foldLeft(Z())(_+_).r
   }
 
   protected final def get_table_kind(s: Option[TableKind], p: Option[String]): Option[TableKind] =
@@ -527,14 +528,18 @@ object AutoModel extends ModelClass {
 
 case class WidgetModel(
   name: String,
+  datasetNames: List[DataSet.DataName],
   expression: Expression,
   expiresKind: Option[ExpiresKind] = None
 ) extends Model with IComponentModel {
-  override val featureName = s"widget__$name"
+  override val featureName = ComponentView.makeModelName(name)
   def toRecord: IRecord = RAISE.notImplementedYetDefect
-  override protected def view_Bindings(strategy: RenderStrategy) = Map(
-    PROP_VIEW_WIDGET -> ViewWidget(WidgetModel.this, strategy)
-  )
+  override protected def view_Bindings(strategy: RenderStrategy) = {
+    val vw = ViewWidget(WidgetModel.this, strategy)
+    Map(
+      PROP_VIEW_WIDGET -> vw,
+    ) ++ vw.dataSetMap
+  }
   def render(strategy: RenderStrategy) = new Renderer(strategy) {
     protected def render_Content: NodeSeq = widget(WidgetModel.this)
   }.apply

@@ -1,5 +1,6 @@
 package arcadia.view
 
+import scalaz._, Scalaz._
 import scala.collection.mutable
 import scala.xml.{NodeSeq, Group, Elem, Node, Text}
 import java.util.{Locale, Date}
@@ -15,6 +16,7 @@ import org.goldenport.i18n.I18NElement
 import org.goldenport.xml.XhtmlUtils
 import org.goldenport.value._
 import org.goldenport.values.PathName
+import org.goldenport.datatype.Name
 import org.goldenport.util.{MapUtils, StringUtils, AnyUtils}
 import arcadia._
 import arcadia.context._
@@ -45,7 +47,8 @@ import arcadia.view.ViewEngine._
  *  version Dec. 30, 2022
  *  version Nov. 28, 2023
  *  version Dec. 28, 2023
- * @version Apr.  2, 2025
+ *  version Apr.  2, 2025
+ * @version Jun. 14, 2025
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -55,6 +58,7 @@ case class RenderStrategy(
   applicationRule: WebApplicationRule,
   partials: Partials,
   components: Components,
+  dataset: DataSet,
   layoutKind: Option[LayoutKind],
   renderContext: RenderContext,
   viewContext: Option[ViewContext],
@@ -132,6 +136,7 @@ case class RenderStrategy(
     components = cs,
     partials = p
   )
+  def withDataSet(p: DataSet) = copy(dataset = p)
   def complementApplicationRule(p: WebApplicationRule) = copy(applicationRule = applicationRule.complement(p))
 
   def withLayoutKind(p: LayoutKind) = copy(layoutKind = Some(p))
@@ -1027,7 +1032,7 @@ case class SchemaRule(
         }
       }
     }
-    val columns = system.columns./:(Z())(_+_).r
+    val columns = system.columns.foldLeft(Z())(_+_).r
     app.copy(columns = columns)
   }
 }
@@ -1128,7 +1133,7 @@ case class Partials(
     MapUtils.complement(byLayout, rhs.byLayout)
   )
   def complements(rhs: Seq[Partials]): Partials =
-    rhs./:(this)(_ complement _)
+    rhs.foldLeft(this)(_ complement _)
 }
 object Partials {
   val empty = Partials()
@@ -1143,7 +1148,7 @@ case class Pages(
     MapUtils.complement(pages, rhs.pages)
   )
 
-  def complements(rhs: Seq[Pages]): Pages =  rhs./:(this)(_ complement _)
+  def complements(rhs: Seq[Pages]): Pages =  rhs.foldLeft(this)(_ complement _)
 }
 object Pages {
   val empty = Pages(Map.empty)
@@ -1155,6 +1160,25 @@ case class Components(
 }
 object Components {
   val empty = Components(Vector.empty)
+}
+
+case class DataSet(
+  dataset: Map[DataSet.DataName, Bindings] = Map.empty
+) {
+  def get(p: String): Option[Bindings] =
+    dataset.get(DataSet.DataName(p))
+
+  def +(rhs: DataSet) = copy(dataset = dataset ++ rhs.dataset)
+}
+object DataSet {
+  val empty = DataSet()
+
+  implicit val dataSetMonoid: Monoid[DataSet] = new Monoid[DataSet] {
+      def append(lhs: DataSet, rhs: => DataSet): DataSet = lhs + rhs
+      def zero: DataSet = empty
+    }
+
+  case class DataName(name: String) extends Name
 }
 
 case class RenderContext(

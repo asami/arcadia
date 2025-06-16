@@ -1,9 +1,13 @@
 package arcadia.view
 
+import scalaz.{Tags => _, _}, Scalaz._
 import scala.xml._
 import java.io.File
+import com.typesafe.config.{Config => Hocon}
 import org.fusesource.scalate._
 import org.fusesource.scalate.util.FileResource
+import org.goldenport.context.Consequence
+import org.goldenport.hocon.HoconUtils
 import org.goldenport.exception.RAISE
 import org.goldenport.record.v2._
 import org.goldenport.value._
@@ -35,7 +39,8 @@ import arcadia.model.{Model, ErrorModel}
  *  version Nov. 28, 2023
  *  version Dec. 28, 2023
  *  version Mar. 29, 2025
- * @version Apr.  3, 2025
+ *  version Apr.  3, 2025
+ * @version Jun. 14, 2025
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -57,6 +62,13 @@ class ViewEngine(
     val a: Vector[Slot] = rule.components.components
     val b: Vector[Slot] = extend.toVector.flatMap(_.components)
     a ++ b
+  }
+
+  lazy val dataset: DataSet = {
+    val a = rule.dataset
+    val b = extend.toVector.map(_.dataset)
+    val c = a +: b
+    c.concatenate
   }
 
 //  lazy val layouts: Map[LayoutKind, LayoutView] = MapUtils.complements(rule.layouts, extend.map(_.layouts))
@@ -188,6 +200,7 @@ class ViewEngine(
       val f = p.context.fold(FormatterContext.default)(x => FormatterContext.create(x))
       (p.render getOrElse PlainHtml).
         withThemeComponentsPartials(t, Components(components), partials).
+        withDataSet(dataset).
         withFormatter(f)
     }
     val parcel = p.withRenderStrategy(render)
@@ -360,6 +373,7 @@ object ViewEngine {
     pages: Pages,
     components: Components,
     tags: Tags,
+    dataset: DataSet,
     singlePageApplication: Option[WebApplicationRule.SinglePageApplication],
     baseDir: Option[File]
   ) {
@@ -398,9 +412,10 @@ object ViewEngine {
       val pages = Pages.empty
       val components = Components.empty
       val tags = Tags.empty
+      val dataset = DataSet.empty
       val singlePageApplication = None
       val baseDir = None
-      Rule(theme, slots, layouts, partials, pages, components, tags, singlePageApplication, baseDir)
+      Rule(theme, slots, layouts, partials, pages, components, tags, dataset, singlePageApplication, baseDir)
     }
 
     def create(
@@ -411,9 +426,10 @@ object ViewEngine {
       pages: Pages,
       components: Components,
       tags: Tags,
+      dataset: DataSet,
       spa: Option[WebApplicationRule.SinglePageApplication],
       basedir: Option[File]
-    ): Rule = Rule(theme, slots.toVector, layouts, partials, pages, components, tags, spa, basedir)
+    ): Rule = Rule(theme, slots.toVector, layouts, partials, pages, components, tags, dataset, spa, basedir)
 
     def create(head: (Guard, View), tail: (Guard, View)*): Rule = Rule(
       None,
@@ -423,6 +439,7 @@ object ViewEngine {
       Pages.empty,
       Components.empty,
       Tags.empty,
+      DataSet.empty,
       None,
       None
     )
@@ -488,6 +505,13 @@ object ViewEngine {
       }
 
     def javaMap: java.util.Map[String, Object] = bindings.asJava
+
+    def update(p: Bindings): Bindings = Bindings(bindings ++ p.bindings)
+  }
+  object Bindings {
+    def createC(p: Hocon): Consequence[Bindings] = Consequence {
+      Bindings(HoconUtils.toFlattenMapAnyRef(p))
+    }
   }
 
   def evalExpression(
@@ -509,14 +533,20 @@ object ViewEngine {
     TemplateSource.fromText(uri, s)
   }
 
-  def evalExpression(s: String, bindings: Bindings): String = {
+  def evalExpression(s: String, bindings: Bindings): String =
+    if (s.contains("${"))
+      _eval_expression(s, bindings)
+    else
+      s
+
+  private def _eval_expression(s: String, bindings: Bindings): String = {
     import org.apache.commons.jexl3._
     import scala.util.matching.Regex
     val context = new MapContext(bindings.javaMap)
     val jexl = new JexlBuilder().create()
     val pattern: Regex = """\$\{([^}]+)\}""".r
     pattern.replaceAllIn(s, m => {
-      val expr = jexl.createExpression(m.group(1).trim) 
+      val expr = jexl.createExpression(m.group(1).trim)
       val result = expr.evaluate(context)
       result.toString
     })

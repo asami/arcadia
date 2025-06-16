@@ -31,7 +31,8 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  *  version May.  4, 2022
  *  version Oct.  1, 2022
  *  version Mar. 21, 2025
- * @version Apr.  2, 2025
+ *  version Apr.  2, 2025
+ * @version Jun. 14, 2025
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -135,7 +136,7 @@ object TagEngine {
 case class Tags(tags: Vector[Tag]) {
   lazy val stream = tags.toStream
   def complements(p: Tags): Tags = Tags(tags ++ p.tags)
-  def complements(ps: List[Tags]): Tags = ps./:(this)(_ complements _)
+  def complements(ps: List[Tags]): Tags = ps.foldLeft(this)(_ complements _)
 }
 object Tags {
   val empty = Tags(Vector.empty)

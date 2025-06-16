@@ -6,7 +6,8 @@ import java.util.Locale
  * @since   Aug.  2, 2017
  *  version Sep. 25, 2017
  *  version Oct. 21, 2017
- * @version Apr.  2, 2025
+ *  version Apr.  2, 2025
+ * @version Jun. 14, 2025
  * @author  ASAMI, Tomoharu
  */
 package object view {
@@ -14,7 +15,8 @@ package object view {
     Locale.ENGLISH,
     PlainTheme,
     SchemaRule.empty,
-    WebApplicationRule.empty, Partials.empty, Components.empty,
+    WebApplicationRule.empty,
+    Partials.empty, Components.empty, DataSet.empty,
     None,
     RenderContext.empty,
     None

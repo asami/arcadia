@@ -34,7 +34,8 @@ import arcadia.context.Session
  *  version Feb. 27, 2022
  *  version Mar. 28, 2022
  *  version May. 28, 2022
- * @version Mar. 21, 2025
+ *  version Mar. 21, 2025
+ * @version Jun. 14, 2025
  * @author  ASAMI, Tomoharu
  */
 sealed trait Content {
@@ -224,7 +225,7 @@ object XmlContent {
     ps.toList match {
       case Nil => XmlContent.empty
       case x :: Nil => x
-      case x :: xs => xs./:(x)(_ + _)
+      case x :: xs => xs.foldLeft(x)(_ + _)
     }
   }
 
@@ -339,7 +340,11 @@ case class ExceptionContent(e: Throwable) extends ErrorContent {
   lazy val show = s"ExceptionContent: ${conclusion.message}"
 
   override def asXml: NodeSeq = throw e
-  override def asXmlContent: XmlContent = throw e
+  override def asXmlContent: XmlContent =
+    if (true)
+      XmlContent.text(s"Warning: ${e.toString}").withCode(500)
+    else
+      throw e
 }
 
 // https://stackoverflow.com/questions/18148884/difference-between-no-cache-and-must-revalidate

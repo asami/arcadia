@@ -39,7 +39,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Mar. 30, 2022
  *  version May.  4, 2022
  *  version Mar. 28, 2025
- * @version Apr.  2, 2025
+ *  version Apr.  2, 2025
+ * @version Jun. 14, 2025
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -112,7 +113,8 @@ case object WidgetTag extends Tag with SelectByName {
 
   protected def eval_Expression(p: Expression): XmlContent = {
     val name = p.take("name")
-    val model = WidgetModel(name, p)
+    val data = p.getStringList("data").toList.flatten.map(DataSet.DataName)
+    val model = WidgetModel(name, data, p)
     p.applyModel(model)
   }
 }

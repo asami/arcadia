@@ -5,6 +5,7 @@ import scala.xml.NodeSeq
 import java.io.File
 import java.nio.file.Path
 import java.net.URL
+import java.net.URI
 import java.util.Locale
 import org.joda.time.{DateTime, DateTimeZone}
 import play.api.libs.json._
@@ -12,9 +13,12 @@ import scalax.io._
 import org.fusesource.scalate._
 import org.fusesource.scalate.support.URLTemplateSource
 import org.goldenport.exception.RAISE
+import org.goldenport.context.Consequence
 import org.goldenport.context.Conclusion
 import org.goldenport.context.FormatContext
+import org.goldenport.config.ConfigLoader
 import org.goldenport.values.{Version, PathName}
+import org.goldenport.io.InputSource
 import org.goldenport.bag.{ProjectVersionDirectoryBag, UrlBag}
 import org.goldenport.realm.Realm
 import org.goldenport.util.StringUtils
@@ -49,7 +53,7 @@ import arcadia.domain.DomainModelSpace
  *  version Dec. 30, 2023
  *  version Mar. 30, 2025
  *  version Apr.  4, 2025
- * @version Jun. 10, 2025
+ * @version Jun. 14, 2025
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -156,9 +160,20 @@ object WebApplication {
     protected def relativePathBody(root: T, p: T): String = StringUtils.pathRelativeBody(path(root), path(p))
     protected def getNameSuffix(p: T): Option[String] = StringUtils.getSuffix(name(p))
     protected def to_url(p: T): URL
+    protected def to_uri(p: T): URI
     protected def to_template_source(p: T): TemplateSource
     protected def to_content_string(p: T): String = Resource.fromURL(to_url(p)).string
     protected def to_content_json(p: T): JsValue = Json.parse(to_content_string(p))
+    protected def get_content_string(p: T): Option[String] = Consequence {
+      to_content_string(p)
+    }.toOption
+    protected def get_content_bindings(p: T): Option[Bindings] =
+      for {
+        uri <- Option(to_uri(p))
+        s <- get_content_string(p)
+        h <- ConfigLoader.loadConfigHocon(InputSource(s, uri)).toOption
+        r <- Bindings.createC(h).toOption
+      } yield r
     protected def get_pathnode(path: PathName): Option[T] =
       get_pathnode(root_node, path)
     protected def get_pathnode(p: T, path: PathName): Option[T] = {
@@ -294,8 +309,9 @@ object WebApplication {
           val theme = config.theme.flatMap(RenderTheme.get)
           val slots = applicationslots ++ compslots
           val tags = Tags.empty // TODO
+          val dataset = build_dataset
           val spa = config.singlePageApplication.map(_.toRule)
-          ViewEngine.Rule.create(theme, slots, layouts, partials, pages, comps, tags, spa, base_dir_for_dynamic_resolving)
+          ViewEngine.Rule.create(theme, slots, layouts, partials, pages, comps, tags, dataset, spa, base_dir_for_dynamic_resolving)
         }
         val controller = {
           val controllers = build_controllers
@@ -508,7 +524,10 @@ object WebApplication {
 
           def +(rhs: T) = {
             if (_is_view(rhs))
-              Z(m :+ ComponentView.create(namebody(rhs), to_template_source(rhs)))
+              Z(m :+ ComponentView.create(
+                namebody(rhs),
+                to_template_source(rhs)
+              ))
             else
               this
           }
@@ -516,6 +535,24 @@ object WebApplication {
         val a = get_pathnode(PathName("WEB-INF/widgets")).map(x => to_children(x)).getOrElse(Nil)
         val b = get_pathnode(PathName("WEB-INF/components")).map(x => to_children(x)).getOrElse(Nil)
         (a ++ b).foldLeft(Z())(_+_).r
+      }
+
+      protected def build_dataset: DataSet = {
+        case class Z(xs: Map[DataSet.DataName, Bindings] = Map.empty) {
+          def r = DataSet(xs)
+
+          def +(rhs: T) = {
+            get_content_bindings(rhs) match {
+              case Some(s) =>
+                val name = namebody(rhs)
+                copy(xs = xs + (DataSet.DataName(name) -> s))
+              case None => this
+            }
+          }
+        }
+
+        val a = get_pathnode(PathName("WEB-INF/data")).map(x => to_children(x)).getOrElse(Nil)
+        a.foldLeft(Z())(_+_).r
       }
 
       protected def build_controllers: Vector[ControllerEngine.Slot] = {

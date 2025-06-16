@@ -9,7 +9,8 @@ import arcadia.model.WidgetModel
 
 /*
  * @since   Dec. 13, 2017
- * @version Dec. 13, 2017
+ *  version Dec. 13, 2017
+ * @version Jun. 14, 2025
  * @author  ASAMI, Tomoharu
  */
 case class ViewWidget(model: WidgetModel, strategy: RenderStrategy) {
@@ -17,4 +18,9 @@ case class ViewWidget(model: WidgetModel, strategy: RenderStrategy) {
   def expression = model.expression
   def get(key: String) = expression.get(key)
   def take(key: String) = expression.take(key)
+
+  def dataSetMap: Map[String, AnyRef] =
+    model.datasetNames.foldLeft(Map.empty[String, AnyRef]) { (z, x) =>
+      strategy.dataset.get(x.name).map(_.bindings) getOrElse Map.empty
+    }
 }
