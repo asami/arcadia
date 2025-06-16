@@ -2,7 +2,7 @@ organization := "org.goldenport"
 
 name := "arcadia"
 
-version := "0.6.2"
+version := "0.6.3"
 
 scalaVersion := "2.12.18"
 // crossScalaVersions := Seq("2.10.39.2", "2.9.1")
@@ -36,7 +36,7 @@ resolvers += "GitHub Packages" at "https://maven.pkg.github.com/asami/maven-repo
 // resolvers += "Asami Maven Repository" at "http://www.asamioffice.com/maven"
 
 // override goldenport-record
-libraryDependencies += "org.goldenport" %% "goldenport-scala-lib" % "2.2.5"
+libraryDependencies += "org.goldenport" %% "goldenport-scala-lib" % "2.2.6"
 
 libraryDependencies += "org.goldenport" %% "goldenport-record" % "2.2.1"
 
