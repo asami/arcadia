@@ -3,7 +3,7 @@ package arcadia.standalone.service.operations
 import java.io.File
 import com.typesafe.config.{Config => Hocon}
 import org.goldenport.RAISE
-import org.goldenport.context.Consequence
+import org.goldenport.context._
 import org.goldenport.i18n.I18NString
 import org.goldenport.cli._
 import org.goldenport.collection.NonEmptyVector
@@ -18,7 +18,7 @@ import arcadia.standalone.service.generators.ArcadiaSiteGenerator
  * @since   Mar. 10, 2025
  *  version Mar. 15, 2025
  *  version Apr.  2, 2025
- * @version Jun. 10, 2025
+ * @version Jun. 21, 2025
  * @author  ASAMI, Tomoharu
  */
 case object SiteOperationClass extends OperationClassWithOperation {
@@ -35,13 +35,10 @@ case object SiteOperationClass extends OperationClassWithOperation {
   def execute(env: Environment, cmd: SiteCommand): SiteResult = {
     val pce = PlatformExecutionContext.develop // TODO
     val config = cmd.config
-    // val realm = {
-    //   cmd.in.map(Realm.create) match {
-    //     case x :: Nil => x
-    //     case x :: xs => xs.foldLeft(x)((z, a) => z + a)
-    //   }
-    // }
-    val realms = cmd.in.map(Realm.create)
+    val dirs = cmd.in.vector.filter(_.exists)
+    if (dirs.isEmpty)
+      InvalidArgumentFault(s"""All directories are not exists: ${cmd.in.vector.map(_.getName).mkString(",")}""").RAISE
+    val realms = NonEmptyVector(dirs.head, dirs.tail).map(Realm.create)
     val libs = cmd.library
     val ctx = ArcadiaContext.create(env, pce, config, libs)
     val site = new ArcadiaSiteGenerator(ctx)

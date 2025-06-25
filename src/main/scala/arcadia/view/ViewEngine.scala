@@ -2,10 +2,13 @@ package arcadia.view
 
 import scalaz.{Tags => _, _}, Scalaz._
 import scala.xml._
+import scala.util.Try
 import java.io.File
 import com.typesafe.config.{Config => Hocon}
 import org.fusesource.scalate._
 import org.fusesource.scalate.util.FileResource
+import org.apache.commons.jexl3.MapContext
+import org.apache.commons.jexl3.JexlEngine
 import org.goldenport.context.Consequence
 import org.goldenport.hocon.HoconUtils
 import org.goldenport.exception.RAISE
@@ -15,6 +18,7 @@ import org.goldenport.values.PathName
 import org.goldenport.io.IoUtils
 import org.goldenport.trace.Result
 import org.goldenport.util.MapUtils
+import org.goldenport.util.AnyRefUtils
 import arcadia._
 import arcadia.context._
 import arcadia.view.tag._
@@ -40,7 +44,7 @@ import arcadia.model.{Model, ErrorModel}
  *  version Dec. 28, 2023
  *  version Mar. 29, 2025
  *  version Apr.  3, 2025
- * @version Jun. 14, 2025
+ * @version Jun. 25, 2025
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -79,8 +83,13 @@ class ViewEngine(
 
   lazy val tags: Tags = rule.tags.complements(extend.map(_.tags)).complements(Tags.embeded)
 
-  def findView(parcel: Parcel): Option[View] =
-    slots.find(_.isAccept(parcel)).map(_.view) orElse _find_new_view(parcel)
+  def findView(parcel: Parcel): Option[View] = {
+    val v = slots.find(_.isAccept(parcel)).map(_.view) orElse _find_new_view(parcel)
+    v map {
+      case m: HtmlView => m.withPathName(parcel.getPathName)
+      case m => m
+    }
+  }
 
   private def _find_new_view(parcel: Parcel): Option[View] =
     _new_slots.find(_.isAccept(parcel)).map(_.view) orElse {
@@ -504,13 +513,16 @@ object ViewEngine {
         case m => None
       }
 
+    def get(key: String): Option[AnyRef] = bindings.get(key)
+
     def javaMap: java.util.Map[String, Object] = bindings.asJava
 
     def update(p: Bindings): Bindings = Bindings(bindings ++ p.bindings)
   }
   object Bindings {
     def createC(p: Hocon): Consequence[Bindings] = Consequence {
-      Bindings(HoconUtils.toFlattenMapAnyRef(p))
+      val a = HoconUtils.toFlattenMapAnyRef(p)
+      Bindings(a)
     }
   }
 
@@ -542,13 +554,28 @@ object ViewEngine {
   private def _eval_expression(s: String, bindings: Bindings): String = {
     import org.apache.commons.jexl3._
     import scala.util.matching.Regex
-    val context = new MapContext(bindings.javaMap)
-    val jexl = new JexlBuilder().create()
+    lazy val context = new MapContext(bindings.javaMap)
+    lazy val jexl = new JexlBuilder().create()
     val pattern: Regex = """\$\{([^}]+)\}""".r
     pattern.replaceAllIn(s, m => {
-      val expr = jexl.createExpression(m.group(1).trim)
-      val result = expr.evaluate(context)
-      result.toString
+      val key = m.group(1).trim
+      _eval_expression_option(bindings, key) orElse
+      _eval_expression_option(context, jexl, key) getOrElse s"N/A ($key)"
     })
   }
+
+  private def _eval_expression_option(
+    bindings: Bindings,
+    key: String
+  ): Option[String] = bindings.get(key).map(AnyRefUtils.toString)
+
+  private def _eval_expression_option(
+    jcontext: MapContext,
+    jexl: JexlEngine,
+    key: String
+  ): Option[String] = Try {
+    val expr = jexl.createExpression(key)
+    val result = expr.evaluate(jcontext)
+    result.toString
+  }.toOption
 }

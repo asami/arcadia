@@ -22,7 +22,7 @@ import arcadia.view.ViewEngine.LayoutKind
  *  version Jun. 26, 2022
  *  version Mar. 28, 2025
  *  version Apr.  4, 2025
- * @version Jun. 10, 2025
+ * @version Jun. 25, 2025
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -230,7 +230,26 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
     }
   }
 
-  def assets: String = {
+  lazy val assets: String = {
+    val path = home
+    val base = strategy.viewContext.flatMap(_.parcel.context.map(_.assets)) getOrElse {
+      "assets"
+    }
+    s"$path$base"
+  }
+
+  def assets(path: String): String = StringUtils.concatPath(assets, path)
+
+  private lazy val _pathname: Option[String] =
+    strategy.viewContext.
+      flatMap(_.parcel.view).
+      flatMap {
+        case m: HtmlView => m.pathname
+        case m: IndexView => m.pathname
+        case m => None
+      }
+
+  lazy val home: String = {
     def _resolve_(pathname: Option[String]): Option[String] =
       pathname.flatMap { x =>
         val pn = PathName(x)
@@ -241,26 +260,62 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
           Some("../" * depth)
       }
 
-    val pathOption: Option[String] = strategy.viewContext.
-      flatMap(_.parcel.view).
-      flatMap {
-        case m: HtmlView => _resolve_(m.pathname)
-        case m: IndexView => _resolve_(m.pathname)
-        case m => None
-      }
-    val path = pathOption getOrElse "./"
-    val base = strategy.viewContext.flatMap(_.parcel.context.map(_.assets)) getOrElse {
-      "assets"
-    }
-    s"$path$base"
+    val pathOption: Option[String] = _resolve_(_pathname)
+    pathOption getOrElse "./"
   }
 
-  def assets(path: String): String = StringUtils.concatPath(assets, path)
+  lazy val homeLocale: String = {
+    def _resolve_(pathname: Option[String]): Option[String] =
+      pathname.flatMap { x =>
+        val pn = PathName(x)
+        val s: Option[String] = default_locale_pathname flatMap { l =>
+          val b = pn.length match {
+            case 0 => true
+            case 1 => pn.getSuffix.isDefined
+            case _ => false
+          }
+          if (b)
+            Some(s"./$l/")
+          else
+            None
+        }
+        s orElse {
+          val depth = if (_in_locale(pn))
+            pn.length - 2
+          else
+            pn.length - 1
+          if (depth <= 0)
+            None
+          else
+            Some("../" * depth)
+        }
+      }
+    val pathOption: Option[String] = _resolve_(_pathname)
+    pathOption getOrElse "./"
+  }
+
+  protected def default_locale_pathname: Option[String] = Some("ja") // TODO
+
+  private def _in_locale(pn: PathName): Boolean =
+    pn.length match {
+      case 0 => false
+      case 1 => false
+      case _ => _is_locale(pn.head)
+    }
+
+  private def _is_locale(p: String) = // TODO
+    p match {
+      case "ja" => true
+      case "en" => true
+      case _ => false
+    }
 
   /*
    * Properties for template engine
    */
   def bindings: Map[String, AnyRef] = Map(
+    "home" -> home,
+    "home_locale" -> homeLocale,
     "assets" -> assets,
     "body_class_name" -> bodyClassName,
     "page_header_style" -> pageHeaderStyle,

@@ -14,6 +14,7 @@ import org.goldenport.io.UrlUtils
 import org.goldenport.io.IoUtils
 import org.goldenport.trace.Result
 import org.goldenport.value._
+import org.goldenport.values.PathName
 import org.goldenport.util.StringUtils
 import org.goldenport.util.RegexUtils
 import com.asamioffice.goldenport.io.UURL
@@ -46,7 +47,7 @@ import ViewEngine.LayoutKind
  *  version Jun. 25, 2023
  *  version Mar. 20, 2025
  *  version Apr.  4, 2025
- * @version Jun. 14, 2025
+ * @version Jun. 25, 2025
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -100,12 +101,13 @@ abstract class View() {
   private def _build_bindings0(engine: ViewEngine, parcel: Parcel): Map[String, AnyRef] = {
     val strategy0 = parcel.render getOrElse PlainHtml
     val strategy = strategy0.withViewContext(engine, parcel)
-    _model_bindings(strategy, parcel) ++
-    _form_bindings(strategy, parcel) ++
-    property_Bindings(strategy) ++
-    _service_bindings(strategy, parcel) ++
-    _properties_bindings(strategy, parcel)
+    val a = _model_bindings(strategy, parcel)
+    val b = _form_bindings(strategy, parcel)
+    val c = property_Bindings(strategy)
+    val d = _service_bindings(strategy, parcel)
+    val e = _properties_bindings(strategy, parcel)
 //    _context_bindings(strategy, parcel)
+    a ++ b ++ c ++ d ++ e
   }
 
   private def _model_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] = {
@@ -279,6 +281,9 @@ case class HtmlView(url: URL, pathname: Option[String] = None) extends View() {
       XmlContent.loadHtml(url)
     else
       StringContent(new UrlBag(url).toText, StaticPageExpires) // UTF-8
+
+  def withPathName(p: Option[PathName]) =
+    p.fold(this)(x => copy(pathname = Some(x.v)))
 }
 object HtmlView {
   def apply(p: File): HtmlView = HtmlView(p.toURI.toURL)
