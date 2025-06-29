@@ -13,7 +13,7 @@ import org.goldenport.values.PathName
 import arcadia._
 import arcadia.context._
 import arcadia.view._
-import arcadia.view.ViewEngine.LayoutKind
+import arcadia.view.ViewEngine.LayoutDirective
 import arcadia.model.{Model, ErrorModel, EmptyModel}
 
 /*
@@ -32,7 +32,7 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  *  version Oct.  1, 2022
  *  version Mar. 21, 2025
  *  version Apr.  2, 2025
- * @version Jun. 14, 2025
+ * @version Jun. 30, 2025
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -273,5 +273,15 @@ case class Expression(
       pn
   }
 
-  def getLayoutKind: Option[LayoutKind] = parcel.render.flatMap(_.layoutKind)
+  def getLayoutDirective: LayoutDirective =
+    parcel.render match {
+      case Some(s) => s.layoutKind match {
+        case Some(k) => LayoutDirective.Layout(k)
+        case None => s.layoutCandidates match {
+          case Some(c) => LayoutDirective.Candidates(c)
+          case None => LayoutDirective.Empty
+        }
+      }
+      case None => LayoutDirective.Empty
+    }
 }

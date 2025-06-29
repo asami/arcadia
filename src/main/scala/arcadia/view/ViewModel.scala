@@ -9,6 +9,7 @@ import arcadia.context.{Query => CQuery, ExecutionContext}
 import arcadia.domain._
 import arcadia.model._
 import arcadia.view.ViewEngine.LayoutKind
+import arcadia.view.ViewEngine.LayoutDirective
 
 /*
  * @since   Aug.  2, 2017
@@ -22,7 +23,7 @@ import arcadia.view.ViewEngine.LayoutKind
  *  version Jun. 26, 2022
  *  version Mar. 28, 2025
  *  version Apr.  4, 2025
- * @version Jun. 25, 2025
+ * @version Jun. 30, 2025
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -83,23 +84,32 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   /*
    * Partial
    */
+  def headDef(l: LayoutDirective): NodeSeq = _render_partial(strategy.partials.headDef(l))
   def headDef(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.headDef(l))
   def headDef(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.headDef(l))
+  def footDef(l: LayoutDirective): NodeSeq = _render_partial(strategy.partials.footDef(l))
   def footDef(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.footDef(l))
   def footDef(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.footDef(l))
+  def header(l: LayoutDirective): NodeSeq = _render_partial(strategy.partials.header(l))
   def header(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.header(l))
   def header(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.header(l))
+  def footer(l: LayoutDirective): NodeSeq = _render_partial(strategy.partials.footer(l))
   def footer(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.footer(l))
   def footer(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.footer(l))
+  def sidebar(l: LayoutDirective): NodeSeq = _render_partial(strategy.partials.sidebar(l))
   def sidebar(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.sidebar(l))
   def sidebar(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.sidebar(l))
+  def sidebarContent(l: LayoutDirective): NodeSeq = strategy.theme.sidebar.content(this)
   def sidebarContent(l: LayoutKind): NodeSeq = strategy.theme.sidebar.content(this)
   def sidebarContent(l: Option[LayoutKind]): NodeSeq = strategy.theme.sidebar.content(this)
+  def navigation(l: LayoutDirective): NodeSeq = _render_partial(strategy.partials.navigation(l))
   def navigation(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.navigation(l))
   def navigation(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.navigation(l))
   def navigationContent: NodeSeq = strategy.theme.navigation.content(this)
+  def contentHeader(l: LayoutDirective): NodeSeq = _render_partial(strategy.partials.contentHeader(l))
   def contentHeader(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.contentHeader(l))
   def contentHeader(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.contentHeader(l))
+  def content(l: LayoutDirective): NodeSeq = _render_partial(strategy.partials.content(l), contentContent)
   def content(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.content(l), contentContent)
   def content(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.content(l), contentContent)
   def contentContent: NodeSeq = main

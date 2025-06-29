@@ -47,7 +47,7 @@ import ViewEngine.LayoutKind
  *  version Jun. 25, 2023
  *  version Mar. 20, 2025
  *  version Apr.  4, 2025
- * @version Jun. 25, 2025
+ * @version Jun. 30, 2025
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -412,7 +412,7 @@ object AssetView {
 case class LayoutView(layoutKind: LayoutKind, template: TemplateSource) extends TemplateViewBase(template) {
   val guard = NotImplementedYetGuard
 
-  override protected def bind_Parcel(p: Parcel) = p.withLayoutKind(layoutKind)
+  override protected def bind_Parcel(p: Parcel) = p.bindLayoutKind(layoutKind)
 }
 
 case class PartialView(template: TemplateSource) extends TemplateViewBase(template) {

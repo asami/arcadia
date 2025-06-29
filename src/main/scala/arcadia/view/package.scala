@@ -7,7 +7,7 @@ import java.util.Locale
  *  version Sep. 25, 2017
  *  version Oct. 21, 2017
  *  version Apr.  2, 2025
- * @version Jun. 14, 2025
+ * @version Jun. 29, 2025
  * @author  ASAMI, Tomoharu
  */
 package object view {
@@ -17,6 +17,7 @@ package object view {
     SchemaRule.empty,
     WebApplicationRule.empty,
     Partials.empty, Components.empty, DataSet.empty,
+    None,
     None,
     RenderContext.empty,
     None

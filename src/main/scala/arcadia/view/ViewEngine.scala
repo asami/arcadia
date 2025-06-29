@@ -44,7 +44,7 @@ import arcadia.model.{Model, ErrorModel}
  *  version Dec. 28, 2023
  *  version Mar. 29, 2025
  *  version Apr.  3, 2025
- * @version Jun. 25, 2025
+ * @version Jun. 30, 2025
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -137,19 +137,35 @@ class ViewEngine(
     b.map(_.view)
   }
 
+  def getLayoutCandidates(parcel: Parcel): Option[LayoutCandidates] =
+    rule.getLayoutCandidate(parcel).orElse(
+      extend.toStream.flatMap(_.rule.getLayoutCandidate(parcel))
+        .headOption
+    )
+
   def getLayout(parcel: Parcel): Option[LayoutView] = {
-    val layout =
-      if (is_spa(parcel))
+    val layout: Option[LayoutKind] =
+      if (is_spa(parcel)) {
         Some(DefaultLayout)
-      else
-        parcel.command.flatMap(_.getLayout).orElse(
+      } else {
+        val a: Option[LayoutKind] = parcel.command.flatMap(_.getLayout)
+        a.orElse(
           rule.getLayoutKind(parcel).orElse(
             extend.toStream.flatMap(_.rule.getLayoutKind(parcel)).headOption
           )
         )
-    layout match {
-      case Some(NoneLayout) => None
-      case Some(m) => getLayoutOrDefault(m)
+      }
+    val candidates = getLayoutCandidates(parcel)
+    getLayout(parcel, candidates)
+  }
+
+  def getLayout(parcel: Parcel, candidates: Option[LayoutCandidates]): Option[LayoutView] =
+    candidates match {
+      case Some(m) =>
+        if (m.isEmpty)
+          None
+        else
+          getLayoutOrDefault(m)
       case None =>
         parcel.command match {
           case Some(s) => s match {
@@ -172,7 +188,9 @@ class ViewEngine(
     //   layouts.get(DefaultLayout)
     // else
     //   None
-  }
+
+  def getLayoutOrDefault(p: LayoutCandidates): Option[LayoutView] =
+    p.candidates.toStream.flatMap(getLayout(_)).headOption orElse getDefaultLayout()
 
   def getLayoutOrDefault(kind: LayoutKind): Option[LayoutView] = getLayout(kind) orElse getDefaultLayout()
 
@@ -246,8 +264,10 @@ class ViewEngine(
       }
     } { content =>
       def go = {
-        val page = getLayout(parcel).getOrElse(content)
-        Some(page.apply(this, parcel.withView(content)))
+        val candidates = getLayoutCandidates(parcel)
+        val page = getLayout(parcel, candidates).getOrElse(content)
+        // val page = getLayout(parcel).getOrElse(content)
+        Some(page.apply(this, parcel.withView(content).withLayoutCandidates(candidates)))
       }
       content match {
         case m: MaterialView =>
@@ -411,6 +431,30 @@ object ViewEngine {
     }
 
     def getLayout(kind: LayoutKind): Option[LayoutView] = layouts.get(kind)
+
+    def getLayoutCandidate(parcel: Parcel): Option[LayoutCandidates] =
+      parcel.command flatMap { 
+        case m: MaterialCommand =>
+          val pathname = m.pathname
+          if (pathname.leafBody.toLowerCase == "index")
+            pathname.length match {
+              case 1 => Some(LayoutCandidates(HomepageLayout, IndexLayout))
+              case 2 if _is_locale(pathname) => Some(LayoutCandidates(LocaleHomepageLayout, HomepageLayout, IndexLayout))
+              case _ => Some(LayoutCandidates(IndexLayout))
+            }
+            else
+              None
+        case _ => None
+      }
+
+    private def _is_locale(pathname: PathName): Boolean =
+      pathname.headOption.fold(false)(x =>
+        x.length match {
+          case 2 => true
+          case 5 if x.contains('-') => true
+          case _ => false
+        }
+      )
   }
   object Rule {
     val error = {
@@ -469,6 +513,7 @@ object ViewEngine {
       ErrorLayout,
       PlainLayout,
       HomepageLayout,
+      LocaleHomepageLayout,
       IndexLayout,
       ArticleLayout
     )
@@ -488,6 +533,9 @@ object ViewEngine {
   case object HomepageLayout extends LayoutKind {
     val name = "homepage"
   }
+  case object LocaleHomepageLayout extends LayoutKind {
+    val name = "localehomepage"
+  }
   case object IndexLayout extends LayoutKind {
     val name = "index"
   }
@@ -495,6 +543,34 @@ object ViewEngine {
     val name = "article"
   }
   case class PageLayout(name: String) extends LayoutKind {
+  }
+
+  case class LayoutCandidates(candidates: Vector[LayoutKind]) {
+    def isEmpty: Boolean = candidates.isEmpty || candidates.forall(_ == NoneLayout)
+
+    // def headOption: Option[LayoutKind] = candidates.headOption
+
+    def bindLayoutKind(p: LayoutKind): LayoutCandidates =
+      if (candidates.contains(p))
+        this
+      else
+        p match {
+          case DefaultLayout => copy(candidates = candidates :+ DefaultLayout)
+          case m => copy(candidates = m +: candidates)
+        }
+
+  }
+  object LayoutCandidates {
+    def apply(p: LayoutKind, ps: LayoutKind*): LayoutCandidates =
+      LayoutCandidates(p +: ps.toVector)
+  }
+
+  sealed trait LayoutDirective {
+  }
+  object LayoutDirective {
+    case object Empty extends LayoutDirective
+    case class Layout(layout: LayoutKind) extends LayoutDirective
+    case class Candidates(candidates: LayoutCandidates) extends LayoutDirective
   }
 
   case class Bindings(

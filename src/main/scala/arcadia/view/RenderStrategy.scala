@@ -48,7 +48,7 @@ import arcadia.view.ViewEngine._
  *  version Nov. 28, 2023
  *  version Dec. 28, 2023
  *  version Apr.  2, 2025
- * @version Jun. 14, 2025
+ * @version Jun. 30, 2025
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -60,6 +60,7 @@ case class RenderStrategy(
   components: Components,
   dataset: DataSet,
   layoutKind: Option[LayoutKind],
+  layoutCandidates: Option[LayoutCandidates],
   renderContext: RenderContext,
   viewContext: Option[ViewContext],
   history: RenderStrategy.History = RenderStrategy.History.empty // unused
@@ -139,7 +140,14 @@ case class RenderStrategy(
   def withDataSet(p: DataSet) = copy(dataset = p)
   def complementApplicationRule(p: WebApplicationRule) = copy(applicationRule = applicationRule.complement(p))
 
-  def withLayoutKind(p: LayoutKind) = copy(layoutKind = Some(p))
+  //def withLayoutKind(p: LayoutKind) = copy(layoutKind = Some(p))
+
+  def bindLayoutKind(p: LayoutKind) = layoutCandidates match {
+    case Some(s) => copy(layoutCandidates = Some(s.bindLayoutKind(p)))
+    case None => copy(layoutKind = Some(p))
+  }
+
+  def withLayoutCandidates(p: Option[LayoutCandidates]) = copy(layoutCandidates = p)
 
   def push(p: RenderStrategy) = copy(history = history.append(p))
 
@@ -1106,25 +1114,48 @@ case class Partials(
   partials: Map[PartialKind, PartialView] = Map.empty,
   byLayout: Map[LayoutKind, Map[PartialKind, PartialView]] = Map.empty
 ) {
+  def get(l: LayoutDirective, p: PartialKind): Option[PartialView] =
+    l match {
+      case LayoutDirective.Empty => _get(p)
+      case LayoutDirective.Layout(k) => get(k, p)
+      case LayoutDirective.Candidates(c) =>
+        val a = c.candidates.toStream.flatMap(_get_by_layout(_, p)).headOption
+        a orElse _get(p)
+    }
+
+  private def _get_by_layout(l: LayoutKind, p: PartialKind): Option[PartialView] =
+    byLayout.get(l).flatMap(_.get(p))
+
   private def _get(p: PartialKind): Option[PartialView] = partials.get(p)
+
   def get(l: LayoutKind, p: PartialKind): Option[PartialView] =
-    byLayout.get(l).flatMap(_.get(p)) orElse _get(p)
+    _get_by_layout(l, p) orElse _get(p)
+
   def get(l: Option[LayoutKind], p: PartialKind): Option[PartialView] =
     l.fold(_get(p))(get(_, p))
+
+  def headDef(l: LayoutDirective): Option[PartialView] = get(l, HeadDefPartial)
   def headDef(l: LayoutKind): Option[PartialView] = get(l, HeadDefPartial)
   def headDef(l: Option[LayoutKind]): Option[PartialView] = get(l, HeadDefPartial)
+  def footDef(l: LayoutDirective): Option[PartialView] = get(l, FootDefPartial)
   def footDef(l: LayoutKind): Option[PartialView] = get(l, FootDefPartial)
   def footDef(l: Option[LayoutKind]): Option[PartialView] = get(l, FootDefPartial)
+  def header(l: LayoutDirective): Option[PartialView] = get(l, HeaderPartial)
   def header(l: LayoutKind): Option[PartialView] = get(l, HeaderPartial)
   def header(l: Option[LayoutKind]): Option[PartialView] = get(l, HeaderPartial)
+  def footer(l: LayoutDirective): Option[PartialView] = get(l, FooterPartial)
   def footer(l: LayoutKind): Option[PartialView] = get(l, FooterPartial)
   def footer(l: Option[LayoutKind]): Option[PartialView] = get(l, FooterPartial)
+  def navigation(l: LayoutDirective): Option[PartialView] = get(l, NavigationPartial)
   def navigation(l: LayoutKind): Option[PartialView] = get(l, NavigationPartial)
   def navigation(l: Option[LayoutKind]): Option[PartialView] = get(l, NavigationPartial)
+  def sidebar(l: LayoutDirective): Option[PartialView] = get(l, SidebarPartial)
   def sidebar(l: LayoutKind): Option[PartialView] = get(l, SidebarPartial)
   def sidebar(l: Option[LayoutKind]): Option[PartialView] = get(l, SidebarPartial)
+  def contentHeader(l: LayoutDirective): Option[PartialView] = get(l, ContentHeaderPartial)
   def contentHeader(l: LayoutKind): Option[PartialView] = get(l, ContentHeaderPartial)
   def contentHeader(l: Option[LayoutKind]): Option[PartialView] = get(l, ContentHeaderPartial)
+  def content(l: LayoutDirective): Option[PartialView] = get(l, ContentPartial)
   def content(l: LayoutKind): Option[PartialView] = get(l, ContentPartial)
   def content(l: Option[LayoutKind]): Option[PartialView] = get(l, ContentPartial)
 

@@ -21,6 +21,7 @@ import arcadia.view.{ViewEngine, RenderStrategy, Partials, View,
 }
 import arcadia.view.RenderTheme
 import arcadia.view.ViewEngine.LayoutKind
+import arcadia.view.ViewEngine.LayoutCandidates
 import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
 
 /*
@@ -46,7 +47,8 @@ import arcadia.controller.{Sink, ModelHangerSink, UrnSource}
  *  version Nov. 28, 2023
  *  version Dec. 28, 2023
  *  version Mar. 12, 2025
- * @version Apr.  2, 2025
+ *  version Apr.  2, 2025
+ * @version Jun. 30, 2025
  * @author  ASAMI, Tomoharu
  */
 case class Parcel(
@@ -79,7 +81,11 @@ case class Parcel(
     case None => copy(render = Some(p))
   }
 
-  def withLayoutKind(p: LayoutKind) = copy(render = render.map(_.withLayoutKind(p)))
+//  def withLayoutKind(p: LayoutKind) = copy(render = render.map(_.withLayoutKind(p)))
+
+  def bindLayoutKind(p: LayoutKind) = copy(render = render.map(_.bindLayoutKind(p)))
+
+  def withLayoutCandidates(p: Option[LayoutCandidates]) = copy(render = render.map(_.withLayoutCandidates(p)))
 
   // def withPartials(p: Partials) = render.fold(this)(r => copy(render = Some(r.copy(partials = p))))
 
@@ -143,7 +149,7 @@ case class Parcel(
 
   def addProperties(p: List[Property]) = {
     val a = propertyModel.map(x => Record.create(x.record)).getOrElse(Record.empty)
-    val b = p./:(a)((z, x) => z.update(x.name, _value(x)))
+    val b = p.foldLeft(a)((z, x) => z.update(x.name, _value(x)))
     val c = if (b.isEmpty)
       None
     else
@@ -232,7 +238,7 @@ case class Parcel(
           this
         }
     }
-    pn.components./:(Z(basename.components))(_+_).r
+    pn.components.foldLeft(Z(basename.components))(_+_).r
   }
 
   def getPathDepthForRedirect: Option[Int] = getPathName.map { x =>
