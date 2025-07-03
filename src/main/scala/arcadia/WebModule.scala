@@ -34,7 +34,8 @@ import arcadia.domain.DomainModelSpace
  *  version Dec. 25, 2022
  *  version Jan.  1, 2023
  *  version Mar. 11, 2025
- * @version Jun. 14, 2025
+ *  version Jun. 14, 2025
+ * @version Jul.  1, 2025
  * @author  ASAMI, Tomoharu
  */
 abstract class WebModule() {
@@ -125,7 +126,11 @@ class DirectoryWebModule(base: File) extends WebModule {
       protected def to_uri(p: File): URI = p.toURI
       protected def to_template_source(p: File): TemplateSource = TemplateSource.fromFile(p)
       protected def root_node: File = base
-      protected def to_children(p: File): List[File] = p.listFiles.toList
+      protected def to_children(p: File): List[File] =
+        if (p.isDirectory)
+          p.listFiles.toList
+        else
+          Nil
       protected def to_descendants(p: File): List[File] = IoUtils.descendants(p).toList
       protected def parse_domain_model(p: File): Option[DomainModel] = webconfig.domainModelFactory.parse(p)
     }

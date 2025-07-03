@@ -19,7 +19,8 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  * @since   Mar. 21, 2025
  *  version Mar. 21, 2025
  *  version Apr.  1, 2025
- * @version Jun. 14, 2025
+ *  version Jun. 14, 2025
+ * @version Jul.  2, 2025
  * @author  ASAMI, Tomoharu
  */
 class ExpressionEngine(
@@ -35,13 +36,19 @@ class ExpressionEngine(
   ) extends CallBase(parcel, bindings) {
     override protected def eval_Text(p: Text): XmlContent = {
       val s = ViewEngine.evalExpression(p.data, bindings)
-      XmlContent(Text(s))
+      if (s == p.data)
+        XmlContent(p)
+      else
+        XmlContent(Text(s))
     }
 
     override protected def eval_Attribute(p: (String, String)): Vector[(String, String)] = {
       val (name, value) = p
       val v = ViewEngine.evalExpression(value, bindings)
-      Vector(name -> v)
+      if (v == value)
+        Vector(p)
+      else
+        Vector(name -> v)
     }
   }
 

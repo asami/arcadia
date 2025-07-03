@@ -40,7 +40,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Mar. 30, 2023
  *  version Oct. 31, 2023
  *  version Nov. 29, 2023
- * @version Dec.  2, 2023
+ *  version Dec.  2, 2023
+ * @version Jul.  3, 2025
  * @author  ASAMI, Tomoharu
  */
 abstract class Renderer(
@@ -109,8 +110,8 @@ abstract class Renderer(
     }
 
   protected lazy val button_search = strategy.label.buttonSearch.apply(locale)
-  protected lazy val placeholder_start = strategy.label.placeholderStart.toI18NString.apply(locale)
-  protected lazy val placeholder_end = strategy.label.placeholderEnd.toI18NString.apply(locale)
+  protected lazy val placeholder_start = strategy.label.placeholderStart.toI18NString.distill(locale)
+  protected lazy val placeholder_end = strategy.label.placeholderEnd.toI18NString.distill(locale)
 
   protected def render_html = <html>{render_head}{render_body}</html>
   protected def render_head = <head>
@@ -141,8 +142,8 @@ abstract class Renderer(
   protected def head_author: Node = theme_head.author(strategy)
   protected def head_theme: Node = theme_head.theme(strategy)
 
-  protected def string(s: I18NString): String = s.apply(locale)
-  protected def node(s: I18NString): Node = Text(s.apply(locale))
+  protected def string(s: I18NString): String = s.distill(locale)
+  protected def node(s: I18NString): Node = Text(s.distill(locale))
   protected def nodeseq(s: I18NElement): NodeSeq = s.apply(locale)
 
   protected def error(

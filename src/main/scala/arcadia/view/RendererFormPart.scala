@@ -24,7 +24,8 @@ import Renderer._
  *  version Apr. 30, 2019
  *  version May.  1, 2019
  *  version Apr. 18, 2020
- * @version Jun. 23, 2023
+ *  version Jun. 23, 2023
+ * @version Jul.  3, 2025
  * @author  ASAMI, Tomoharu
  */
 trait RendererFormPart { self: Renderer =>
@@ -177,7 +178,7 @@ trait RendererFormPart { self: Renderer =>
     <div class="col-sm-10">{
       XmlUtils.appendAttributes(
         <input type={_form_type(c)} class="form-control" id={id} name={c.name} />,
-        "placeholder" -> c.form.placeholder.map(_(locale))
+        "placeholder" -> c.form.placeholder.map(_.distill(locale))
       )
     }</div>
   }
@@ -248,7 +249,7 @@ trait RendererFormPart { self: Renderer =>
     <div class="col-sm-10">{
       XmlUtils.appendAttributes(
         <input type={_form_type(c)} class="form-control" id={id} name={c.name} />,
-        "placeholder" -> c.form.placeholder.map(_(locale))
+        "placeholder" -> c.form.placeholder.map(_.distill(locale))
       )
     }</div>
   }
@@ -481,7 +482,7 @@ trait RendererFormPart { self: Renderer =>
     <div class="col-sm-10">{
       XmlUtils.appendAttributes(
         <input type={_form_type(c)} class="form-control" id={id} name={c.name} />,
-        "placeholder" -> c.form.placeholder.map(_(locale))
+        "placeholder" -> c.form.placeholder.map(_.distill(locale))
       )
     }</div>
     </div>

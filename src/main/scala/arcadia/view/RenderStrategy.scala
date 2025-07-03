@@ -16,7 +16,7 @@ import org.goldenport.i18n.I18NElement
 import org.goldenport.xml.XhtmlUtils
 import org.goldenport.value._
 import org.goldenport.values.PathName
-import org.goldenport.datatype.Name
+import org.goldenport.datatype
 import org.goldenport.util.{MapUtils, StringUtils, AnyUtils}
 import arcadia._
 import arcadia.context._
@@ -48,7 +48,8 @@ import arcadia.view.ViewEngine._
  *  version Nov. 28, 2023
  *  version Dec. 28, 2023
  *  version Apr.  2, 2025
- * @version Jun. 30, 2025
+ *  version Jun. 30, 2025
+ * @version Jul.  1, 2025
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -1209,7 +1210,7 @@ object DataSet {
       def zero: DataSet = empty
     }
 
-  case class DataName(name: String) extends Name
+  case class DataName(name: String) extends datatype.PathName
 }
 
 case class RenderContext(

@@ -53,7 +53,8 @@ import arcadia.domain.DomainModelSpace
  *  version Dec. 30, 2023
  *  version Mar. 30, 2025
  *  version Apr.  4, 2025
- * @version Jun. 14, 2025
+ *  version Jun. 14, 2025
+ * @version Jul.  1, 2025
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -537,22 +538,42 @@ object WebApplication {
         (a ++ b).foldLeft(Z())(_+_).r
       }
 
-      protected def build_dataset: DataSet = {
+      protected def build_dataset: DataSet =
+        get_pathnode(PathName("WEB-INF/data")) match {
+          case Some(home) => _build_dataset(home)
+          case None => DataSet.empty
+        }
+
+      private def _build_dataset(home: T): DataSet = {
+        def _pathname_(p: T): String = {
+          val a = path(p)
+          val c = path(home)
+          if (a.startsWith(c))
+            StringUtils.toRelative(StringUtils.toPathnameBody(a.substring(c.length)))
+          else
+            name(p)
+        }
+
         case class Z(xs: Map[DataSet.DataName, Bindings] = Map.empty) {
           def r = DataSet(xs)
 
           def +(rhs: T) = {
             get_content_bindings(rhs) match {
               case Some(s) =>
-                val name = namebody(rhs)
+                val name = _pathname_(rhs)
                 copy(xs = xs + (DataSet.DataName(name) -> s))
               case None => this
             }
           }
         }
 
-        val a = get_pathnode(PathName("WEB-INF/data")).map(x => to_children(x)).getOrElse(Nil)
-        a.foldLeft(Z())(_+_).r
+        def go(node: T, z: Z): Z = {
+          val z1 = z + node
+          val xs = to_children(node)
+          xs.foldLeft(z1)((z, x) => go(x, z))
+        }
+
+        go(home, Z()).r
       }
 
       protected def build_controllers: Vector[ControllerEngine.Slot] = {

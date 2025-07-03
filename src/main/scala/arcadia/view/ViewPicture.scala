@@ -11,7 +11,8 @@ import arcadia.model.Picture
 /*
  * @since   Nov.  8, 2017
  *  version Nov. 22, 2017
- * @version Dec. 29, 2023
+ *  version Dec. 29, 2023
+ * @version Jul.  3, 2025
  * @author  ASAMI, Tomoharu
  */
 sealed trait ViewPicture {
@@ -31,7 +32,7 @@ object ViewPicture {
     def m: String = v.m // 640
     def s: String = v.s // 320
     def xs: String = v.xs // 160
-    def alt: String = v.alt.map(_(strategy.locale)) getOrElse ""
+    def alt: String = v.alt.map(_.distill(strategy.locale)) getOrElse ""
   }
 
   def create(picture: Picture, strategy: RenderStrategy): ViewPicture = picture match {

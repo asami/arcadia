@@ -32,7 +32,8 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  *  version Oct.  1, 2022
  *  version Mar. 21, 2025
  *  version Apr.  2, 2025
- * @version Jun. 30, 2025
+ *  version Jun. 30, 2025
+ * @version Jul.  3, 2025
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -261,7 +262,7 @@ case class Expression(
 
   def isLabel(p: String): Boolean = prefix === "c" && label === p
 
-  def format(p: I18NString): String = p(strategy.locale)
+  def format(p: I18NString): String = p.distill(strategy.locale)
 
   def format(p: I18NElement): String = p(strategy.locale).text
 

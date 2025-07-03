@@ -39,7 +39,8 @@ import arcadia.domain._
  *  version May.  3, 2022
  *  version Mar. 31, 2023
  *  version Apr. 22, 2023
- * @version Dec. 29, 2023
+ *  version Dec. 29, 2023
+ * @version Jul.  3, 2025
  * @author  ASAMI, Tomoharu
  */
 sealed trait Particle {
@@ -319,7 +320,7 @@ object Submits {
 
 case class Submit(kind: SubmitKind, label: I18NString) extends Particle {
   def name = ScenarioCommand.PROP_SUBMIT // ScenarioCommand.PROP_SUBMIT_PREFIX + kind.name
-  def value(locale: Locale) = label(locale)
+  def value(locale: Locale) = label.distill(locale)
 }
 object Submit {
   lazy val ok = apply(OkSubmitKind)

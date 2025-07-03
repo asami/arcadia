@@ -15,7 +15,8 @@ import Renderer._
 
 /*
  * @since   Jul.  2, 2018
- * @version Apr. 30, 2019
+ *  version Apr. 30, 2019
+ * @version Jul.  3, 2025
  * @author  ASAMI, Tomoharu
  */
 sealed trait FormRenderer {
@@ -38,8 +39,8 @@ sealed trait FormRenderer {
   protected def generate_id() = strategy.generateId()
   protected def add_javascript_in_footer(p: String): Unit = strategy.addJavaScriptInFooter(p)
 
-  protected lazy val placeholder_start = strategy.label.placeholderStart.toI18NString.apply(locale)
-  protected lazy val placeholder_end = strategy.label.placeholderEnd.toI18NString.apply(locale)
+  protected lazy val placeholder_start = strategy.label.placeholderStart.toI18NString.distill(locale)
+  protected lazy val placeholder_end = strategy.label.placeholderEnd.toI18NString.distill(locale)
 
   def apply = <form method={form.method.name} action={form.action.toString}>{
     body
@@ -112,7 +113,7 @@ sealed trait FormRenderer {
     XmlUtils.appendAttributes(
       <input type={input_type(c)} class={class_input} id={inputid} name={c.name}/>,
       "value" -> form.getValue(c.name).map(input_value(c, _)),
-      "placeholder" -> c.form.placeholder.map(_(locale))
+      "placeholder" -> c.form.placeholder.map(_.distill(locale))
     )
 
   def inputType(c: FormRenderer.Field): String = input_type(c)
@@ -265,13 +266,13 @@ sealed trait NowUiFormRenderer extends BootstrapFormRenderer {
         XmlUtils.appendAttributes(
           <input type="text" class="form-control col datetimepicker" id={inputid} name={startproperty}/>,
           "value" -> form.getValue(c.name).map(input_value(c, _)),
-          "placeholder" -> c.form.placeholder.map(_(locale))
+          "placeholder" -> c.form.placeholder.map(_.distill(locale))
         ),
         <span class="ml-1 mr-1">〜</span>,
         XmlUtils.appendAttributes(
           <input type="text" class="form-control col datetimepicker" name={endproperty}/>,
           "value" -> form.getValue(c.name).map(input_value(c, _)),
-          "placeholder" -> c.form.placeholder.map(_(locale))
+          "placeholder" -> c.form.placeholder.map(_.distill(locale))
         )
       )
     }</div>
@@ -285,13 +286,13 @@ sealed trait NowUiFormRenderer extends BootstrapFormRenderer {
         XmlUtils.appendAttributes(
           <input type="text" class="form-control col datepicker" id={inputid} name={startproperty}/>,
           "value" -> form.getValue(c.name).map(input_value(c, _)),
-          "placeholder" -> c.form.placeholder.map(_(locale))
+          "placeholder" -> c.form.placeholder.map(_.distill(locale))
         ),
         <span class="ml-1 mr-1">〜</span>,
         XmlUtils.appendAttributes(
           <input type="text" class="form-control col datepicker" name={endproperty}/>,
           "value" -> form.getValue(c.name).map(input_value(c, _)),
-          "placeholder" -> c.form.placeholder.map(_(locale))
+          "placeholder" -> c.form.placeholder.map(_.distill(locale))
         )
       )
     }</div>
@@ -305,12 +306,12 @@ sealed trait NowUiFormRenderer extends BootstrapFormRenderer {
         XmlUtils.appendAttributes(
           <input type="text" class="form-control timepicker" id={inputid} name={startproperty}/>,
           "value" -> form.getValue(c.name).map(input_value(c, _)),
-          "placeholder" -> c.form.placeholder.map(_(locale))
+          "placeholder" -> c.form.placeholder.map(_.distill(locale))
         ),
         XmlUtils.appendAttributes(
           <input type="text" class="form-control timepicker" name={endproperty}/>,
           "value" -> form.getValue(c.name).map(input_value(c, _)),
-          "placeholder" -> c.form.placeholder.map(_(locale))
+          "placeholder" -> c.form.placeholder.map(_.distill(locale))
         )
       )
     }</div>
@@ -320,28 +321,28 @@ sealed trait NowUiFormRenderer extends BootstrapFormRenderer {
     XmlUtils.appendAttributes(
       <input type="text" class="form-control datetimepicker" id={inputid} name={c.name}/>,
       "value" -> form.getValue(c.name).map(input_value(c, _)),
-      "placeholder" -> c.form.placeholder.map(_(locale))
+      "placeholder" -> c.form.placeholder.map(_.distill(locale))
     )
 
   override protected def input_date(c: FormRenderer.Field, inputid: String): Elem =
     XmlUtils.appendAttributes(
       <input type="text" class="form-control datepicker" id={inputid} name={c.name}/>,
       "value" -> form.getValue(c.name).map(input_value(c, _)),
-      "placeholder" -> c.form.placeholder.map(_(locale))
+      "placeholder" -> c.form.placeholder.map(_.distill(locale))
     )
 
   override protected def input_time(c: FormRenderer.Field, inputid: String): Elem =
     XmlUtils.appendAttributes(
       <input type="text" class="form-control timepicker" id={inputid} name={c.name}/>,
       "value" -> form.getValue(c.name).map(input_value(c, _)),
-      "placeholder" -> c.form.placeholder.map(_(locale))
+      "placeholder" -> c.form.placeholder.map(_.distill(locale))
     )
 
   override protected def input_powertype(c: FormRenderer.Field, inputid: String, pt: XPowertype): Elem = {
     <select class="selectpicker" id={inputid} data-style="btn btn-secondary btn-round">{
       List(
         c.form.placeholder.map(x =>
-          <option selected="">{x(locale)}</option>
+          <option selected="">{x.distill(locale)}</option>
         ).getOrElse(
           <option selected=""></option>
         ),
