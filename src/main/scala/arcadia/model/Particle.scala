@@ -89,7 +89,7 @@ case class TitleLine(
       Some(this)
 
   def title(locale: Locale): NodeSeq =
-    XmlUtils.orEmptyNodeSeq(title.map(_.apply(locale)))
+    XmlUtils.orEmptyNodeSeq(title.map(_.distill(locale)))
 }
 object TitleLine {
   val blank = TitleLine(Some(I18NElement("")), None)
@@ -294,7 +294,7 @@ case class Xml(
   i18n: Option[I18NElement],
   node: Option[NodeSeq]
 ) extends Particle {
-  def apply(locale: Locale): NodeSeq = i18n.map(_.apply(locale)) orElse node getOrElse Group(Nil)
+  def apply(locale: Locale): NodeSeq = i18n.map(_.distill(locale)) orElse node getOrElse Group(Nil)
 }
 object Xml {
   val empty = Xml(None, None)

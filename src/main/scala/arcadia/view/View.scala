@@ -47,7 +47,8 @@ import ViewEngine.LayoutKind
  *  version Jun. 25, 2023
  *  version Mar. 20, 2025
  *  version Apr.  4, 2025
- * @version Jun. 30, 2025
+ *  version Jun. 30, 2025
+ * @version Jul.  4, 2025
  * @author  ASAMI, Tomoharu
  */
 abstract class View() {
@@ -106,8 +107,9 @@ abstract class View() {
     val c = property_Bindings(strategy)
     val d = _service_bindings(strategy, parcel)
     val e = _properties_bindings(strategy, parcel)
+    val f = _category_bindings(strategy, parcel)
 //    _context_bindings(strategy, parcel)
-    a ++ b ++ c ++ d ++ e
+    a ++ b ++ c ++ d ++ e ++ f
   }
 
   private def _model_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] = {
@@ -141,6 +143,24 @@ abstract class View() {
     (parcel.context orElse strategy.viewContext.flatMap(_.parcel.context)).
       map(x => Map(PROP_VIEW_PROPERTIES -> ViewProperties(x, strategy))).
       getOrElse(Map.empty)
+
+  private def _category_bindings(strategy: RenderStrategy, parcel: Parcel): Map[String, AnyRef] = {
+    parcel.view match {
+      case Some(s) => s match {
+        case m: HtmlView => m.pathname match {
+          case Some(pathname) =>
+            val key = StringUtils.concatPath(StringUtils.makePathContainerRelativeBody(pathname), "category")
+            strategy.dataset.get(key) match {
+              case Some(bindings) => bindings.toMapWithPrefix("category")
+              case None => Map.empty
+            }
+          case None => Map.empty
+        }
+        case _ => Map.empty
+      }
+      case None => Map.empty
+    }
+  }
 }
 
 trait ModelViewBase[T <: Model] extends View {

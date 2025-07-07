@@ -109,7 +109,7 @@ abstract class Renderer(
       case (l, r) => r > l
     }
 
-  protected lazy val button_search = strategy.label.buttonSearch.apply(locale)
+  protected lazy val button_search = strategy.label.buttonSearch.distill(locale)
   protected lazy val placeholder_start = strategy.label.placeholderStart.toI18NString.distill(locale)
   protected lazy val placeholder_end = strategy.label.placeholderEnd.toI18NString.distill(locale)
 
@@ -144,7 +144,7 @@ abstract class Renderer(
 
   protected def string(s: I18NString): String = s.distill(locale)
   protected def node(s: I18NString): Node = Text(s.distill(locale))
-  protected def nodeseq(s: I18NElement): NodeSeq = s.apply(locale)
+  protected def nodeseq(s: I18NElement): NodeSeq = s.distill(locale)
 
   protected def error(
     code: Int,
@@ -171,7 +171,7 @@ abstract class Renderer(
 
     val rec = Record.dataOption(
       "code" -> Some(code),
-      "message" -> msg.map(_(locale)),
+      "message" -> msg.map(_.distill(locale)),
       "topuri" -> topUri,
       "backuri" -> backUri,
       "exception_message" -> exception.flatMap(x => Option(x.getMessage)),
@@ -393,8 +393,8 @@ abstract class Renderer(
               else
                 <div class="carousel-caption d-none d-md-block"> {
                   List(
-                    x.caption.map(c => <h3>{c(locale)}</h3>),
-                    x.description.map(d => <p>{d(locale)}</p>)
+                    x.caption.map(c => <h3>{c.distill(locale)}</h3>),
+                    x.description.map(d => <p>{d.distill(locale)}</p>)
                   ).flatten
                 } </div>
             }

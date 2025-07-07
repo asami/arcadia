@@ -11,7 +11,8 @@ import Renderer._
 /*
  * @since   May.  3, 2018
  *  version Jul.  2, 2018
- * @version Sep.  1, 2018
+ *  version Sep.  1, 2018
+ * @version Jul.  3, 2025
  * @author  ASAMI, Tomoharu
  */
 trait RendererTabsPart { self: Renderer =>
@@ -25,8 +26,8 @@ trait RendererTabsPart { self: Renderer =>
       p.panes match {
         case Nil => <div/>
         case x :: xs =>
-          <li class="nav-item"><a class="nav-link active" data-toggle="tab" href={s"#${ids(x)}"}>{x.label(locale)}</a></li> +:
-          xs.map(x => <li class="nav-item"><a class="nav-link" data-toggle="tab" href={s"#${ids(x)}"}>{x.label(locale)}</a></li>)
+          <li class="nav-item"><a class="nav-link active" data-toggle="tab" href={s"#${ids(x)}"}>{x.label.distill(locale)}</a></li> +:
+          xs.map(x => <li class="nav-item"><a class="nav-link" data-toggle="tab" href={s"#${ids(x)}"}>{x.label.distill(locale)}</a></li>)
       }
     }</ul>
     val content = <div class="tab-content">{

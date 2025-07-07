@@ -264,7 +264,7 @@ case class Expression(
 
   def format(p: I18NString): String = p.distill(strategy.locale)
 
-  def format(p: I18NElement): String = p(strategy.locale).text
+  def format(p: I18NElement): String = p.distill(strategy.locale).text
 
   def resolveActionPathName(p: URI): PathName = {
     val pn = PathName(p.toString)

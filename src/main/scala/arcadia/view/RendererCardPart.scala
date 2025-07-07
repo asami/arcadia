@@ -18,7 +18,8 @@ import Renderer._
  *  version Sep.  1, 2018
  *  version Apr. 16, 2019
  *  version Nov. 28, 2023
- * @version Dec.  2, 2023
+ *  version Dec.  2, 2023
+ * @version Jul.  3, 2025
  * @author  ASAMI, Tomoharu
  */
 trait RendererCardPart { self: Renderer =>
@@ -41,7 +42,7 @@ trait RendererCardPart { self: Renderer =>
 
   private def _to_card_productclass_mycolor(table: Table, rec: IRecord): Card = {
     val icon = picture_icon(rec)
-    val title = get_title(rec).map(_(locale)) getOrElse Text("")
+    val title = get_title(rec).map(_.distill(locale)) getOrElse Text("")
     val price = Text("10,000") // TODO
     val content =
       <div class="c-card__textArea">
@@ -162,7 +163,7 @@ trait RendererCardPart { self: Renderer =>
           card_title_bootstrap(h)
         }</div>
       ).toVector ++ card.content.map(c => <div class="card-body">{
-        <div class="card-text">{c(locale)}</div>
+        <div class="card-text">{c.distill(locale)}</div>
       }</div>).toVector ++ card.footer.map(f =>
         <div class="card-footer">{
           card_title_bootstrap(f)
@@ -182,8 +183,8 @@ trait RendererCardPart { self: Renderer =>
 
   def card_title_bootstrap(p: TitleLine): List[Node] = {
     List(
-      p.title.map(t => <h4 class="card-title">{t(locale)}</h4>),
-      p.subtitle.map(d => <p class="card-subtitle">{d(locale)}</p>)
+      p.title.map(t => <h4 class="card-title">{t.distill(locale)}</h4>),
+      p.subtitle.map(d => <p class="card-subtitle">{d.distill(locale)}</p>)
     ).flatten
   }
 
@@ -192,18 +193,18 @@ trait RendererCardPart { self: Renderer =>
       card.image_top.map(picture(_)) ++ card.header.map(h =>
         <div class="header">{
           List(
-            h.title.map(t => <h4 class="title">{t(locale)}</h4>),
-            h.subtitle.map(d => <p class="category">{d(locale)}</p>)
+            h.title.map(t => <h4 class="title">{t.distill(locale)}</h4>),
+            h.subtitle.map(d => <p class="category">{d.distill(locale)}</p>)
           ).flatten
         }</div>
       ) ++ card.content.map(c =>
         <div class="content">{
-          c(locale) ++ List(
+          c.distill(locale) ++ List(
             card.footer.map(f =>
               <div class="footer">{
                 List(
-                  f.title.map(t => <h4 class="title">{t(locale)}</h4>),
-                  f.subtitle.map(d => <p class="category">{d(locale)}</p>)
+                  f.title.map(t => <h4 class="title">{t.distill(locale)}</h4>),
+                  f.subtitle.map(d => <p class="category">{d.distill(locale)}</p>)
                 ).flatten
               }</div>
             )
@@ -216,14 +217,14 @@ trait RendererCardPart { self: Renderer =>
   protected def card_table(card: Card): Elem = {
     def render = {
       def tl(p: TitleLine): Vector[Node] = Vector(
-        p.title.map(x => <h3>{x(locale)}</h3>),
-        p.subtitle.map(x => <p>{x(locale)}</p>)
+        p.title.map(x => <h3>{x.distill(locale)}</h3>),
+        p.subtitle.map(x => <p>{x.distill(locale)}</p>)
       ).flatten
       <table> {
         Vector(
           card.image_top.toVector.flatMap(picture).map(x => <tr><td>{x}</td></tr>), // XXX css
           card.header.toVector.flatMap(tl).map(x => <tr><td>{x}</td></tr>), // XXX css
-          card.summary.toVector.flatMap(_(locale)).map(x => <tr><td>{x}</td></tr>), // XXX css
+          card.summary.toVector.flatMap(_.distill(locale)).map(x => <tr><td>{x}</td></tr>), // XXX css
           card.footer.toVector.flatMap(tl).map(x => <tr><td>{x}</td></tr>)
         ).flatten // XXX css
       }</table>
@@ -253,14 +254,14 @@ trait RendererCardPart { self: Renderer =>
     }
     def render = {
       def tl(p: TitleLine): Vector[Node] = Vector(
-        p.title.map(x => <h3>{x(locale)}</h3>),
-        p.subtitle.map(x => <p>{x(locale)}</p>)
+        p.title.map(x => <h3>{x.distill(locale)}</h3>),
+        p.subtitle.map(x => <p>{x.distill(locale)}</p>)
       ).flatten
       <div class={theme_card.css.div.card}> {
         Vector(
           card.image_top.toVector.flatMap(f).map(x => <div class={theme_card.css.div.imageTop}>{x}</div>),
           card.header.toVector.flatMap(tl).map(x => <div class={theme_card.css.div.header}>{x}</div>),
-          card.content.toVector.flatMap(_(locale)).map(x => <div class={theme_card.css.div.content}>{x}</div>),
+          card.content.toVector.flatMap(_.distill(locale)).map(x => <div class={theme_card.css.div.content}>{x}</div>),
           card.footer.toVector.flatMap(tl).map(x => <div class={theme_card.css.div.footer}>{x}</div>)
         ).flatten
       }</div>
@@ -307,8 +308,8 @@ trait RendererCardPart { self: Renderer =>
     val i = p.image_top.map(img)
     val b = <div class="media-body">{
       xmlutils.childrenOption(
-        p.header.flatMap(_.title.map(x => <h5 class="mt-0 text-trunate">{x(locale)}</h5>)),
-        p.summary.map(x => <div class="text-trunate">{x(locale)}</div>)
+        p.header.flatMap(_.title.map(x => <h5 class="mt-0 text-trunate">{x.distill(locale)}</h5>)),
+        p.summary.map(x => <div class="text-trunate">{x.distill(locale)}</div>)
       )
     }</div>
     Group(i.toVector ++ Vector(b))

@@ -44,7 +44,8 @@ import arcadia.model.{Model, ErrorModel}
  *  version Dec. 28, 2023
  *  version Mar. 29, 2025
  *  version Apr.  3, 2025
- * @version Jun. 30, 2025
+ *  version Jun. 30, 2025
+ * @version Jul.  4, 2025
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -592,6 +593,11 @@ object ViewEngine {
     def get(key: String): Option[AnyRef] = bindings.get(key)
 
     def javaMap: java.util.Map[String, Object] = bindings.asJava
+
+    def toMapWithPrefix(prefix: String): Map[String, AnyRef] =
+      bindings.map {
+        case (k, v) => s"${prefix}.${k}" -> v
+      }
 
     def update(p: Bindings): Bindings = Bindings(bindings ++ p.bindings)
   }
