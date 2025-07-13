@@ -54,7 +54,7 @@ import arcadia.domain.DomainModelSpace
  *  version Mar. 30, 2025
  *  version Apr.  4, 2025
  *  version Jun. 14, 2025
- * @version Jul.  1, 2025
+ * @version Jul.  9, 2025
  * @author  ASAMI, Tomoharu
  */
 case class WebApplication(
@@ -99,7 +99,8 @@ object WebApplication {
     textSuffixes = Set("dox", "md", "markdown", "org", "html", "jade", "pub", "ssp", "scaml", "mustache"),
     binarySuffixes = Set(
       "png", "jpg", "jpeg", "gif", "apng", "webp", "svg", "avif", "css", "js",
-      "woff2", "woff", "ttf", "eof"
+      "woff2", "woff", "ttf", "eof",
+      "ico", "webmanifest"
     )
   )
 

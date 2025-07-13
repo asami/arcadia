@@ -40,7 +40,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version May.  4, 2022
  *  version Mar. 28, 2025
  *  version Apr.  2, 2025
- * @version Jun. 30, 2025
+ *  version Jun. 30, 2025
+ * @version Jul.  9, 2025
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -458,7 +459,9 @@ case object FootDefTag extends Tag with SelectByName {
   val name = "foot-def"
 
   protected def eval_Expression(p: Expression): XmlContent = {
-    XmlContent(p.viewModel.footDef(p.getLayoutDirective))
+    val t = p.viewModel.footDef(p.getLayoutDirective)
+//    println(s"footDef: $t")
+    XmlContent(t)
   }
 }
 
