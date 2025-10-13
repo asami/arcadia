@@ -41,7 +41,8 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Mar. 28, 2025
  *  version Apr.  2, 2025
  *  version Jun. 30, 2025
- * @version Jul.  9, 2025
+ *  version Jul.  9, 2025
+ * @version Oct. 12, 2025
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -494,6 +495,14 @@ case object NavigationTag extends Tag with SelectByName {
 
   protected def eval_Expression(p: Expression): XmlContent = {
     XmlContent(p.viewModel.navigation(p.getLayoutDirective))
+  }
+}
+
+case object AnnouncementTag extends Tag with SelectByName {
+  val name = "announcement"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    XmlContent(p.viewModel.announcement(p.getLayoutDirective))
   }
 }
 

@@ -33,7 +33,8 @@ import arcadia.model.{Model, ErrorModel, EmptyModel}
  *  version Mar. 21, 2025
  *  version Apr.  2, 2025
  *  version Jun. 30, 2025
- * @version Jul.  3, 2025
+ *  version Jul.  3, 2025
+ * @version Oct. 12, 2025
  * @author  ASAMI, Tomoharu
  */
 class TagEngine(
@@ -172,6 +173,7 @@ object Tags {
     FooterTag,
     SidebarTag,
     NavigationTag,
+    AnnouncementTag,
     ContentHeaderTag,
     ContentMainTag,
     PageTitleTag,

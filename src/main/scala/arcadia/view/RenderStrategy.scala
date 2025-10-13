@@ -49,7 +49,8 @@ import arcadia.view.ViewEngine._
  *  version Dec. 28, 2023
  *  version Apr.  2, 2025
  *  version Jun. 30, 2025
- * @version Jul.  1, 2025
+ *  version Jul.  1, 2025
+ * @version Oct. 12, 2025
  * @author  ASAMI, Tomoharu
  */
 case class RenderStrategy(
@@ -1081,6 +1082,7 @@ object PartialKind extends EnumerationClass[PartialKind] {
     HeaderPartial,
     FooterPartial,
     NavigationPartial,
+    AnnouncementPartial,
     SidebarPartial,
     ContentHeaderPartial,
     ContentPartial
@@ -1100,6 +1102,9 @@ case object FooterPartial extends PartialKind {
 }
 case object NavigationPartial extends PartialKind {
   val name = "navigation"
+}
+case object AnnouncementPartial extends PartialKind {
+  val name = "announcement"
 }
 case object SidebarPartial extends PartialKind {
   val name = "sidebar"
@@ -1150,6 +1155,9 @@ case class Partials(
   def navigation(l: LayoutDirective): Option[PartialView] = get(l, NavigationPartial)
   def navigation(l: LayoutKind): Option[PartialView] = get(l, NavigationPartial)
   def navigation(l: Option[LayoutKind]): Option[PartialView] = get(l, NavigationPartial)
+  def announcement(l: LayoutDirective): Option[PartialView] = get(l, AnnouncementPartial)
+  def announcement(l: LayoutKind): Option[PartialView] = get(l, AnnouncementPartial)
+  def announcement(l: Option[LayoutKind]): Option[PartialView] = get(l, AnnouncementPartial)
   def sidebar(l: LayoutDirective): Option[PartialView] = get(l, SidebarPartial)
   def sidebar(l: LayoutKind): Option[PartialView] = get(l, SidebarPartial)
   def sidebar(l: Option[LayoutKind]): Option[PartialView] = get(l, SidebarPartial)

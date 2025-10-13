@@ -23,7 +23,8 @@ import arcadia.view.ViewEngine.LayoutDirective
  *  version Jun. 26, 2022
  *  version Mar. 28, 2025
  *  version Apr.  4, 2025
- * @version Jun. 30, 2025
+ *  version Jun. 30, 2025
+ * @version Oct. 12, 2025
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -106,6 +107,9 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   def navigation(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.navigation(l))
   def navigation(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.navigation(l))
   def navigationContent: NodeSeq = strategy.theme.navigation.content(this)
+  def announcement(l: LayoutDirective): NodeSeq = _render_partial(strategy.partials.announcement(l))
+  def announcement(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.announcement(l))
+  def announcement(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.announcement(l))
   def contentHeader(l: LayoutDirective): NodeSeq = _render_partial(strategy.partials.contentHeader(l))
   def contentHeader(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.contentHeader(l))
   def contentHeader(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.contentHeader(l))
