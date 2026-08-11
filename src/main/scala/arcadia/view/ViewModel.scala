@@ -116,9 +116,9 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
   def content(l: LayoutDirective): NodeSeq = _render_partial(strategy.partials.content(l), contentContent)
   def content(l: LayoutKind): NodeSeq = _render_partial(strategy.partials.content(l), contentContent)
   def content(l: Option[LayoutKind]): NodeSeq = _render_partial(strategy.partials.content(l), contentContent)
-  def contentContent: NodeSeq = main
+  def contentContent: NodeSeq = _main
 
-  private def main: NodeSeq = contentDocument.headOption.
+  private def _main: NodeSeq = contentDocument.headOption.
     flatMap(_to_body_content).
     getOrElse(contentDocument)
 
