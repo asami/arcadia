@@ -1,11 +1,11 @@
 package arcadia.view
 
 import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-import org.scalatest._
+import org.scalatest.GivenWhenThen
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.junit.JUnitRunner
 import java.net.URI
-import org.goldenport.i18n.{I18NString, I18NElement}
-import org.goldenport.record.v2.Column
 import arcadia.context._
 import arcadia.view.Renderer.TableOrder.Paging
 import arcadia.view.Renderer.TableOrder.Paging.Navigation
@@ -14,95 +14,114 @@ import arcadia.view.Renderer.TableOrder.Paging.Navigation._
 /*
  * @since   Oct. 29, 2023
  *  version Oct. 31, 2023
- * @version Nov.  4, 2023
+ * @version Aug. 11, 2026
  * @author  ASAMI, Tomoharu
  */
 @RunWith(classOf[JUnitRunner])
-class RendererTableOrderPagingSpec extends WordSpec with Matchers with GivenWhenThen {
-  val uri = new URI("http://example.com")
-  val windowSize = 10
+class RendererTableOrderPagingSpec extends AnyWordSpec with Matchers with GivenWhenThen {
+  private val _uri = new URI("http://example.com")
+  private val _window_size = 10
 
-  def paging(
+  private def _paging(
     offset: Int,
-    pageSize: Int,
-    totalSize: Int
-  ) = Paging(uri, offset, pageSize, windowSize, Some(totalSize))
+    pagesize: Int,
+    totalsize: Int
+  ) = Paging(_uri, offset, pagesize, _window_size, Some(totalsize))
 
-  private def _uri(offset: Int, limit: Int) = s"${uri}?offset=$offset&limit=$limit"
+  private def _uri_string(offset: Int, limit: Int) = s"${_uri}?offset=$offset&limit=$limit"
 
   private def _location(offset: Int, limit: Int) =
-    Location(_uri(offset, limit), offset, limit)
-
-  private def _navigation_empty() = {
-    val prev = None
-    val next = None
-    val slots = Nil
-    Navigation(prev, next, slots)
-  }
-
-  case class Builder(start: Int, limit: Int, total: Int) {
-    def build(): List[Slot] =
-      _build(_page_number(start), start, Vector.empty).toList
-
-    private def _page_number(offset: Int) = offset / limit
-
-    @annotation.tailrec
-    private def _build(number: Int, index: Int, xs: Vector[Slot]): Vector[Slot] =
-      if (index >= total || number >= windowSize)
-        xs
-      else
-        _build(number + 1, index + limit, xs = xs :+ Slot(number, _location(index, limit)))
-  }
-
-  def navigation(offset: Int, limit: Int, total: Int) = {
-    val slots = Builder(offset, limit, total).build()
-    val prev = slots.headOption match {
-      case Some(s) =>
-        if (s.location.offset == 0) {
-          None
-        } else {
-          val a = math.max(0, offset - (limit * windowSize))
-          Some(Prev(_location(a, limit)))
-        }
-      case None => None
-    }
-    val next = slots.lastOption match {
-      case Some(s) =>
-        // println(s"a: ${s.location.offset}")
-        // println(s"a: ${limit}")
-        // println(s"a: ${s.location.offset + limit}")
-        // println(s"b: ${total}")
-        if (s.location.offset + limit < total)
-          Some(Next(_location(offset + (limit * windowSize), limit)))
-        else
-          None
-      case None => None
-    }
-    Navigation(prev, next, slots)
-  }
+    Location(_uri_string(offset, limit), offset, limit)
 
   "RendererTableOrderPaging" should {
     "typical" which {
-      "paging" in {
-        val pg = paging(0, 20, 100)
+      "calculate the first result window" in {
+        Given("a first page with five twenty-item slots")
+        val pg = _paging(0, 20, 100)
+
+        When("the paging navigation is calculated")
         val nav = pg.navigation
-        nav should be(navigation(0, 20, 100))
+
+        Then("the navigation matches the first-page window")
+        nav should be(Navigation(
+          None,
+          None,
+          List(
+            Slot(0, _location(0, 20)),
+            Slot(1, _location(20, 20)),
+            Slot(2, _location(40, 20)),
+            Slot(3, _location(60, 20)),
+            Slot(4, _location(80, 20))
+          )
+        ))
       }
-      "paging2" in {
-        val pg = paging(0, 20, 200)
+      "omit the next-window link at the exact-window boundary" in {
+        Given("a first page with exactly ten twenty-item slots")
+        val pg = _paging(0, 20, 200)
+
+        When("the paging navigation is calculated")
         val nav = pg.navigation
-        nav should be(navigation(0, 20, 200))
+
+        Then("the navigation has no next-window link")
+        nav should be(Navigation(
+          None,
+          None,
+          List(
+            Slot(0, _location(0, 20)),
+            Slot(1, _location(20, 20)),
+            Slot(2, _location(40, 20)),
+            Slot(3, _location(60, 20)),
+            Slot(4, _location(80, 20)),
+            Slot(5, _location(100, 20)),
+            Slot(6, _location(120, 20)),
+            Slot(7, _location(140, 20)),
+            Slot(8, _location(160, 20)),
+            Slot(9, _location(180, 20))
+          )
+        ))
       }
-      "paging3" in {
-        val pg = paging(0, 20, 300)
+      "retain the first window for several result windows" in {
+        Given("a first page with results spanning several windows")
+        val pg = _paging(0, 20, 300)
+
+        When("the paging navigation is calculated")
         val nav = pg.navigation
-        nav should be(navigation(0, 20, 300))
+
+        Then("the navigation matches the first window")
+        nav should be(Navigation(
+          None,
+          Some(Next(_location(200, 20))),
+          List(
+            Slot(0, _location(0, 20)),
+            Slot(1, _location(20, 20)),
+            Slot(2, _location(40, 20)),
+            Slot(3, _location(60, 20)),
+            Slot(4, _location(80, 20)),
+            Slot(5, _location(100, 20)),
+            Slot(6, _location(120, 20)),
+            Slot(7, _location(140, 20)),
+            Slot(8, _location(160, 20)),
+            Slot(9, _location(180, 20))
+          )
+        ))
       }
-      "paging4" in {
-        val pg = paging(1, 1, 4)
+      "calculate navigation from a nonzero one-item offset" in {
+        Given("a one-item page after the initial offset")
+        val pg = _paging(1, 1, 4)
+
+        When("the paging navigation is calculated")
         val nav = pg.navigation
-        println(nav)
-        nav should be(navigation(1, 1, 4))
+
+        Then("the navigation matches the offset page")
+        nav should be(Navigation(
+          Some(Prev(_location(0, 1))),
+          None,
+          List(
+            Slot(1, _location(1, 1)),
+            Slot(2, _location(2, 1)),
+            Slot(3, _location(3, 1))
+          )
+        ))
       }
     }
   }

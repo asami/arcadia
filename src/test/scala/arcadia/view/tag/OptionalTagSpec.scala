@@ -1,8 +1,10 @@
 package arcadia.view.tag
 
 import org.junit.runner.RunWith
-import org.scalatest.{GivenWhenThen, Matchers, WordSpec}
-import org.scalatest.junit.JUnitRunner
+import org.scalatest.GivenWhenThen
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.junit.JUnitRunner
 import scala.xml.XML
 import arcadia.XmlContent
 import arcadia.view.ViewEngine
@@ -14,7 +16,7 @@ import arcadia.view.expression.ExpressionEngine
  * @author  ASAMI, Tomoharu
  */
 @RunWith(classOf[JUnitRunner])
-class OptionalTagSpec extends WordSpec with Matchers with GivenWhenThen {
+class OptionalTagSpec extends AnyWordSpec with Matchers with GivenWhenThen {
   "optional tag" should {
     "render children only for exact nonblank bindings" which {
       "omit the complete subtree when no listed key is present" in {

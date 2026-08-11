@@ -1,11 +1,12 @@
 package arcadia.controller
 
 import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-import org.scalatest._
+import org.scalatest.GivenWhenThen
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.junit.JUnitRunner
 import java.net.URI
 import org.goldenport.i18n.{I18NString, I18NElement}
-import org.goldenport.record.v2.Column
 import arcadia.context._
 import arcadia.domain.DomainEntityType
 
@@ -16,20 +17,26 @@ import arcadia.domain.DomainEntityType
  *  version Jan. 22, 2018
  *  version Mar. 14, 2018
  *  version May.  8, 2019
- * @version Oct. 29, 2023
+ * @version Aug. 11, 2026
  * @author  ASAMI, Tomoharu
  */
 @RunWith(classOf[JUnitRunner])
-class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
+class ActionSpec extends AnyWordSpec with Matchers with GivenWhenThen {
   "action" should {
     "typical" which {
       "carousel" in {
+        Given("a carousel action rule with a source and sink")
         val rule = """{
   "action": "carousel",
   "source": "urn:prefer:free:/web/carousel",
   "sink": "carousel"
 }"""
-        Action.parseActionList(rule) should be(List(
+
+        When("the action rule is parsed")
+        val actions = Action.parseActionList(rule)
+
+        Then("a carousel action preserves its source and sink")
+        actions should be(List(
           CarouselAction(
             Some(UrnSource("urn:prefer:free:/web/carousel")),
             Some(ModelHangerSink("carousel"))
@@ -37,12 +44,18 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
         ))
       }
       "notice" in {
+        Given("a notice action rule with a source and sink")
         val rule = """{
   "action": "notice",
   "source": "urn:prefer:free:/web/notice",
   "sink": "notice"
 }"""
-        Action.parseActionList(rule) should be(List(
+
+        When("the action rule is parsed")
+        val actions = Action.parseActionList(rule)
+
+        Then("a notice action preserves its source and sink")
+        actions should be(List(
           NoticeAction(
             Some(UrnSource("urn:prefer:free:/web/notice")),
             Some(ModelHangerSink("notice"))
@@ -50,12 +63,18 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
         ))
       }
       "content" in {
+        Given("a content action rule with a source and sink")
         val rule = """{
   "action": "content",
   "source": "urn:prefer:free:/web/catchphrase",
   "sink": "catchphrase"
 }"""
-        Action.parseActionList(rule) should be(List(
+
+        When("the action rule is parsed")
+        val actions = Action.parseActionList(rule)
+
+        Then("a content action preserves its source and sink")
+        actions should be(List(
           ContentAction(
             Some(UrnSource("urn:prefer:free:/web/catchphrase")),
             Some(ModelHangerSink("catchphrase"))
@@ -63,13 +82,19 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
         ))
       }
       "read-entity-list" in {
+        Given("a read-entity-list action rule with an entity, source, and sink")
         val rule = """{
   "action": "read-entity-list",
-  "entity": "productclass",
+  "entity": {"name": "productclass"},
   "source": "urn:prefer:free:/web/recommended_products",
   "sink": "recommended_products"
 }"""
-        Action.parseActionList(rule) should be(List(
+
+        When("the action rule is parsed")
+        val actions = Action.parseActionList(rule)
+
+        Then("the entity, source, and sink are preserved")
+        actions should be(List(
           ReadEntityListAction(
             DomainEntityType("productclass"),
             None,
@@ -81,6 +106,7 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
         ))
       }
       "list" in {
+        Given("a rule containing the supported action variants")
         val rule = """[{
   "action": "carousel",
   "source": "urn:prefer:free:/web/carousel",
@@ -91,19 +117,19 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
   "sink": "banner_brands"
 },{
   "action": "read-entity-list",
-  "entity": "productclass",
+  "entity": {"name": "productclass"},
   "source": "urn:prefer:free:/web/recommended_products",
   "sink": "recommended_products"
 },{
   "action": "read-entity-list",
-  "entity": "productclass",
+  "entity": {"name": "productclass"},
   "query": {
     "limit": "20"
   },
   "sink": "ranking"
 },{
   "action": "read-entity-list",
-  "entity": "article",
+  "entity": {"name": "article"},
   "query": {
     "limit": "20"
   },
@@ -114,7 +140,7 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
   "sink": "banner1"
 },{
   "action": "read-entity-list",
-  "entity": "campaign",
+  "entity": {"name": "campaign"},
   "query": {
     "limit": "20"
   },
@@ -140,7 +166,12 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
   "sink": "catchphrase"
 }]
 """
-        Action.parseActionList(rule) should be(List(
+
+        When("the action list is parsed")
+        val actions = Action.parseActionList(rule)
+
+        Then("each action variant preserves its configured semantics")
+        actions should be(List(
           CarouselAction(
             Some(UrnSource("urn:prefer:free:/web/carousel")),
             Some(ModelHangerSink("carousel"))
@@ -206,6 +237,7 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
         ))
       }
       "directive" in {
+        Given("an invoke-directive rule with URI, title, parameter, and sink")
         val rule = """{
   "action": "invoke-directive",
   "sink": "rcauser",
@@ -216,7 +248,12 @@ class ActionSpec extends WordSpec with Matchers with GivenWhenThen {
     "placeholder": "User ID/Access Token"
   }]
 }"""
-        Action.parseActionList(rule) should be(List(
+
+        When("the directive action rule is parsed")
+        val actions = Action.parseActionList(rule)
+
+        Then("the directive action preserves its configured semantics")
+        actions should be(List(
           InvokeDirectiveAction(
             new URI("/rca/user"),
             None,

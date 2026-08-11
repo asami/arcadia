@@ -2,7 +2,7 @@ organization := "org.goldenport"
 
 name := "arcadia"
 
-version := "1.0.2"
+version := "1.0.3-SNAPSHOT"
 
 scalaVersion := "2.12.18"
 // crossScalaVersions := Seq("2.10.39.2", "2.9.1")
@@ -46,11 +46,13 @@ libraryDependencies += "org.scalatra.scalate" %% "scalate-core" % "1.10.1"
 
 libraryDependencies += "org.scalatra.scalate" %% "scalamd" % "1.8.0"
 
-libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % "test"
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19" % "test"
+
+libraryDependencies += "org.scalatestplus" %% "junit-4-13" % "3.2.19.0" % "test"
 
 libraryDependencies += "de.neuland-bfi" % "pug4j" % "2.3.1"
 
-libraryDependencies += "junit" % "junit" % "4.10" % "test"
+libraryDependencies += "junit" % "junit" % "4.13.2" % "test"
 
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-xml" % "2.1.0",
