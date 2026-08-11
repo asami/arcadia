@@ -42,7 +42,7 @@ import arcadia.controller.Controller.PROP_REDIRECT
  *  version Apr.  2, 2025
  *  version Jun. 30, 2025
  *  version Jul.  9, 2025
- * @version Oct. 12, 2025
+ * @version Aug. 11, 2026
  * @author  ASAMI, Tomoharu
  */
 trait Tag {
@@ -216,6 +216,26 @@ case object ContentTag extends Tag with SelectByName {
 
   protected def eval_Expression(p: Expression): XmlContent = {
     XmlContent(p.viewModel.content(p.getLayoutDirective))
+  }
+}
+
+case object OptionalTag extends Tag with SelectByName {
+  val name = "optional"
+
+  protected def eval_Expression(p: Expression): XmlContent = {
+    val keys = p.getStringList("binding") match {
+      case Some(xs) if xs.nonEmpty => xs
+      case _ => RAISE.missingPropertyFault("binding")
+    }
+    val isPresent = keys.exists { key =>
+      p.bindings.get(key).exists { value =>
+        value != null && !Strings.blankp(value.toString)
+      }
+    }
+    if (isPresent)
+      XmlContent(p.children)
+    else
+      XmlContent.empty
   }
 }
 

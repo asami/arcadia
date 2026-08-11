@@ -24,7 +24,7 @@ import arcadia.view.ViewEngine.LayoutDirective
  *  version Mar. 28, 2025
  *  version Apr.  4, 2025
  *  version Jun. 30, 2025
- * @version Oct. 12, 2025
+ * @version Aug. 11, 2026
  * @author  ASAMI, Tomoharu
  */
 case class ViewModel(model: Model, strategy: RenderStrategy) {
@@ -324,12 +324,18 @@ case class ViewModel(model: Model, strategy: RenderStrategy) {
       case _ => false
     }
 
+  lazy val pageLocale: String = _pathname.flatMap { x =>
+    val pn = PathName(x)
+    if (_in_locale(pn)) Some(pn.head) else None
+  }.getOrElse(locale.getLanguage)
+
   /*
    * Properties for template engine
    */
   def bindings: Map[String, AnyRef] = Map(
     "home" -> home,
     "home_locale" -> homeLocale,
+    "page_locale" -> pageLocale,
     "assets" -> assets,
     "body_class_name" -> bodyClassName,
     "page_header_style" -> pageHeaderStyle,
