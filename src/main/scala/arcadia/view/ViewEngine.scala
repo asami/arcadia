@@ -45,7 +45,8 @@ import arcadia.model.{Model, ErrorModel}
  *  version Mar. 29, 2025
  *  version Apr.  3, 2025
  *  version Jun. 30, 2025
- * @version Jul.  4, 2025
+ *  version Jul.  4, 2025
+ * @version Aug. 15, 2026
  * @author  ASAMI, Tomoharu
  */
 class ViewEngine(
@@ -225,11 +226,13 @@ class ViewEngine(
       val t = p.getTheme orElse theme getOrElse PlainTheme
       // val style = "MM" // TODO
       // val f = FormatterContext.createStyle(style)
-      val f = p.context.fold(FormatterContext.default)(x => FormatterContext.create(x))
-      (p.render getOrElse PlainHtml).
+      val strategy = p.render getOrElse {
+        val f = p.context.fold(FormatterContext.default)(x => FormatterContext.create(x))
+        PlainHtml.withFormatter(f)
+      }
+      strategy.
         withThemeComponentsPartials(t, Components(components), partials).
-        withDataSet(dataset).
-        withFormatter(f)
+        withDataSet(dataset)
     }
     val parcel = p.withRenderStrategy(render)
     _apply_option_recursive(parcel)
@@ -249,10 +252,10 @@ class ViewEngine(
         //     m.apply(render)
         //   }
         // }
-        def f(m: Model): Content = getLayout(parcel).
+        def _apply_model_(m: Model): Content = getLayout(parcel).
           map(_.apply(this, parcel)).
           getOrElse(m.apply(_render_))
-        parcel.getEffectiveModel.map(f).
+        parcel.getEffectiveModel.map(_apply_model_).
           orElse(
             if (is_spa_redirect(parcel))
               rule.
@@ -264,7 +267,7 @@ class ViewEngine(
           )
       }
     } { content =>
-      def go = {
+      def _apply_layout_ = {
         val candidates = getLayoutCandidates(parcel)
         val page = getLayout(parcel, candidates).getOrElse(content)
         // val page = getLayout(parcel).getOrElse(content)
@@ -276,10 +279,10 @@ class ViewEngine(
             m.apply(this, parcel) match {
               case m: BinaryContent => Some(m)
               case m: StringContent => Some(m) // TODO layout
-              case _ => go
+              case _ => _apply_layout_
             }
           }
-        case _ => go
+        case _ => _apply_layout_
       }
       // val a: Option[Content] = content match {
       //   case m: MaterialView => m.getControlContent(parcel)
@@ -332,9 +335,9 @@ class ViewEngine(
   def error(p: Parcel, code: Int): Content = error(p, ErrorModel.create(p, code))
   def error(p: Parcel, e: Throwable): Content = error(p, ErrorModel.create(p, 503, e))
   def error(p: Parcel, m: ErrorModel): Content = { // TODO layout
-    def name(code: Int) = s"error/${code}"
-    def default = "error/default"
-    (pages.get(name(m.code)) orElse pages.get(default)).map { x =>
+    def _error_name_(code: Int) = s"error/${code}"
+    def _default_error_name_ = "error/default"
+    (pages.get(_error_name_(m.code)) orElse pages.get(_default_error_name_)).map { x =>
       // val page = getLayout(parcel).getOrElse(content)
       val page = x
       page.apply(this, p.withModel(m).withView(x)).withCode(m.code)
@@ -423,12 +426,12 @@ object ViewEngine {
     )
 
     def getLayoutKind(parcel: Parcel): Option[LayoutKind] = {
-      def bymodel = parcel.model.flatMap {
+      def _by_model_ = parcel.model.flatMap {
         case m: ErrorModel => Some(ErrorLayout)
         case _ => None
       }
-      def byoperation = parcel.getOperationName.flatMap(_operation_kind.get)
-      bymodel orElse byoperation
+      def _by_operation_ = parcel.getOperationName.flatMap(_operation_kind.get)
+      _by_model_ orElse _by_operation_
     }
 
     def getLayout(kind: LayoutKind): Option[LayoutView] = layouts.get(kind)
@@ -467,9 +470,9 @@ object ViewEngine {
       val components = Components.empty
       val tags = Tags.empty
       val dataset = DataSet.empty
-      val singlePageApplication = None
-      val baseDir = None
-      Rule(theme, slots, layouts, partials, pages, components, tags, dataset, singlePageApplication, baseDir)
+      val singlepageapplication = None
+      val basedir = None
+      Rule(theme, slots, layouts, partials, pages, components, tags, dataset, singlepageapplication, basedir)
     }
 
     def create(
