@@ -4,6 +4,7 @@ gen
 lib_managed
 lib
 *.bak
+maven-local
 target
 .*
 boot

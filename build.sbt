@@ -2,7 +2,7 @@ organization := "org.goldenport"
 
 name := "arcadia"
 
-version := "1.0.3-SNAPSHOT"
+version := "1.0.3"
 
 scalaVersion := "2.12.18"
 // crossScalaVersions := Seq("2.10.39.2", "2.9.1")
@@ -13,7 +13,7 @@ scalacOptions += "-unchecked"
 
 scalacOptions += "-feature"
 
-javacOptions ++= Seq("--release", "21")
+javacOptions ++= Seq("--release", "17")
 
 // javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 
@@ -78,10 +78,11 @@ exportClasspath := {
 
 Compile / mainClass := Some("arcadia.standalone.Standalone")
 
-publishTo := Some(
-  "GitHub Packages" at "https://maven.pkg.github.com/asami/maven-repository"
-)
-
-credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
+publishTo := {
+  val repo = sys.env.get("SIMPLEMODELING_MAVEN_LOCAL")
+    .map(file)
+    .getOrElse(baseDirectory.value / "maven-local")
+  Some(Resolver.file("local-simplemodeling-maven", repo))
+}
 
 publishMavenStyle := true
